@@ -1,0 +1,9 @@
+node_modules
+*.tar
+*.tar.gz
+.git
+.env
+*.md
+deploy.sh
+migrate-*.py
+sanwd-k8s.yaml

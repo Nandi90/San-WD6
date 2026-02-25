@@ -1,0 +1,106 @@
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: sanwd
+  labels:
+    app: sanwd
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: sanwd-secrets
+  namespace: sanwd
+type: Opaque
+stringData:
+  SESSION_SECRET: "35b955c6a0749365ab74f957d8f14c1d76589cf2fa9d3fce1beb3940f9fd8228"
+  NEXTCLOUD_URL: "https://office.brk-sob.de"
+  NEXTCLOUD_USER: "sanwd-service"
+  NEXTCLOUD_PASSWORD: "Y6mRH-p7akb-2DPXr-rjT69-XMbyd"
+  NEXTCLOUD_BASE_PATH: "/SanWD"
+  OIDC_ISSUER: "https://auth.brk-sob.de/realms/brk"
+  OIDC_CLIENT_ID: "sanwd-app"
+  OIDC_CLIENT_SECRET: "puqmsK7Aqf1UHKPbQw9iUtqaTApGb0nt"
+  OIDC_REDIRECT_URI: "https://sanwd.brkndsob.org/auth/callback"
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: sanwd-data
+  namespace: sanwd
+spec:
+  accessModes: [ReadWriteOnce]
+  storageClassName: longhorn
+  resources:
+    requests:
+      storage: 5Gi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: sanwd-app
+  namespace: sanwd
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: sanwd-app
+  template:
+    metadata:
+      labels:
+        app: sanwd-app
+    spec:
+      nodeName: k8s-master-01
+      containers:
+        - name: sanwd
+          image: sanwd-app:v65
+          imagePullPolicy: Never
+          ports:
+            - containerPort: 3000
+          env:
+            - name: NODE_ENV
+              value: "production"
+            - name: PORT
+              value: "3000"
+            - name: DATABASE_PATH
+              value: "/data/sanwd.db"
+            - name: APP_URL
+              value: "https://sanwd.brkndsob.org"
+          envFrom:
+            - secretRef:
+                name: sanwd-secrets
+          volumeMounts:
+            - name: data
+              mountPath: /data
+          resources:
+            requests: { memory: "256Mi", cpu: "100m" }
+            limits: { memory: "512Mi", cpu: "500m" }
+          livenessProbe:
+            httpGet: { path: /api/health, port: 3000 }
+            initialDelaySeconds: 10
+            periodSeconds: 30
+          readinessProbe:
+            httpGet: { path: /api/health, port: 3000 }
+            initialDelaySeconds: 5
+            periodSeconds: 10
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: sanwd-data
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: sanwd-app
+  namespace: sanwd
+spec:
+  type: NodePort
+  selector:
+    app: sanwd-app
+  ports:
+    - name: http
+      port: 3000
+      targetPort: 3000
+      nodePort: 30092
