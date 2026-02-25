@@ -928,7 +928,7 @@ export default function App(){
 
   const saveKunden=useCallback(async(k)=>{try{for(const kunde of k){await API.saveKunde(kunde);}}catch{}},[]);
 
-  const upsertKunde=useCallback((ev)=>{if(!ev.veranstalter&&!ev.rechnungsempfaenger)return;const name=ev.veranstalter||ev.rechnungsempfaenger;const entry={name,ansprechpartner:ev.ansprechpartner||"",telefon:ev.telefon||"",email:ev.email||"",rechnungsempfaenger:ev.rechnungsempfaenger||"",reStrasse:ev.reStrasse||"",rePlzOrt:ev.rePlzOrt||"",anrede:ev.anrede||"Sehr geehrte Damen und Herren,"};setKunden(prev=>{const idx=prev.findIndex(k=>k.name===name);const next=idx>=0?prev.map((k,i)=>i===idx?entry:k):[...prev,entry];saveKunden(next);return next;});},[saveKunden]);
+  const upsertKunde=useCallback((ev)=>{if(!ev.veranstalter&&!ev.rechnungsempfaenger)return;const name=ev.veranstalter||ev.rechnungsempfaenger;const entry={name,ansprechpartner:ev.ansprechpartner||"",telefon:ev.telefon||"",email:ev.email||"",rechnungsempfaenger:ev.rechnungsempfaenger||"",reStrasse:ev.reStrasse||"",rePlzOrt:ev.rePlzOrt||"",anrede:ev.anrede||"Sehr geehrte Damen und Herren,"};API.saveKunde(entry).catch(()=>{});setKunden(prev=>{const idx=prev.findIndex(k=>k.name===name);return idx>=0?prev.map((k,i)=>i===idx?entry:k):[...prev,entry];});},[]);
 
   useEffect(()=>{if(!user)return;(async()=>{try{const c=await API.getCounter(year);setLaufendeNr(c.nextNr||1);}catch{}})();},[user,storagePrefix]);
 
@@ -951,21 +951,11 @@ export default function App(){
   useEffect(()=>{if(!user||!currentEventId||tab==="events")return;const t=setTimeout(saveEvent,2000);return()=>clearTimeout(t);},[event,days,currentEventId,user,tab,saveEvent]);
 
 
-  // Lock heartbeat (v6.1: 30s interval, 60s timeout)
-  useEffect(()=>{
-    if(!user||!currentEventId||tab==="events")return;
-    let hb=null;
-    const doLock=async()=>{try{const r=await API.lockVorgang(currentEventId);if(r){setLockInfo({locked:true,lockedBy:r.by||r.lockedBy||user?.name,lockedAt:r.lockedAt||new Date().toISOString(),isOwner:true});}}catch(e){if(e?.response?.status===423){const d=typeof e.response.json==='function'?await e.response.json():e;setLockInfo({locked:true,lockedBy:d.lockedBy||"anderer Benutzer",lockedAt:d.lockedSince||null,isOwner:false});}}};
-    const checkLock=async()=>{try{const r=await API.getLockStatus(currentEventId);setLockInfo(r||null);}catch{}};
-    doLock();hb=setInterval(doLock,30000);
-    return()=>{clearInterval(hb);if(currentEventId)API.unlockVorgang(currentEventId).catch(()=>{});};
-  },[currentEventId,user,tab]);
-  // Load history + status when event opens
+  // Lock + History (v6.1 - temporarily simplified)
   useEffect(()=>{
     if(!user||!currentEventId)return;
     (async()=>{
       try{const h=await API.getVorgangHistory(currentEventId);setEditHistory(h||[]);}catch{setEditHistory([]);}
-      try{const s=await API.getStatusLog(currentEventId);if(s?.status)setVorgangStatus(s.status);else setVorgangStatus(null);}catch{setVorgangStatus(null);}
     })();
   },[currentEventId,user]);
   const updateEvent=useCallback((k,v)=>setEvent(p=>({...p,[k]:v})),[]);
