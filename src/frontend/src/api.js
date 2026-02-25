@@ -70,7 +70,7 @@ const API = {
 
   // ── Vorgänge ─────────────────────────────────────────────────
   async getVorgaenge(year, bc) {
-    const q = bc ? `?bc=${bc}` : "";
+    const q = (bc === "" || bc === "ALL") ? "?bc=ALL" : (bc ? `?bc=${bc}` : "");
     return this.json(`/api/vorgaenge/${year}${q}`);
   },
 
@@ -212,6 +212,7 @@ const API = {
   async unlockVorgang(id) { return this.json("/api/vorgaenge/"+id+"/lock",{method:"DELETE"}); },
   async getLockStatus(id) { return this.json("/api/vorgaenge/"+id+"/lock"); },
   async setVorgangStatus(id,status,reason) { return this.json("/api/vorgaenge/"+id+"/status",{method:"POST",body:JSON.stringify({status,reason})}); },
+  async entsperrenVorgang(id, begruendung) { return this.json("/api/vorgaenge/"+id+"/entsperren",{method:"POST",body:JSON.stringify({begruendung})}); },
   async getVorgangHistory(id) { return this.json("/api/vorgaenge/"+id+"/history"); },
   async getStatusLog(id) { return this.json("/api/vorgaenge/"+id+"/status-log"); },
   async getAnfragen() { return this.json("/api/anfragen"); },

@@ -975,6 +975,7 @@ export default function App(){
   const generateNr=useCallback(()=>{const b=BEREITSCHAFTEN[stammdaten.bereitschaftIdx];const yr=String(year).slice(-2);const nr=String(laufendeNr).padStart(3,"0");setEvent(p=>({...p,auftragsnr:`${b.code} ${yr}/${nr}`}));const next=laufendeNr+1;setLaufendeNr(next);if(user)try{API.incrementCounter(year).catch(()=>{});}catch{}},[stammdaten.bereitschaftIdx,laufendeNr,year,user,storagePrefix]);
 
   const saveEvent=useCallback(async()=>{
+  if(event._isVersendet){alert("Vorgang ist versendet und gesperrt. Bitte zuerst entsperren.");return;}
     // Auto-Nummer wenn noch keine gesetzt
     if(!event.auftragsnr){
       const b=BEREITSCHAFTEN[stammdaten.bereitschaftIdx];
@@ -1112,7 +1113,7 @@ export default function App(){
           <StatusBanner angebotVersendet={event?.checklist?.angebotVersendet} onUnlock={async(begruendung)=>{await API.entsperrenVorgang(currentEventId,begruendung);updateEvent("checklist",{...event.checklist,angebotVersendet:false});}}/>
           <div style={{display:"grid",gridTemplateColumns:"2fr 1fr",gap:14}}>
             <div>
-              <Card title="Auftrag" accent={C.rot} sub={event.auftragsnr?`Nr. ${event.auftragsnr}`:"Noch keine Nummer"} action={<div style={{display:"flex",gap:6}}><Btn small onClick={generateNr} icon="🔢">Nr. generieren</Btn><Btn small variant="success" onClick={saveEvent} icon="💾">Speichern</Btn></div>}>
+              <Card title="Auftrag" accent={C.rot} sub={event.auftragsnr?`Nr. ${event.auftragsnr}`:"Noch keine Nummer"} action={<div style={{display:"flex",gap:6}}><Btn small onClick={generateNr} icon="🔢">Nr. generieren</Btn><Btn small variant="success" onClick={saveEvent} icon="💾" disabled={event._isVersendet}>Speichern</Btn></div>}>
                 <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:"0 16px"}}>
                   <Sel label="Bereitschaft" value={stammdaten.bereitschaftIdx} onChange={v=>updateStamm("bereitschaftIdx",v)} options={BEREITSCHAFTEN.map((b,i)=>({value:i,label:`${b.code} — ${b.name}`}))}/>
                   <Inp label="Auftragsnummer" value={event.auftragsnr} onChange={v=>updateEvent("auftragsnr",v)} placeholder="Auto-generiert"/>
