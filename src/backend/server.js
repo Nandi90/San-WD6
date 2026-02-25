@@ -391,168 +391,83 @@ function buildVertragHTML(vorgang, stamm, user) {
     ? `<img src="${user.unterschrift || ev.unterschrift}" style="height:45px;width:auto;display:block;margin:0 auto 4px">`
     : `<div style="height:49px"></div>`;
 
-  return `<!DOCTYPE html><html lang="de"><head><meta charset="utf-8"><style>
-    * { box-sizing: border-box; }
-    body { font-family: Arial, sans-serif; font-size: 9.5pt; color: #000; margin: 0; line-height: 1.55; }
+  // Logo: entweder aus DB oder BRK-Standard-Logo als Fallback
+  const logoImg = logoData
+    ? `<img src="${logoData}" style="max-width:200px;max-height:90px;object-fit:contain;" />`
+    : `<img src="https://www.brk-erding.de/images/ueber-uns/BRK-Bereitschaften_1252x626.jpg" style="max-width:200px;max-height:90px;object-fit:contain;" />`;
 
-    /* ── Header ── */
-    .doc-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 10px; padding-bottom: 6px; border-bottom: 2px solid ${ROT}; }
-    .doc-header-left { display: flex; align-items: center; gap: 8px; }
-    .doc-header-org { font-size: 8pt; color: ${DUNKELGRAU}; margin-top: 3px; }
-    .doc-header-right { text-align: right; font-size: 8pt; color: ${DUNKELGRAU}; }
-    .doc-header-right strong { color: #000; }
+  return `<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<style>
+  body { font-family: Arial, sans-serif; font-size: 13px; margin: 0; padding: 20px; color: #000; }
+  table { width: 100%; border-collapse: collapse; }
+  .header-table td { border: 1px solid #000; padding: 8px; vertical-align: middle; text-align: center; }
+  .info-table td { padding: 4px 8px; vertical-align: top; }
+  .sig-box { background: #d3d3d3; border: 1px solid #000; padding: 16px; text-align: center; height: 100%; }
+  hr { border: none; border-top: 2px solid #000; margin: 12px 0; }
+  .bemerkung-box { background: #d3d3d3; border: 1px solid #000; padding: 10px; margin-top: 8px; min-height: 80px; }
+  .freitext-box { border: 1px solid #000; padding: 10px; margin-top: 4px; min-height: 60px; }
+  strong { font-weight: bold; }
+</style>
+</head>
+<body>
+<table class="header-table">
+<tr>
+  <td style="width:33%;">${logoImg}</td>
+  <td style="width:33%;font-size:18px;">
+    <strong>Einsatzprotokoll</strong><br/>
+    <span style="font-size:14px;">${esc(ev.auftragsnr||"")}</span>
+  </td>
+  <td style="width:33%;font-size:13px;">
+    <strong>BRK Kreisverband Neuburg-Schrobenhausen</strong><br/>
+    ${esc(stamm.name||"BRK Bereitschaft")}
+  </td>
+</tr>
+</table>
 
-    /* ── Titel ── */
-    .doc-title { font-size: 11pt; font-weight: bold; text-align: center; color: ${ROT}; margin: 12px 0 4px 0; }
-    .doc-subtitle { font-size: 13pt; font-weight: bold; text-align: center; margin: 0 0 16px 0; }
+<p>&nbsp;</p>
 
-    /* ── Paragraphen ── */
-    .section { font-weight: bold; margin-top: 12px; margin-bottom: 4px; padding-left: 3px; border-left: 3px solid ${ROT}; }
-    .p { margin-bottom: 6px; }
-    .avoid { page-break-inside: avoid; }
-    .break { page-break-before: always; }
-
-    /* ── Tabellen ── */
-    table { width: 100%; border-collapse: collapse; font-size: 9pt; margin-bottom: 6px; }
-    .info-table td { padding: 2px 0; vertical-align: top; }
-    .info-table td:first-child { width: 155px; color: ${DUNKELGRAU}; }
-
-    /* ── Parteien-Blöcke ── */
-    .party-block { background: ${HELLGRAU}; border-left: 3px solid ${ROT}; padding: 8px 10px; margin-bottom: 10px; line-height: 1.65; }
-    .party-label { text-align: right; font-style: italic; color: ${DUNKELGRAU}; font-size: 8.5pt; margin-top: 4px; }
-
-    /* ── Unterschriften ── */
-    .sig-table { width: 100%; margin-top: 24px; border-collapse: collapse; }
-    .sig-cell { width: 45%; text-align: center; vertical-align: bottom; padding: 0 8px; }
-    .sig-line { border-top: 1px solid #000; padding-top: 4px; font-size: 8pt; margin-top: 4px; }
-
-    /* ── Footer-Zeile ── */
-    .doc-footer-line { margin-top: 24px; font-size: 7pt; color: #aaa; text-align: center; border-top: 1px solid #eee; padding-top: 6px; }
-  </style></head><body>
-
-  <!-- Header mit Logo und Auftragsnr -->
-  <div class="doc-header">
-    <div class="doc-header-left">
-      ${logoHtml}
-      <div class="doc-header-org">${kvName}</div>
+<table class="info-table">
+<tr>
+  <td style="width:50%;vertical-align:top;">
+    <p><strong>Kunde:</strong> ${esc(ev.veranstalter||ev.rechnungsempfaenger||"")}, ${esc(ev.ansprechpartner||"")}</p>
+    <p><strong>Veranstaltung:</strong> ${esc(ev.name||"")}</p>
+    <p><strong>Ort:</strong> ${esc(ev.ort||"")}${ev.adresse?", "+esc(ev.adresse):""}</p>
+    <p><strong>Datum:</strong> ${esc(firstDate)}</p>
+    <p><strong>Uhrzeit:</strong> ${esc(timeRange)}</p>
+    <p><strong>Ansprechpartner vor Ort:</strong> ${esc(ev.ansprechpartner||"")}</p>
+    <p><strong>Bekleidung:</strong> Kleiderordnung: Einsatzkleidung nach DBO</p>
+    <p><strong>Helferverpflegung:</strong> ${ev.verpflegung?"kostenfrei durch den Veranstalter":"Selbstverpflegung"}</p>
+  </td>
+  <td style="width:50%;vertical-align:top;">
+    <div class="sig-box">
+      <p><strong>Der Sanitätsdienst wurde korrekt durchgeführt:</strong></p>
+      <p>&nbsp;</p><p>&nbsp;</p><p>&nbsp;</p>
+      <p>________________________________<br/>Unterschrift Veranstalter</p>
     </div>
-    <div class="doc-header-right">
-      Auftragsnr: <strong>${esc(ev.auftragsnr||"—")}</strong>
-    </div>
-  </div>
+  </td>
+</tr>
+</table>
 
-  <!-- Dokumenttitel -->
-  <div class="doc-title">Vereinbarung zur sanitätsdienstlichen Absicherung der Veranstaltung:</div>
-  <div class="doc-subtitle">${esc(ev.name||"[Veranstaltung]")}</div>
+<hr/>
+<p><strong>tatsächliche Ankunftszeit Einsatzort:</strong> ____________</p>
+<p><strong>tatsächliches Ende der Veranstaltung:</strong> ____________</p>
+<p><strong>Einsatzleiter/in:</strong> ${esc(ev.ilsEL||"")}</p>
+<p><strong>Einsatzkräfte:</strong> __________________________________________________</p>
+<hr/>
 
-  <!-- BRK-Partei -->
-  <div style="margin-bottom:6px">Zwischen dem <strong>Bayerischen Roten Kreuz, ${kvName}</strong><br>vertreten durch:</div>
-  <div class="party-block avoid">
-    <strong>${kgf}</strong><br>
-    Kreisgeschäftsführer<br>
-    ${kvAdresse}<br>
-    ${kvPlzOrt}
-    <div class="party-label">- nachstehend "BRK" genannt -</div>
-  </div>
+<p><strong>Fahrzeuge:</strong></p>
+<div class="freitext-box">${esc(ev.bemerkungFahrzeuge||"")}</div>
 
-  <!-- Veranstalter-Partei -->
-  <div style="margin-bottom:6px">und der Firma / Organisation / Verein: <strong>${esc(ev.veranstalter||ev.rechnungsempfaenger||"[Veranstalter]")}</strong><br>vertreten durch:</div>
-  <div class="party-block avoid">
-    <strong>${esc(ev.rechnungsempfaenger||ev.veranstalter||"")}</strong><br>
-    ${esc(ev.reStrasse||"")}<br>
-    ${esc(ev.rePlzOrt||"")}
-    <div class="party-label">- nachstehend "Veranstalter" genannt -</div>
-  </div>
+<p style="margin-top:12px;"><strong>Bemerkungen zum Einsatz:</strong></p>
+<div class="bemerkung-box" style="min-height:120px;">${esc(ev.bemerkung||"")}</div>
 
-  <div class="p">wird folgende Vereinbarung getroffen:</div>
-
-  <!-- §1 -->
-  <div class="avoid">
-    <div class="section">§1 Vertragsgegenstand</div>
-    <div class="p">Der Veranstalter führt die nachfolgende Veranstaltung durch:</div>
-    <table class="info-table"><tbody>
-      <tr><td>Zu betreuende Veranstaltung:</td><td><strong>${esc(ev.name||"")}</strong></td></tr>
-      <tr><td>Veranstaltungsort:</td><td>${esc(ev.ort||"")}${ev.adresse?", "+esc(ev.adresse):""}</td></tr>
-    </tbody></table>
-    <div class="p" style="color:${DUNKELGRAU}">Veranstaltungsdauer:</div>
-    <table><tbody>${dayRows}</tbody></table>
-    <table class="info-table"><tbody>
-      <tr><td>Erwartete Teilnehmer:</td>${besucherCells}</tr>
-      <tr><td>Behördliche Auflagen:</td><td colspan="8">${esc(ev.auflagen||"keine")}</td></tr>
-      <tr><td>Risiken / Pol. Erkenntnisse:</td><td colspan="8">${days.some(d=>d.polizeiRisiko)?"ja":"nein"}</td></tr>
-      <tr><td>Beteiligung Prominenter:</td><td colspan="8">${days.reduce((s,d)=>s+(d.prominente||0),0)}</td></tr>
-    </tbody></table>
-  </div>
-
-  <!-- §2 -->
-  <div class="section">§2 Verpflichtung des BRK</div>
-  <div class="p avoid">1. Das BRK verpflichtet sich, nach Maßgabe dieser Vereinbarung einschließlich Anlagen die vorstehende Veranstaltung sanitätsdienstlich abzusichern. Hierzu stellt das BRK geeignetes Personal und die erforderliche Ausrüstung. Anzahl und Qualifikation des eingesetzten Personals, die erforderliche Ausstattung und Ausrüstung sowie die Bereitstellungszeiten richten sich nach Anlage 1, die Bestandteil dieser Vereinbarung ist.</div>
-  <div class="p avoid">2. Das BRK ist gegenüber den Besuchern der Veranstaltung, die einer sanitätsdienstlichen Betreuung bedürfen (Patienten) verpflichtet, die sanitätsdienstliche Hilfe zu erbringen. Die Patienten haben gegen das BRK einen unmittelbaren Anspruch auf diese Leistungen. Die Leistungen werden vom Veranstalter gem. §5 dieses Vertrages vergütet. Die vorliegende Vereinbarung ist somit ein Vertrag zugunsten Dritter.</div>
-  <div class="p avoid">3. Die medizinische Versorgung und der Transport von Notfallpatienten im Sinne des Art. 2 Abs. 2 BayRDG ist nicht Gegenstand dieser Vereinbarung. Soweit Versorgung und/oder Transport von Notfallpatienten erforderlich ist, wird dies durch die Rettungsleitstelle/Integrierte Leitstelle Ingolstadt gemäß Art. 9 BayRDG erledigt. Das BRK wird zur Erstversorgung der Patienten tätig, bis ein Rettungsmittel des öffentlich-rechtlichen Rettungsdienstes eingetroffen ist.</div>
-  <div class="p avoid">4. Die Verpflichtungen in den Ziffern 1-3 dieses Abschnitts beschränken sich (auch gegenüber dritten) auf eine sanitätsdienstliche Absicherung, die im Regelfall nach billigem Ermessen des BRK auf der Grundlage der mitgeteilten Daten des Veranstalters (§§ 1, 3 Abs. 1) voraussichtlich als angemessen zu erwarten ist. Das BRK behält sich für den Katastrophenfall (auch außerhalb der Veranstaltung) nach dem BayKSG vor, Einsatzkräfte nach billigem Ermessen unter Beachtung der Verhältnismäßigkeit und den Anforderungen des BayKSG jederzeit von der Veranstaltung abzuziehen. Hierüber ist der Veranstalter unverzüglich zu unterrichten. In diesem Falle vermindert sich das nach §4 zu entrichtende Entgelt anteilig im Verhältnis der abgezogenen Einsatzkräfte.</div>
-  <div class="p avoid">5. Das BRK übernimmt keinerlei Aufgaben der Veranstaltungsorganisation und -durchführung. Sämtliche Aufgaben der Veranstaltungsorganisation und -durchführung obliegen allein dem Veranstalter.</div>
-
-  <div class="avoid">
-    <div class="section">§ 2a Bereitstellung von Ärzten (soweit im Einzelfall erforderlich)</div>
-    <div class="p" style="padding-left:16px">Das BRK stellt dem Veranstalter im Rahmen der sanitätsdienstlichen Absicherung <strong>${days.reduce((s,d)=>s+(d.oAerzte||0),0)}</strong> Ärzte zur Verfügung.</div>
-    <div class="p" style="padding-left:16px">Die Einzelheiten der Bereitstellung und die Kostenerstattung sind in Anlage 3 geregelt, die Bestandteil dieser Vereinbarung ist.</div>
-  </div>
-
-  <!-- §3 neue Seite -->
-  <div class="section">§ 3 Verpflichtung des Veranstalters</div>
-  <div class="p avoid">1. Der Veranstalter informiert das BRK rechtzeitig und vollständig über alle Umstände, die für die Planung des sanitätsdienstlichen Einsatzes erforderlich sind. Dies sind insbesondere:
-    <div style="padding-left:18px;margin-top:3px;color:${DUNKELGRAU}">· Erwartete Teilnehmerzahl<br>· Erwartete Zuschauer- bzw. Besucherzahl<br>· Erwartete Personen mit erhöhtem Sicherheitsrisiko (VIP)<br>· Besondere oder aus früheren Veranstaltungen bekannte Risiken der Veranstaltung<br>· Risikoschwerpunkte<br>· Streckenverlauf einschließlich Standort der Streckenposten des Veranstalters<br>· Zu- und Abwege zur Veranstaltung einschließlich Rettungswege<br>· Veranstaltungsdauer einschl. Vor- und Nachlaufzeiten</div>
-  </div>
-  <div class="p avoid">2. Der Veranstalter stellt während der gesamten Veranstaltung und in angemessene Zeit vorher und nachher einen gesicherten Kommunikationsweg zwischen dem BRK und einer verantwortlichen Person des Veranstalters sicher (z.B. Festnetz- oder gesicherte Mobilnetzverbindung, Funkverbindung über Veranstaltungsfunk, etc.). Soweit vom Veranstalter ein Sicherheitsdienst für die Veranstaltung eingesetzt wird, ist auch die ständige Kommunikation zum Sicherheitsdienst sicherzustellen.</div>
-  <div class="p avoid">3. Der Veranstalter stellt dem BRK die für den Sanitätswachdienst erforderlichen Stellflächen gemäß im Vorfeld zu treffender Abstimmung zur Verfügung und stellt die notwendige Strom- und Wasserversorgung sicher.</div>
-  <div class="p avoid">4. Der Veranstalter informiert das BRK während des Verlaufes der Veranstaltung über alle Vorkommnisse und Ereignisse, die für die sanitätsdienstliche Absicherung und etwaige rettungsdienstliche Einsätze von Bedeutung sind.</div>
-  <div class="p avoid">5. Der Veranstalter verpflichtet sich, das BRK bei rettungs- oder sanitätsdienstlichen Einsätzen nach Kräften zu unterstützen. Dies gilt insbesondere für die Sperrung und/oder Freihaltung von Zu- und Abfahrtswegen, soweit notwendig auch die Unterbrechung der Veranstaltung bis zum Abschluss von Rettungsmaßnahmen, die Zurverfügungstellung von Fahrzeugen, Personal und Kommunikationsmitteln, soweit diese vorhanden sind und vom BRK benötigt werden.</div>
-  <div class="p avoid">6. Der Veranstalter verpflichtet sich ferner, dem BRK alle etwaigen Auflagen von Genehmigungsbehörden oder sonstigen Behörden und Organisationen, die die Veranstaltung betreffen, rechtzeitig und vollständig bekannt zu geben.</div>
-
-  <div class="avoid">
-    <div class="section break">§4 Vergütung</div>
-    <div class="p">Der Veranstalter verpflichtet sich, an das BRK für die sanitätsdienstliche Absicherung der Veranstaltung ein Entgelt zu entrichten. Die Vergütung und die Abrechnungsmodalitäten sind im Einzelnen in Anlage 2 geregelt, die Bestandteil dieser Vereinbarung ist.</div>
-  </div>
-
-  <!-- §5+6 neue Seite -->
-  <div class="avoid">
-    <div class="section">§5 Haftung</div>
-    <div class="p">Die Haftung des BRK aus dieser Vereinbarung wird auf Vorsatz und grobe Fahrlässigkeit beschränkt.</div>
-    <div class="section">§6 Allgemeine Regeln</div>
-    <div class="p">Änderungen oder Ergänzungen dieser Vereinbarung bedürfen der Schriftform. Mündliche Nebenabreden sind nicht getroffen worden.</div>
-    <div class="p">Soweit eine der Regelungen dieser Vereinbarung unwirksam ist oder wird, berührt dies nicht die Wirksamkeit der Vereinbarung insgesamt. In diesem Fall verpflichten sich die Parteien, die unwirksame Regelung durch eine wirksame zu ersetzen, die dem wirtschaftlichen Zweck der unwirksamen Regelung möglichst nahe kommt.</div>
-  </div>
-
-  <!-- Unterschriften -->
-  <table class="sig-table avoid">
-    <tr>
-      <td class="sig-cell">
-        <div style="font-size:9pt;padding-bottom:4px">${ort}, ${today}</div>
-        <div class="sig-line" style="color:${DUNKELGRAU}">Ort, Datum</div>
-      </td>
-      <td style="width:10%"></td>
-      <td class="sig-cell">
-        <div style="font-size:9pt;padding-bottom:4px">&nbsp;</div>
-        <div class="sig-line" style="color:${DUNKELGRAU}">Ort, Datum</div>
-      </td>
-    </tr>
-    <tr><td colspan="3" style="height:16px"></td></tr>
-    <tr>
-      <td class="sig-cell">
-        ${unterschriftHtml}
-        <div class="sig-line"><strong>${unterzeichner}</strong><br><span style="color:${DUNKELGRAU}">${titel}</span></div>
-      </td>
-      <td style="width:10%"></td>
-      <td class="sig-cell">
-        <div style="height:49px"></div>
-        <div class="sig-line" style="color:${DUNKELGRAU}">Name, Veranstalter</div>
-      </td>
-    </tr>
-  </table>
-
-  <div class="doc-footer-line">${unterzeichner} · BRK ${kvName} · ${kvAdresse}, ${kvPlzOrt}</div>
-  </body></html>`;
+</body>
+</html>`;
 }
+
 
 
 
