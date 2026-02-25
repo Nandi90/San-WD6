@@ -556,6 +556,191 @@ function buildVertragHTML(vorgang, stamm, user) {
 
 
 
+
+// ═══════════════════════════════════════════════════════════════════
+// HTML-Builder: Einsatzprotokoll
+// ═══════════════════════════════════════════════════════════════════
+function buildEinsatzprotokollHTML(vorgang, stamm, user, dayCalcs) {
+  const ev = vorgang.event || vorgang;
+  const days = (vorgang.days || []).filter(d => d.active !== false);
+  const esc = s => String(s||"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
+
+  // Datum formatieren
+  const fDate = d => {
+    if (!d) return "";
+    const dt = new Date(d);
+    if (isNaN(dt)) return d;
+    return dt.toLocaleDateString("de-DE", {weekday:"long", day:"2-digit", month:"2-digit", year:"numeric"});
+  };
+
+  // Fahrzeuge eines Tages als String
+  const fzgStr = (day) => {
+    const fzg = day.fahrzeuge || [];
+    if (fzg.length === 0) return "keine Fahrzeuge eingeplant";
+    return fzg.map(f => typeof f === "string" ? f : (f.kennzeichen || f.name || JSON.stringify(f))).join(", ");
+  };
+
+  // Material eines Tages (Sonstiges)
+  const matStr = (day) => {
+    const mat = day.material || day.sonstiges || [];
+    if (!mat || mat.length === 0) return "kein Material eingeplant";
+    return Array.isArray(mat) ? mat.join(", ") : String(mat);
+  };
+
+  // Helfer-Anzahl aus dayCalcs oder Berechnung
+  const getHelfer = (dayIdx) => {
+    if (dayCalcs && dayCalcs[dayIdx]) return dayCalcs[dayIdx].tp || "";
+    return "";
+  };
+
+  // Uhrzeit aller Tage für Übersicht
+  const timeRange = days.length > 0
+    ? `${days[0].startTime||""} - ${days[days.length-1].endTime||""}`
+    : "";
+
+  // Datum des ersten Tags
+  const firstDate = days.length > 0 ? fDate(days[0].date) : "";
+
+  // Material/Fahrzeug-Sektionen pro Tag
+  let matSections = `<p><strong>Material: </strong><br>`;
+  matSections += `<strong>für alle Schichten / Abschnitte:</strong><br>${esc(matStr({material: ev.materialAllgemein}))}<br><br>`;
+  days.forEach((day, i) => {
+    const dateLabel = day.date ? fDate(day.date) : `Tag ${day.id||i+1}`;
+    matSections += `<strong>zusätzlich für ${esc(dateLabel)}, ${esc(day.startTime||"")} - ${esc(day.endTime||"")} Uhr:</strong><br>${esc(matStr(day))}<br><br>`;
+  });
+  matSections += `</p>`;
+
+  let fzgSections = `<p><strong>Fahrzeuge:</strong><br>`;
+  fzgSections += `<strong>für alle Schichten / Abschnitte:</strong><br>keine Fahrzeuge eingeplant<br><br>`;
+  days.forEach((day, i) => {
+    const dateLabel = day.date ? fDate(day.date) : `Tag ${day.id||i+1}`;
+    fzgSections += `<strong>zusätzlich für ${esc(dateLabel)}, ${esc(day.startTime||"")} - ${esc(day.endTime||"")} Uhr:</strong><br>${esc(fzgStr(day))}<br><br>`;
+  });
+  fzgSections += `</p>`;
+
+  return `<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<style>
+  body { font-family: Arial, sans-serif; font-size: 13px; margin: 0; padding: 20px; color: #000; }
+  table { width: 100%; border-collapse: collapse; }
+  .header-table td { border: 1px solid #000; padding: 8px; vertical-align: middle; }
+  .header-logo { text-align: center; width: 33%; }
+  .header-title { text-align: center; width: 33%; font-size: 18px; }
+  .header-orga { text-align: center; width: 33%; font-size: 13px; }
+  .header-title h2 { margin: 4px 0; font-size: 20px; }
+  .header-orga h3 { margin: 4px 0; font-size: 13px; }
+  .info-table { margin-top: 16px; }
+  .info-table td { padding: 4px 8px; vertical-align: top; }
+  .sig-box { background: #d3d3d3; border: 1px solid #000; padding: 16px; text-align: center; }
+  hr { border: none; border-top: 2px solid #000; margin: 12px 0; }
+  .bemerkung-box { background: #d3d3d3; border: 1px solid #000; padding: 10px; margin-top: 8px; }
+  strong { font-weight: bold; }
+  @media print { body { margin: 0; padding: 10mm; } }
+</style>
+</head>
+<body>
+<table class="header-table">
+<tr>
+  <td class="header-logo">
+    <img src="${BRK_LOGO}" style="width:180px;height:auto;vertical-align:top;" />
+  </td>
+  <td class="header-title">
+    <h2>Einsatzprotokoll</h2>
+    <p>${esc(ev.auftragsnr||"")}</p>
+  </td>
+  <td class="header-orga">
+    <h3>BRK Kreisverband Neuburg-Schrobenhausen</h3>
+    <h3>${esc(stamm.name||"BRK Bereitschaft")}</h3>
+  </td>
+</tr>
+</table>
+
+<p>&nbsp;</p>
+
+<table class="info-table">
+<tr>
+  <td style="width:50%;padding:4px 8px;vertical-align:top;">
+    <p><strong>Kunde:</strong> ${esc(ev.veranstalter||ev.rechnungsempfaenger||"")}, ${esc(ev.ansprechpartner||"")}</p>
+    <p><strong>Veranstaltung:</strong> ${esc(ev.name||"")}</p>
+    <p><strong>Ort:</strong> ${esc(ev.ort||"")}${ev.adresse?", "+esc(ev.adresse):""}</p>
+    <p><strong>Datum:</strong> ${esc(firstDate)}</p>
+    <p><strong>Uhrzeit:</strong> ${esc(timeRange)}</p>
+    <p><strong>Ansprechpartner vor Ort:</strong> ${esc(ev.ansprechpartner||"")}</p>
+    <p><strong>Bekleidung:</strong> Kleiderordnung: Einsatzkleidung nach DBO</p>
+    <p><strong>Helferverpflegung:</strong> ${ev.verpflegung?"kostenfrei durch den Veranstalter":"Selbstverpflegung"}</p>
+  </td>
+  <td style="width:50%;vertical-align:top;">
+    <div class="sig-box">
+      <p><strong>Der Sanitätsdienst wurde korrekt durchgeführt:</strong></p>
+      <p>&nbsp;</p>
+      <p>&nbsp;</p>
+      <p>&nbsp;</p>
+      <p>________________________________<br/>Unterschrift Veranstalter</p>
+    </div>
+  </td>
+</tr>
+</table>
+
+<hr/>
+<p><strong>tatsächliche Ankunftszeit Einsatzort:</strong> ____________</p>
+<p><strong>tatsächliches Ende der Veranstaltung:</strong> ____________</p>
+<p><strong>Einsatzleiter/in:</strong> ${esc(ev.ilsEL||"")}</p>
+<p><strong>Einsatzkräfte:</strong> __________________________________________________</p>
+<hr/>
+
+${matSections}
+${fzgSections}
+
+<div class="bemerkung-box">
+  <p><strong>Bemerkungen zum Einsatz:</strong> ${esc(ev.bemerkung||"")}</p>
+</div>
+</body>
+</html>`;
+}
+
+
+// ═══════════════════════════════════════════════════════════════════
+// PDF: Einsatzprotokoll (serverseitig via Puppeteer)
+// ═══════════════════════════════════════════════════════════════════
+app.post("/api/pdf/einsatzprotokoll/:id", requireAuth, async (req, res) => {
+  const puppeteer = require("puppeteer-core");
+  try {
+    const db = require("./db").getDb();
+    const row = db.prepare("SELECT data, bereitschaft_code FROM vorgaenge WHERE id=?").get(req.params.id);
+    if (!row) return res.status(404).json({ error: "Vorgang nicht gefunden" });
+    const vorgang = JSON.parse(row.data);
+    const bc = row.bereitschaft_code || req.session.user.bereitschaftCode;
+    const stamm = db.prepare("SELECT * FROM bereitschaften WHERE code=?").get(bc) || {};
+    const user = db.prepare("SELECT name, titel FROM users WHERE sub=?").get(req.session.user.sub) || {};
+    const { dayCalcs } = req.body;
+    const html = buildEinsatzprotokollHTML(vorgang, stamm, user, dayCalcs || []);
+    const browser = await puppeteer.launch({
+      executablePath: process.env.CHROMIUM_PATH || "/usr/bin/chromium-browser",
+      args: ["--no-sandbox","--disable-setuid-sandbox","--disable-dev-shm-usage","--disable-gpu"],
+      headless: true
+    });
+    const page = await browser.newPage();
+    await page.setContent(html, { waitUntil: "domcontentloaded" });
+    const pdf = await page.pdf({
+      format: "A4",
+      margin: { top: "10mm", right: "10mm", bottom: "15mm", left: "10mm" },
+      printBackground: true
+    });
+    await browser.close();
+    const nr = (vorgang.event?.auftragsnr || req.params.id).replace(/[^a-zA-Z0-9_-]/g,"_");
+    res.set({
+      "Content-Type": "application/pdf",
+      "Content-Disposition": `attachment; filename="${nr}_Einsatzprotokoll.pdf"`
+    });
+    res.send(pdf);
+  } catch(e) {
+    console.error("Einsatzprotokoll PDF:", e);
+    res.status(500).json({ error: e.message });
+  }
+});
+
 // ═══════════════════════════════════════════════════════════════════
 // PDF: Angebot (serverseitig)
 // ═══════════════════════════════════════════════════════════════════

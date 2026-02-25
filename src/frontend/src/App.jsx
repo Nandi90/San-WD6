@@ -24,7 +24,10 @@ const NEF_T=[{min:0,max:13,v:0},{min:13,max:30,v:1},{min:30,max:60,v:2},{min:60,
 const CHECKLIST_ITEMS=[
   {key:"angebotVersendet",label:"Angebot versendet",icon:"📨"},
   {key:"vertragAabVersendet",label:"Vertrag + AAB versendet",icon:"📝"},
+  {key:"angebotSigniertVorliegend",label:"Angebot akzeptiert und liegt signiert vor",icon:"✍️"},
   {key:"hiorgAngelegt",label:"SanWD in HiOrg/DRK Server angelegt",icon:"🖥️"},
+  {key:"ilsAngemeldet",label:"Anmeldung ILS",icon:"📡"},
+  {key:"einsatzprotokollGedruckt",label:"Einsatzprotokoll für Helfer gedruckt",icon:"🖨️"},
   {key:"fibuWeitergeleitet",label:"Weiterleitung an FiBu",icon:"💳"},
   {key:"abgeschlossen",label:"Abgeschlossen",icon:"✅"},
 ];
@@ -1260,7 +1263,7 @@ export default function App(){
           <Card accent={C.rot}>
             <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:10}}>
               <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
-                {["gefahren","angebot","vertrag","aab","ils"].map(v=>(<Btn key={v} variant={pdfView===v?"primary":"secondary"} small onClick={()=>setPdfView(v)}>{{gefahren:"Gefahrenanalyse",angebot:"Angebot",vertrag:"Vertrag",aab:"AAB",ils:"ILS Anmeldung"}[v]}</Btn>))}
+                {["gefahren","angebot","vertrag","aab","ils","einsatzprotokoll"].map(v=>(<Btn key={v} variant={pdfView===v?"primary":"secondary"} small onClick={()=>setPdfView(v)}>{{gefahren:"Gefahrenanalyse",angebot:"Angebot",vertrag:"Vertrag",aab:"AAB",ils:"ILS Anmeldung",einsatzprotokoll:"Einsatzprotokoll"}[v]}</Btn>))}
               </div>
               <div style={{display:"flex",gap:6,flexWrap:"wrap",alignItems:"center"}}>
                 {(pdfView==="gefahren")&&<Btn onClick={handlePrint} icon="🖨️" variant="blue">Drucken</Btn>}
@@ -1276,6 +1279,16 @@ export default function App(){
             {pdfView==="vertrag"&&<Card accent={C.dunkelblau}><div style={{display:"flex",alignItems:"center",gap:10,marginBottom:12}}><span style={{fontSize:20}}>📄</span><div><div style={{fontSize:14,fontWeight:700,color:C.dunkelblau}}>Vereinbarung</div><div style={{fontSize:11,color:C.dunkelgrau}}>Serverseitig generiertes PDF mit Seitenzahlen</div></div></div><Btn variant="primary" onClick={async()=>{if(!currentEventId){alert("Bitte zuerst Vorgang speichern");return;}await saveEvent();try{const r=await fetch("/api/pdf/vertrag/"+currentEventId,{method:"POST",credentials:"include"});if(!r.ok){const e=await r.json();alert(e.error||"Fehler");return;}const blob=await r.blob();const url=URL.createObjectURL(blob);window.open(url,"_blank");}catch(e){alert("Fehler: "+e.message);}}}>Vertrag-PDF generieren und öffnen</Btn></Card>}
             {pdfView==="aab"&&<div data-print="aab"><AABPDF stammdaten={stammdaten} bereitschaft={bereitschaft}/></div>}
             {pdfView==="ils"&&<ILSPreview event={event} days={days} stammdaten={stammdaten} user={user} updateEvent={updateEvent} currentEventId={currentEventId} saveEvent={saveEvent}/>}
+            {pdfView==="einsatzprotokoll"&&<Card accent={C.dunkelblau}>
+              <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:12}}>
+                <span style={{fontSize:20}}>🖨️</span>
+                <div><div style={{fontSize:14,fontWeight:700,color:C.dunkelblau}}>Einsatzprotokoll</div>
+                <div style={{fontSize:11,color:C.dunkelgrau}}>Helferausdruck für den Einsatz · Pro Tag oder Gesamt</div></div>
+              </div>
+              <div style={{display:"flex",flexWrap:"wrap",gap:8}}>
+                <Btn variant="primary" onClick={async()=>{if(!currentEventId){alert("Bitte zuerst Vorgang speichern");return;}await saveEvent();try{const blob=await API.getEinsatzprotokollPDF(currentEventId,dayCalcs);const url=URL.createObjectURL(blob);window.open(url,"_blank");}catch(e){alert("Fehler: "+e.message);}}} icon="🖨️">Einsatzprotokoll drucken</Btn>
+              </div>
+            </Card>}
             
           </div>
         </div>)}

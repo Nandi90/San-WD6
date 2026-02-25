@@ -218,5 +218,14 @@ const API = {
   async getAnfragen() { return this.json("/api/anfragen"); },
   async updateAnfrageStatus(id,status) { return this.json("/api/anfragen/"+id+"/status",{method:"PUT",body:JSON.stringify({status})}); },
   async deleteAnfrage(id) { return this.json("/api/anfragen/"+id,{method:"DELETE"}); },
+  async getEinsatzprotokollPDF(id, dayCalcs) {
+    const r = await fetch(`/api/pdf/einsatzprotokoll/${id}`, {
+      method: "POST", credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ dayCalcs: dayCalcs || [] })
+    });
+    if (!r.ok) { const e = await r.json().catch(()=>({error:"Fehler"})); throw new Error(e.error||"PDF Fehler"); }
+    return r.blob();
+  },
 };
 export default API;
