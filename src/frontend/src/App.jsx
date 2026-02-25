@@ -1,3 +1,4 @@
+import React from "react";
 import { useState, useMemo, useCallback, useEffect, useRef } from "react";
 import API from "./api";
 
@@ -45,6 +46,20 @@ const fTS=(ts)=>ts?new Date(ts).toLocaleDateString("de-DE",{day:"2-digit",month:
 // ═══════════════════════════════════════════════════════════════════════════
 // UI COMPONENTS
 // ═══════════════════════════════════════════════════════════════════════════
+const ChangelogItem=({v,d,items})=>{
+  const [open,setOpen]=React.useState(v.includes("6.5")||v.includes("6.1"));
+  return(<div style={{borderBottom:`1px solid ${C.mittelgrau}20`}}>
+    <div onClick={()=>setOpen(!open)} style={{display:"flex",alignItems:"center",gap:10,padding:"14px 20px",cursor:"pointer"}} onMouseEnter={e=>e.currentTarget.style.background=C.hellgrau} onMouseLeave={e=>e.currentTarget.style.background="transparent"}>
+      <span style={{fontSize:12,color:C.bgrau,transition:"transform 0.2s",transform:open?"rotate(90deg)":"rotate(0deg)"}}>▶</span>
+      <span style={{background:C.rot,color:"#fff",borderRadius:4,padding:"2px 8px",fontWeight:700,fontSize:12,fontFamily:"monospace"}}>{v}</span>
+      <span style={{fontSize:11,color:C.dunkelgrau}}>({items.length})</span>
+      <span style={{fontSize:11,color:C.dunkelgrau}}>{d}</span>
+    </div>
+    {open&&<div style={{padding:"0 20px 14px 46px"}}><ul style={{margin:0,paddingLeft:18}}>
+      {items.map((item,i)=><li key={i} style={{fontSize:13,color:C.schwarz,marginBottom:3}}>{item}</li>)}
+    </ul></div>}
+  </div>);
+};
 const Card=({children,title,accent,sub,action})=>(<div style={{background:C.weiss,borderRadius:8,border:`1px solid ${C.mittelgrau}40`,borderTop:accent?`3px solid ${accent}`:undefined,padding:"18px 22px",marginBottom:14,boxShadow:"0 1px 4px #0001"}}>{(title||action)&&<div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:14}}><div><h3 style={{margin:0,fontSize:15,fontWeight:700,color:C.dunkelgrau,fontFamily:FONT.sans}}>{title}</h3>{sub&&<div style={{fontSize:11,color:C.bgrau,marginTop:2}}>{sub}</div>}</div>{action}</div>}{children}</div>);
 const Inp=({label,value,onChange,type="text",min,max,step,disabled,suffix,small,placeholder})=>(<label style={{display:"block",marginBottom:small?6:10}}><span style={{display:"block",fontSize:11,color:C.dunkelgrau,marginBottom:3,fontWeight:600,fontFamily:FONT.sans}}>{label}</span><div style={{display:"flex",alignItems:"center",gap:6}}><input type={type} value={value} placeholder={placeholder} onChange={e=>onChange(type==="number"?(e.target.value===""?"":Number(e.target.value)):e.target.value)} min={min} max={max} step={step} disabled={disabled} style={{width:"100%",padding:"8px 10px",background:C.weiss,border:`1px solid ${C.mittelgrau}`,borderRadius:4,color:C.schwarz,fontSize:13,outline:"none",fontFamily:FONT.sans,boxSizing:"border-box"}} onFocus={e=>e.target.style.borderColor=C.mittelblau} onBlur={e=>e.target.style.borderColor=C.mittelgrau}/>{suffix&&<span style={{color:C.dunkelgrau,fontSize:12}}>{suffix}</span>}</div></label>);
 const Sel=({label,value,onChange,options,small})=>(<label style={{display:"block",marginBottom:small?6:10}}><span style={{display:"block",fontSize:11,color:C.dunkelgrau,marginBottom:3,fontWeight:600,fontFamily:FONT.sans}}>{label}</span><select value={value} onChange={e=>onChange(isNaN(e.target.value)?e.target.value:Number(e.target.value))} style={{width:"100%",padding:"8px 10px",background:C.weiss,border:`1px solid ${C.mittelgrau}`,borderRadius:4,color:C.schwarz,fontSize:13,fontFamily:FONT.sans,cursor:"pointer",boxSizing:"border-box"}}>{options.map(o=><option key={o.value} value={o.value}>{o.label}</option>)}</select></label>);
@@ -260,17 +275,42 @@ function LockBanner({lockInfo,onUnlock,isOwner}){
     {isOwner&&<button onClick={onUnlock} style={{padding:"4px 12px",background:"transparent",border:"1px solid #a5d6a7",borderRadius:4,fontSize:11,cursor:"pointer",color:"#2e7d32"}}>Sperre aufheben</button>}
   </div>);
 }
-function StatusBanner({status,onUnlock,isAdmin}){
-  if(status!=="versendet")return null;
-  return(<div style={{padding:"10px 16px",background:"#e8f5e9",border:"1px solid #a5d6a7",borderRadius:6,marginBottom:12,display:"flex",alignItems:"center",justifyContent:"space-between"}}>
-    <div style={{display:"flex",alignItems:"center",gap:10}}>
-      <span style={{fontSize:18}}>✅</span>
-      <div><div style={{fontSize:13,fontWeight:600,color:"#2e7d32"}}>Angebot versendet</div>
-        <div style={{fontSize:10,color:"#666"}}>Vorgang ist gesperrt. Nur Admin kann entsperren.</div>
+function StatusBanner({angebotVersendet,onUnlock}){
+  const [showModal,setShowModal]=React.useState(false);
+  const [begruendung,setBegruendung]=React.useState("");
+  const [err,setErr]=React.useState("");
+  const [loading,setLoading]=React.useState(false);
+  if(!angebotVersendet)return null;
+  const doEntsperre=async()=>{
+    if(begruendung.trim().length<5){setErr("Bitte mind. 5 Zeichen eingeben");return;}
+    setLoading(true);setErr("");
+    try{await onUnlock(begruendung.trim());setShowModal(false);setBegruendung("");}
+    catch(e){setErr(e.message||"Fehler");}
+    finally{setLoading(false);}
+  };
+  return(<>
+    <div style={{padding:"10px 16px",background:"#e8f5e9",border:"1px solid #a5d6a7",borderRadius:6,marginBottom:12,display:"flex",alignItems:"center",justifyContent:"space-between"}}>
+      <div style={{display:"flex",alignItems:"center",gap:10}}>
+        <span style={{fontSize:18}}>📨</span>
+        <div><div style={{fontSize:13,fontWeight:600,color:"#2e7d32"}}>Angebot versendet – Felder gesperrt</div>
+          <div style={{fontSize:10,color:"#666"}}>Zum Bearbeiten entsperren (Begründung erforderlich)</div>
+        </div>
       </div>
+      <button onClick={()=>setShowModal(true)} style={{padding:"5px 14px",background:"#e53935",color:"#fff",border:"none",borderRadius:4,fontSize:12,fontWeight:600,cursor:"pointer"}}>🔓 Entsperren</button>
     </div>
-    {isAdmin&&<button onClick={onUnlock} style={{padding:"5px 14px",background:"#e53935",color:"#fff",border:"none",borderRadius:4,fontSize:12,fontWeight:600,cursor:"pointer"}}>🔓 Entsperren</button>}
-  </div>);
+    {showModal&&<div style={{position:"fixed",top:0,left:0,right:0,bottom:0,background:"rgba(0,0,0,0.5)",zIndex:9999,display:"flex",alignItems:"center",justifyContent:"center"}}>
+      <div style={{background:"#fff",borderRadius:8,padding:24,maxWidth:420,width:"90%",boxShadow:"0 8px 32px rgba(0,0,0,0.2)"}}>
+        <div style={{fontSize:16,fontWeight:700,marginBottom:8}}>🔓 Angebot entsperren</div>
+        <div style={{fontSize:12,color:"#666",marginBottom:16}}>Bitte begründe warum das Angebot entsperrt wird. Die Begründung wird im Audit-Log gespeichert.</div>
+        <textarea value={begruendung} onChange={e=>setBegruendung(e.target.value)} placeholder="z.B. Korrektur der Personenzahl nach Rücksprache mit Veranstalter..." rows={4} style={{width:"100%",padding:"8px 10px",border:"1px solid #ccc",borderRadius:4,fontSize:13,fontFamily:"inherit",boxSizing:"border-box",resize:"vertical"}}/>
+        {err&&<div style={{color:"#e53935",fontSize:11,marginTop:4}}>{err}</div>}
+        <div style={{display:"flex",gap:8,marginTop:12,justifyContent:"flex-end"}}>
+          <button onClick={()=>{setShowModal(false);setBegruendung("");setErr("");}} style={{padding:"7px 16px",background:"#f5f5f5",border:"1px solid #ccc",borderRadius:4,fontSize:13,cursor:"pointer"}}>Abbrechen</button>
+          <button onClick={doEntsperre} disabled={loading} style={{padding:"7px 16px",background:"#e53935",color:"#fff",border:"none",borderRadius:4,fontSize:13,fontWeight:600,cursor:loading?"not-allowed":"pointer",opacity:loading?0.7:1}}>{loading?"Bitte warten...":"Entsperren"}</button>
+        </div>
+      </div>
+    </div>}
+  </>);
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -797,7 +837,7 @@ function VorgaengeListe({bereitschaftCode,user,onLoad,onNew,onCopy,bereitschaft,
 
   const prefix=`sanwd:${bereitschaftCode}:${viewYear}`;
   useEffect(()=>{loadEvents();},[prefix]);
-  const loadEvents=async()=>{setLoading(true);try{const data=await API.getVorgaenge(viewYear);setEvents(data.map(v=>({...v,id:v.id})));}catch{setEvents([]);}setLoading(false);};
+  const loadEvents=async(bcFilter)=>{setLoading(true);try{const bc=bcFilter!==undefined?bcFilter:filterBereitschaft;const data=await API.getVorgaenge(viewYear,bc);setEvents(data.map(v=>({...v,id:v.id})));}catch{setEvents([]);}setLoading(false);};
   const del=async(id)=>{if(!confirm("Vorgang löschen?"))return;try{await API.deleteVorgang(id);}catch{}loadEvents();};
   const years=[];for(let y=thisYear;y>=2025;y--)years.push(y);
   const isArchive=viewYear<thisYear;
@@ -819,7 +859,7 @@ function VorgaengeListe({bereitschaftCode,user,onLoad,onNew,onCopy,bereitschaft,
       <div style={{display:"flex",gap:6}}>
         <Btn small variant={subTab==="liste"?"primary":"secondary"} onClick={()=>setSubTab("liste")}>Liste</Btn>
         <Btn small variant={subTab==="uebersicht"?"primary":"secondary"} onClick={()=>setSubTab("uebersicht")}>Übersicht</Btn>
-        {(user?.rolle==="admin")&&<select value={filterBereitschaft} onChange={e=>{setFilterBereitschaft(e.target.value);if(onFilterChange)onFilterChange(e.target.value);}} style={{padding:"5px 10px",borderRadius:4,border:`1px solid ${C.mittelgrau}`,fontSize:12,fontFamily:FONT.sans}}><option value="">Alle Bereitschaften</option>{(allBereitschaften||[]).map(b=><option key={b.code} value={b.code}>{b.short} — {b.name}</option>)}</select>}
+        {(user?.rolle==="admin"||user?.rolle==="kbl")&&<select value={filterBereitschaft} onChange={e=>{const v=e.target.value;setFilterBereitschaft(v);loadEvents(v);if(onFilterChange)onFilterChange(v);}} style={{padding:"5px 10px",borderRadius:4,border:`1px solid ${C.mittelgrau}`,fontSize:12,fontFamily:FONT.sans}}><option value="">Alle Bereitschaften</option>{(allBereitschaften||[]).map(b=><option key={b.code} value={b.code}>{b.short} — {b.name}</option>)}</select>}
         {!isArchive&&<Btn onClick={onNew} icon="➕">Neuer Vorgang</Btn>}
       </div>
     </div>
@@ -946,7 +986,15 @@ export default function App(){
         setEvent(p=>({...p,auftragsnr:autoNr}));
         setLaufendeNr(prev=>prev+1);
       }catch{}
-    }if(!user)return;setSaving(true);const id=currentEventId||`evt-${Date.now()}`;if(!currentEventId)setCurrentEventId(id);try{await API.saveVorgang(id,{id,event,days,year,updatedAt:Date.now(),activeDays:days.filter(d=>d.active).length,createdBy:user.name});upsertKunde(event);}catch{}setSaving(false);},[user,currentEventId,event,days,storagePrefix,upsertKunde,year]);
+    }if(!user)return;setSaving(true);const id=currentEventId||`evt-${Date.now()}`;if(!currentEventId)setCurrentEventId(id);try{
+      const bc=BEREITSCHAFTEN[stammdaten.bereitschaftIdx]?.code;
+      await API.saveVorgang(id,{id,event,days,year,updatedAt:Date.now(),activeDays:days.filter(d=>d.active).length,createdBy:user.name,bereitschaftCode:bc});
+      upsertKunde(event);
+      console.log("✅ Gespeichert:",id);
+    }catch(e){
+      console.error("❌ Speichern fehlgeschlagen:",e.message,e);
+      alert("Speichern fehlgeschlagen: "+e.message);
+    }setSaving(false);},[user,currentEventId,event,days,stammdaten.bereitschaftIdx,upsertKunde,year]);
 
   useEffect(()=>{if(!user||!currentEventId||tab==="events")return;const t=setTimeout(saveEvent,2000);return()=>clearTimeout(t);},[event,days,currentEventId,user,tab,saveEvent]);
 
@@ -1061,7 +1109,7 @@ export default function App(){
         {/* VERANSTALTUNG */}
         {tab==="event"&&(<div>
           <LockBanner lockInfo={lockInfo} isOwner={lockInfo?.lockedBy===user?.name} onUnlock={async()=>{try{await API.unlockVorgang(currentEventId);setLockInfo(null);}catch{}}}/>
-          <StatusBanner status={vorgangStatus} isAdmin={user?.rolle==="admin"} onUnlock={async()=>{try{await API.setVorgangStatus(currentEventId,"offen");setVorgangStatus(null);}catch{}}}/>
+          <StatusBanner angebotVersendet={event?.checklist?.angebotVersendet} onUnlock={async(begruendung)=>{await API.entsperrenVorgang(currentEventId,begruendung);updateEvent("checklist",{...event.checklist,angebotVersendet:false});}}/>
           <div style={{display:"grid",gridTemplateColumns:"2fr 1fr",gap:14}}>
             <div>
               <Card title="Auftrag" accent={C.rot} sub={event.auftragsnr?`Nr. ${event.auftragsnr}`:"Noch keine Nummer"} action={<div style={{display:"flex",gap:6}}><Btn small onClick={generateNr} icon="🔢">Nr. generieren</Btn><Btn small variant="success" onClick={saveEvent} icon="💾">Speichern</Btn></div>}>
@@ -1348,20 +1396,7 @@ export default function App(){
                 "Grundlegende Kostenberechnung nach BRK-Kostensaetzen",
                 "Ausgabe als druckbares PDF-Dokument",
               ]},
-            ].map(({v,d,c:items})=>{
-              const [open,setOpen]=useState(v.includes("6.5")||v.includes("6.1"));
-              return(<div key={v} style={{borderBottom:`1px solid ${C.mittelgrau}20`}}>
-                <div onClick={()=>setOpen(!open)} style={{display:"flex",alignItems:"center",gap:10,padding:"14px 20px",cursor:"pointer"}} onMouseEnter={e=>e.currentTarget.style.background=C.hellgrau} onMouseLeave={e=>e.currentTarget.style.background="transparent"}>
-                  <span style={{fontSize:12,color:C.bgrau,transition:"transform 0.2s",transform:open?"rotate(90deg)":"rotate(0deg)"}}>▶</span>
-                  <span style={{background:C.rot,color:"#fff",borderRadius:4,padding:"2px 8px",fontWeight:700,fontSize:12,fontFamily:"monospace"}}>{v}</span>
-                  <span style={{fontSize:11,color:C.dunkelgrau}}>({items.length})</span>
-                  <span style={{fontSize:11,color:C.dunkelgrau}}>{d}</span>
-                </div>
-                {open&&<div style={{padding:"0 20px 14px 46px"}}><ul style={{margin:0,paddingLeft:18}}>
-                  {items.map((item,i)=><li key={i} style={{fontSize:13,color:C.schwarz,marginBottom:3}}>{item}</li>)}
-                </ul></div>}
-              </div>);
-            })}
+            ].map(({v,d,c:items})=><ChangelogItem key={v} v={v} d={d} items={items}/>)}
           </div>
         </div>
       )}
