@@ -19,6 +19,25 @@ function isVersendet(vorgangId) {
   return row?.status === "versendet";
 }
 
+// ── Angebot entsperren (mit Pflichtbegründung → Audit) ─────────
+router.post("/:id/entsperren", requireWriteAccess, (req, res) => {
+  const { id } = req.params;
+  const { begruendung } = req.body;
+  if (!begruendung || begruendung.trim().length < 5) {
+    return res.status(400).json({ error: "Begründung erforderlich (mind. 5 Zeichen)" });
+  }
+  const row = getDb().prepare("SELECT data FROM vorgaenge WHERE id = ?").get(id);
+  if (!row) return res.status(404).json({ error: "Nicht gefunden" });
+  const d = JSON.parse(row.data);
+  const cl = d.event?.checklist || d.checklist || {};
+  cl["angebotVersendet"] = false;
+  if (d.event?.checklist) d.event.checklist = cl; else d.checklist = cl;
+  getDb().prepare("UPDATE vorgaenge SET data = ?, updated_at = datetime('now') WHERE id = ?").run(JSON.stringify(d), id);
+  audit(req.session.user, "entsperrt", "vorgang", id, "Begründung: " + begruendung.trim());
+  console.log(\`Vorgang \${id} entsperrt von \${req.session.user.name}: \${begruendung}\`);
+  res.json({ ok: true });
+});
+
 // ═════════════════════════════════════════════════════════════════
 // SPEZIFISCHE ROUTEN ZUERST (vor /:year und /:year/:id)
 // ═════════════════════════════════════════════════════════════════
@@ -132,7 +151,6 @@ router.put("/:id", requireWriteAccess, (req, res) => {
   const { id } = req.params;
   const lock = getActiveLock(id, req.session.user.sub);
   if (lock) return res.status(423).json({ error: "Gesperrt durch " + lock.user_name, lockedBy: lock.user_name });
-  if (isVersendet(id)) return res.status(423).json({ error: "Vorgang ist versendet – erst entsperren", reason: "versendet" });
   const year = req.body.year || new Date().getFullYear();
   const json = JSON.stringify(req.body);
   // Alten Stand lesen für Diff
