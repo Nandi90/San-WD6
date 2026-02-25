@@ -326,7 +326,7 @@ function HistoryWidget({history}){
         <div style={{flex:1}}>
           <div style={{fontWeight:600,color:C.schwarz}}>{h.description||h.action}</div>
           {h.details&&<div style={{fontSize:10,color:C.bgrau,marginTop:2,whiteSpace:"pre-wrap"}}>{typeof h.details==="string"?h.details:JSON.stringify(h.details,null,2)}</div>}
-          <div style={{fontSize:10,color:C.bgrau,marginTop:2}}>{h.user||"System"} · {fTS(h.timestamp)}</div>
+          <div style={{fontSize:10,color:C.bgrau,marginTop:2}}>{h.user||h.user_name||"System"} · {fTS(h.time||h.timestamp)}</div>
         </div>
       </div>))}
     </div>
