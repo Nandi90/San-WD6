@@ -249,7 +249,7 @@ function ILSPreview({event,days,stammdaten,user,updateEvent,currentEventId,saveE
 // LOCK BANNER (v6.1: Concurrent Editing)
 // ═══════════════════════════════════════════════════════════════════════════
 function LockBanner({lockInfo,onUnlock,isOwner}){
-  if(!lockInfo||!lockInfo.locked)return null;
+  if(!lockInfo||!lockInfo.locked||lockInfo.isOwner)return null;
   return(<div style={{padding:"10px 16px",background:isOwner?"#e8f5e9":"#fff3cd",border:`1px solid ${isOwner?"#a5d6a7":"#ffc107"}`,borderRadius:6,marginBottom:12,display:"flex",alignItems:"center",justifyContent:"space-between"}}>
     <div style={{display:"flex",alignItems:"center",gap:10}}>
       <span style={{fontSize:18}}>{isOwner?"✏️":"🔒"}</span>
@@ -955,7 +955,7 @@ export default function App(){
   useEffect(()=>{
     if(!user||!currentEventId||tab==="events")return;
     let hb=null;
-    const doLock=async()=>{try{const r=await API.lockVorgang(currentEventId);if(r)setLockInfo(r);}catch{}};
+    const doLock=async()=>{try{const r=await API.lockVorgang(currentEventId);if(r){setLockInfo({locked:true,lockedBy:r.by||r.lockedBy||user?.name,lockedAt:r.lockedAt||new Date().toISOString(),isOwner:true});}}catch(e){if(e?.response?.status===423){const d=typeof e.response.json==='function'?await e.response.json():e;setLockInfo({locked:true,lockedBy:d.lockedBy||"anderer Benutzer",lockedAt:d.lockedSince||null,isOwner:false});}}};
     const checkLock=async()=>{try{const r=await API.getLockStatus(currentEventId);setLockInfo(r||null);}catch{}};
     doLock();hb=setInterval(doLock,30000);
     return()=>{clearInterval(hb);if(currentEventId)API.unlockVorgang(currentEventId).catch(()=>{});};
