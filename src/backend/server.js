@@ -560,7 +560,7 @@ function buildVertragHTML(vorgang, stamm, user) {
 // ═══════════════════════════════════════════════════════════════════
 // HTML-Builder: Einsatzprotokoll
 // ═══════════════════════════════════════════════════════════════════
-function buildEinsatzprotokollHTML(vorgang, stamm, user, dayCalcs) {
+function buildEinsatzprotokollHTML(vorgang, stamm, user, dayCalcs, logoData) {
   const ev = vorgang.event || vorgang;
   const days = (vorgang.days || []).filter(d => d.active !== false);
   const esc = s => String(s||"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
@@ -644,7 +644,7 @@ function buildEinsatzprotokollHTML(vorgang, stamm, user, dayCalcs) {
 <table class="header-table">
 <tr>
   <td class="header-logo">
-    <img src="${BRK_LOGO}" style="width:180px;height:auto;vertical-align:top;" />
+    ${logoData ? `<img src="${logoData}" style="width:180px;height:auto;vertical-align:top;" />` : `<div style="font-weight:bold;font-size:14px;">BRK Bereitschaft</div>`}
   </td>
   <td class="header-title">
     <h2>Einsatzprotokoll</h2>
@@ -714,8 +714,10 @@ app.post("/api/pdf/einsatzprotokoll/:id", requireAuth, async (req, res) => {
     const bc = row.bereitschaft_code || req.session.user.bereitschaftCode;
     const stamm = db.prepare("SELECT * FROM bereitschaften WHERE code=?").get(bc) || {};
     const user = db.prepare("SELECT name, titel FROM users WHERE sub=?").get(req.session.user.sub) || {};
+    const logoRow = db.prepare("SELECT data FROM logos WHERE bereitschaft_code=?").get(bc);
+    const logoData = logoRow?.data || null;
     const { dayCalcs } = req.body;
-    const html = buildEinsatzprotokollHTML(vorgang, stamm, user, dayCalcs || []);
+    const html = buildEinsatzprotokollHTML(vorgang, stamm, user, dayCalcs || [], logoData);
     const browser = await puppeteer.launch({
       executablePath: process.env.CHROMIUM_PATH || "/usr/bin/chromium-browser",
       args: ["--no-sandbox","--disable-setuid-sandbox","--disable-dev-shm-usage","--disable-gpu"],
