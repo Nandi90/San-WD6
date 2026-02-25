@@ -41,7 +41,7 @@ const mkDay=(n)=>({id:n,active:n===1,date:"",startTime:"18:00",endTime:"23:00",a
 const EMPTY_EVENT={auftragsnr:"",rechnungsnr:"",name:"",ort:"",adresse:"",veranstalter:"",ansprechpartner:"",telefon:"",email:"",rechnungsempfaenger:"",reStrasse:"",rePlzOrt:"",anrede:"Sehr geehrte Damen und Herren,",auflagen:"keine",kfzStellplatz:true,sanitaetsraum:false,strom:true,verpflegung:true,pauschalangebot:0,bemerkung:"",coords:null,w3w:"",checklist:{},ilsEL:"",ilsTelefon:"",ilsFunk:"",ilsAbkoemmlich:"",ilsFzg1:"",ilsFzg2:"",ilsFzg3:"",ilsSonstige:""};
 const f2=(v)=>new Intl.NumberFormat("de-DE",{minimumFractionDigits:2,maximumFractionDigits:2}).format(v);
 const fDate=(d)=>d?new Date(d).toLocaleDateString("de-DE"):"";
-const fTS=(ts)=>ts?new Date(ts).toLocaleDateString("de-DE",{day:"2-digit",month:"2-digit",year:"numeric",hour:"2-digit",minute:"2-digit"}):"";
+const fTS=(ts)=>{if(!ts)return"";const s=String(ts);const d=new Date(s.includes("T")||s.endsWith("Z")?s:s.replace(" ","T")+"Z");return d.toLocaleDateString("de-DE",{day:"2-digit",month:"2-digit",year:"numeric",hour:"2-digit",minute:"2-digit"})};
 
 // ═══════════════════════════════════════════════════════════════════════════
 // UI COMPONENTS
@@ -318,7 +318,7 @@ function StatusBanner({angebotVersendet,onUnlock}){
 // ═══════════════════════════════════════════════════════════════════════════
 function HistoryWidget({history}){
   if(!history||history.length===0)return null;
-  const iconMap={create:"🆕",update:"✏️",checklist:"☑️",status:"📊",lock:"🔒",unlock:"🔓",delete:"🗑️"};
+  const iconMap={create:"🆕",update:"✏️",edit:"✏️",checklist:"☑️",status:"📊",status_versendet:"📤",status_entsperrt:"🔓",lock:"🔒",unlock:"🔓",entsperrt:"🔓",gesperrt:"🔒",save:"💾",delete:"🗑️"};
   return(<Card title="Änderungsverlauf" accent="#78909c" sub={`${history.length} Einträge`}>
     <div style={{maxHeight:300,overflowY:"auto"}}>
       {history.map((h,i)=>(<div key={i} style={{display:"flex",gap:10,padding:"6px 0",borderBottom:i<history.length-1?`1px solid ${C.hellgrau}`:"none",fontSize:12}}>
