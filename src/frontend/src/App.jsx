@@ -126,22 +126,37 @@ function AddressAutocomplete({label,value,onChange,onResult}){
   const handleChange=(v)=>{onChange(v);clearTimeout(debounceRef.current);debounceRef.current=setTimeout(()=>search(v),600);};
   const selectAddr=async(s)=>{
     onChange(s.address);setSuggestions([]);
-    // Wenn Hausnummer vorhanden, strukturierte Suche fuer praezise Coords+w3w
     if(s.hnr && s.road){
+      // 1. Versuch: Nominatim strukturiert
       try{
         const params=new URLSearchParams({street:s.hnr+" "+s.road,format:"json",addressdetails:"1",limit:"1",countrycodes:"de","accept-language":"de"});
         if(s.city)params.set("city",s.city);
         if(s.plz)params.set("postalcode",s.plz);
         const rr=await fetch(`https://nominatim.openstreetmap.org/search?${params}`,{headers:{"User-Agent":"BRK-SanWD/6.0"}});
         const rd=await rr.json();
-        if(rd[0]){
+        if(rd[0] && rd[0].address && rd[0].address.house_number){
           const rlat=parseFloat(rd[0].lat),rlng=parseFloat(rd[0].lon);
           let rw3w=null;
           try{const wr=await fetch(`/api/w3w?lat=${rlat}&lng=${rlng}`,{credentials:"include"});const wd=await wr.json();rw3w=wd.w3w||null;}catch{}
-          if(onResult)onResult({...s,lat:rlat,lng:rlng,w3w:rw3w||s.w3w});
+          if(onResult)onResult({...s,lat:rlat,lng:rlng,w3w:rw3w||s.w3w,imprecise:false});
           return;
         }
       }catch{}
+      // 2. Fallback: HERE Geocoding (praezise Hausnummer-Aufloesung)
+      try{
+        const hq=s.road+" "+s.hnr+(s.plz?" "+s.plz:"")+(s.city?" "+s.city:"");
+        const hr=await fetch(`/api/geocode?q=${encodeURIComponent(hq)}`,{credentials:"include"});
+        const hd=await hr.json();
+        if(hd.lat && hd.houseNumber){
+          let rw3w=null;
+          try{const wr=await fetch(`/api/w3w?lat=${hd.lat}&lng=${hd.lng}`,{credentials:"include"});const wd=await wr.json();rw3w=wd.w3w||null;}catch{}
+          if(onResult)onResult({...s,lat:hd.lat,lng:hd.lng,w3w:rw3w||s.w3w,imprecise:false});
+          return;
+        }
+      }catch{}
+      // Beide Geocoder gescheitert
+      if(onResult)onResult({...s,imprecise:true});
+      return;
     }
     if(onResult)onResult(s);
   };
@@ -1191,9 +1206,10 @@ export default function App(){
                 <Inp label="Name der Veranstaltung" value={event.name} onChange={v=>updateEvent("name",v)}/>
                 <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"0 16px"}}>
                   <Inp label="Veranstaltungsort" value={event.ort} onChange={v=>updateEvent("ort",v)}/>
-                  <AddressAutocomplete label="Adresse inkl. Hausnummer (z.B. Dreiweiherweg 8)" value={event.adresse} onChange={v=>updateEvent("adresse",v)} onResult={s=>{updateEvent("coords",{lat:s.lat,lng:s.lng});if(s.w3w)updateEvent("w3w",s.w3w);}}/>
+                  <AddressAutocomplete label="Adresse inkl. Hausnummer (z.B. Karl-Konrad-Str. 3)" value={event.adresse} onChange={v=>updateEvent("adresse",v)} onResult={s=>{updateEvent("coords",{lat:s.lat,lng:s.lng});if(s.w3w)updateEvent("w3w",s.w3w);updateEvent("addrImprecise",!!s.imprecise);}}/>
                 </div>
-                <LeafletMap coords={event.coords} w3w={event.w3w} onChange={r=>{updateEvent("coords",{lat:r.lat,lng:r.lng});if(r.address)updateEvent("adresse",r.address);}} onW3W={w=>updateEvent("w3w",w)}/>
+                <LeafletMap coords={event.coords} w3w={event.w3w} onChange={r=>{updateEvent("coords",{lat:r.lat,lng:r.lng});if(r.address)updateEvent("adresse",r.address);updateEvent("addrImprecise",false);}} onW3W={w=>updateEvent("w3w",w)}/>
+                {event.addrImprecise&&<div style={{background:"#fff3cd",border:"1px solid #ffc107",borderRadius:4,padding:"8px 12px",marginTop:6,fontSize:12,color:"#856404",display:"flex",alignItems:"center",gap:8}}>⚠️ <span>Hausnummer konnte nicht exakt aufgelöst werden. <strong>Bitte Pin auf der Karte zur genauen Position verschieben</strong> – der what3words-Code wird automatisch aktualisiert.</span></div>}
                 <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"0 16px",marginTop:10}}>
                   <Chk label="Kfz-Stellplatz vorhanden" checked={event.kfzStellplatz} onChange={v=>updateEvent("kfzStellplatz",v)}/>
                   <Chk label="Sanitätsraum vorhanden" checked={event.sanitaetsraum} onChange={v=>updateEvent("sanitaetsraum",v)}/>

@@ -284,6 +284,33 @@ app.use("/api/klauseln", klauselnRouter);
 
 
 // ── W3W Proxy ────────────────────────────────────────────────────
+// ═══════════════════════════════════════════════════════════════════
+// Geocoding Proxy (HERE Fallback fuer Hausnummer-Aufloesung)
+// ═══════════════════════════════════════════════════════════════════
+app.get("/api/geocode", requireAuth, async (req, res) => {
+  const q = req.query.q;
+  if (!q) return res.json({ items: [] });
+  const apiKey = process.env.HERE_API_KEY;
+  if (!apiKey) return res.status(501).json({ error: "HERE API nicht konfiguriert" });
+  try {
+    const url = `https://geocode.search.hereapi.com/v1/geocode?q=${encodeURIComponent(q)}&apiKey=${encodeURIComponent(apiKey)}&lang=de&in=countryCode:DEU&limit=1`;
+    const resp = await fetch(url);
+    const data = await resp.json();
+    if (data.items && data.items[0]) {
+      const item = data.items[0];
+      res.json({
+        lat: item.position.lat,
+        lng: item.position.lng,
+        address: item.address.label,
+        houseNumber: item.address.houseNumber || null,
+        resultType: item.resultType
+      });
+    } else {
+      res.json({ lat: null, lng: null });
+    }
+  } catch(e) { console.error("HERE Geocode:", e); res.json({ lat: null, lng: null }); }
+});
+
 app.get("/api/w3w", async (req, res) => {
   const { lat, lng } = req.query;
   const key = process.env.W3W_API_KEY;
