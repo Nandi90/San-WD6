@@ -565,6 +565,31 @@ function buildVertragHTML(vorgang, stamm, user) {
 
 
 // ═══════════════════════════════════════════════════════════════════
+// PDF: Gefahrenanalyse (serverseitig)
+// ═══════════════════════════════════════════════════════════════════
+app.post("/api/pdf/gefahren/:id", requireAuth, async (req, res) => {
+  const puppeteer = require("puppeteer-core");
+  try {
+    const db = require("./db").getDb();
+    const row = db.prepare("SELECT data FROM vorgaenge WHERE id=?").get(req.params.id);
+    if (!row) return res.status(404).json({ error: "Vorgang nicht gefunden" });
+    const vorgang = JSON.parse(row.data);
+    const stamm = db.prepare("SELECT * FROM bereitschaften WHERE code=?").get(req.session.user.bereitschaftCode) || {};
+    const { dayCalcs, activeDays } = req.body;
+    if (!dayCalcs || !dayCalcs.length) return res.status(400).json({ error: "Keine Tage vorhanden" });
+    const html = buildGefahrenHTML(vorgang.event || {}, activeDays || [], dayCalcs, stamm);
+    const browser = await puppeteer.launch({ executablePath: process.env.CHROMIUM_PATH || "/usr/bin/chromium-browser", args: ["--no-sandbox","--disable-setuid-sandbox","--disable-dev-shm-usage","--disable-gpu"], headless: true });
+    const page = await browser.newPage();
+    await page.setContent(html, { waitUntil: "domcontentloaded" });
+    const pdf = await page.pdf({ format: "A4", margin: { top: "15mm", right: "10mm", bottom: "20mm", left: "10mm" }, displayHeaderFooter: true, headerTemplate: "<span></span>", footerTemplate: '<div style="width:100%;text-align:center;font-size:8pt;color:#aaa;font-family:Arial,sans-serif">Seite <span class="pageNumber"></span> von <span class="totalPages"></span></div>', printBackground: true });
+    await browser.close();
+    const nr = (vorgang.event?.auftragsnr || req.params.id).replace(/[^a-zA-Z0-9_-]/g,"_");
+    res.set({ "Content-Type": "application/pdf", "Content-Disposition": `attachment; filename="${nr}_Gefahrenanalyse.pdf"` });
+    res.send(pdf);
+  } catch(e) { console.error("Gefahren PDF:", e); res.status(500).json({ error: e.message }); }
+});
+
+// ═══════════════════════════════════════════════════════════════════
 // PDF: Angebot (serverseitig)
 // ═══════════════════════════════════════════════════════════════════
 app.post("/api/pdf/angebot/:id", requireAuth, async (req, res) => {

@@ -190,6 +190,12 @@ const API = {
     return this.json(`/api/klauseln/${id}`, { method: "PUT", body: JSON.stringify({ inhalt }) });
   },
   // ── PDF serverseitig ─────────────────────────────────────────
+  generateGefahrenPDF: async function(vorgangId, dayCalcs, activeDays) {
+    const res = await this._fetch(`/api/pdf/gefahren/${vorgangId}`, {
+      method: "POST", body: JSON.stringify({ dayCalcs, activeDays }),
+    });
+    return res.blob();
+  },
   generateAngebotPDF: async function(vorgangId, dayCalcs, totalCosts, activeDays) {
     const res = await this._fetch(`/api/pdf/angebot/${vorgangId}`, {
       method: "POST", body: JSON.stringify({ dayCalcs, totalCosts, activeDays }),
