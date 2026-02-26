@@ -488,7 +488,7 @@ function SignaturePad({value,onChange}){
   const [hasSignature,setHasSignature]=useState(!!value);
   useEffect(()=>{
     if(value&&canvasRef.current){
-      const img=new Image();img.onload=()=>{const ctx=canvasRef.current.getContext("2d");ctx.clearRect(0,0,300,100);ctx.drawImage(img,0,0);};img.src=value;
+      const img=new Image();img.onload=()=>{if(!canvasRef.current)return;const canvas=canvasRef.current;const ctx=canvas.getContext("2d");ctx.clearRect(0,0,canvas.width,canvas.height);const scale=Math.min(canvas.width/img.width,canvas.height/img.height);const w=img.width*scale;const h=img.height*scale;const x=(canvas.width-w)/2;const y=(canvas.height-h)/2;ctx.drawImage(img,x,y,w,h);};img.src=value;
       setHasSignature(true);
     } else if(!value&&canvasRef.current){
       const ctx=canvasRef.current.getContext("2d");ctx.clearRect(0,0,300,100);
