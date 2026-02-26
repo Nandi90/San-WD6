@@ -87,7 +87,22 @@ function AddressAutocomplete({label,value,onChange,onResult}){
         const lat=parseFloat(r.lat),lng=parseFloat(r.lon);
         let w3w=null;
         try{const wr=await fetch(`/api/w3w?lat=${lat}&lng=${lng}`,{credentials:"include"});const wd=await wr.json();w3w=wd.w3w||null;}catch{}
-        return{address:r.display_name,lat,lng,w3w};
+        // Strukturierte Adresse mit Hausnummer aufbauen
+        const addr = r.address || {};
+        const road = addr.road || addr.pedestrian || addr.path || addr.footway || "";
+        const hnr  = addr.house_number || "";
+        const sub  = addr.suburb || addr.quarter || addr.neighbourhood || "";
+        const city = addr.city || addr.town || addr.village || addr.hamlet || "";
+        const plz  = addr.postcode || "";
+        const parts = [];
+        if (hnr && road) parts.push(hnr + ", " + road);
+        else if (road) parts.push(road);
+        if (sub) parts.push(sub);
+        if (city) parts.push(city);
+        if (plz) parts.push(plz);
+        parts.push("Deutschland");
+        const addrStr = parts.join(", ") || r.display_name;
+        return{address:addrStr,display:r.display_name,lat,lng,w3w};
       }));
       setSuggestions(mapped);
     }catch{setSuggestions([]);}
