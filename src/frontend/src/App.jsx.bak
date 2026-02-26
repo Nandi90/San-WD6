@@ -1198,7 +1198,7 @@ export default function App(){
   const generateNr=useCallback(()=>{const b=BEREITSCHAFTEN[stammdaten.bereitschaftIdx];const yr=String(year).slice(-2);const nr=String(laufendeNr).padStart(3,"0");setEvent(p=>({...p,auftragsnr:`${b.code} ${yr}/${nr}`}));const next=laufendeNr+1;setLaufendeNr(next);if(user)try{API.incrementCounter(year).catch(()=>{});}catch{}},[stammdaten.bereitschaftIdx,laufendeNr,year,user,storagePrefix]);
 
   const saveEvent=useCallback(async()=>{
-  if(event?.checklist?.angebotVersendet||event?.checklist?.abgeschlossen){console.log("⏭️ Speichern übersprungen: Vorgang gesperrt");return;}
+  if(event._isVersendet){alert("Vorgang ist versendet und gesperrt. Bitte zuerst entsperren.");return;}
     // Auto-Nummer wenn noch keine gesetzt
     if(!event.auftragsnr){
       const b=BEREITSCHAFTEN[stammdaten.bereitschaftIdx];
@@ -1216,15 +1216,11 @@ export default function App(){
       upsertKunde(event);
       console.log("✅ Gespeichert:",id);
     }catch(e){
-      if(e.message&&(e.message.includes("423")||e.message.includes("Gesperrt")||e.message.includes("versendet"))){
-        console.warn("⏭️ Speichern übersprungen (gesperrt):",e.message);
-      }else{
-        console.error("❌ Speichern fehlgeschlagen:",e.message,e);
-        alert("Speichern fehlgeschlagen: "+e.message);
-      }
+      console.error("❌ Speichern fehlgeschlagen:",e.message,e);
+      alert("Speichern fehlgeschlagen: "+e.message);
     }setSaving(false);},[user,currentEventId,event,days,stammdaten.bereitschaftIdx,upsertKunde,year]);
 
-  useEffect(()=>{if(!user||!currentEventId||tab==="events")return;if(event?.checklist?.angebotVersendet||event?.checklist?.abgeschlossen)return;if(lockInfo&&lockInfo.locked&&lockInfo.lockedBy!==user?.name)return;const t=setTimeout(saveEvent,2000);return()=>clearTimeout(t);},[event,days,currentEventId,user,tab,saveEvent,lockInfo]);
+  useEffect(()=>{if(!user||!currentEventId||tab==="events")return;const t=setTimeout(saveEvent,2000);return()=>clearTimeout(t);},[event,days,currentEventId,user,tab,saveEvent]);
 
 
   // Lock + History (v6.1 - temporarily simplified)
@@ -1453,12 +1449,12 @@ export default function App(){
         {tab==="days"&&(<div>
           <LockBanner lockInfo={lockInfo} isOwner={lockInfo?.lockedBy===user?.name} onUnlock={async()=>{try{await API.unlockVorgang(currentEventId);setLockInfo(null);}catch{}}}/>
           <StatusBanner angebotVersendet={event?.checklist?.angebotVersendet} abgeschlossen={event?.checklist?.abgeschlossen} onUnlock={async(begruendung)=>{await API.entsperrenVorgang(currentEventId,begruendung);updateEvent("checklist",{...event.checklist,angebotVersendet:false,abgeschlossen:false});}}/>
-          <div style={{display:"flex",gap:4,marginBottom:12,flexWrap:"wrap"}}>{days.map((d,i)=>(<div key={i} style={{display:"inline-flex",alignItems:"center",gap:0}}>
-              <button onClick={()=>{if(!(isLocked||isEditLocked)&&!d.active)updateDay(i,"active",true);if(d.active)setActiveDay(i);}} style={{padding:"6px 14px",borderRadius:d.active&&i>0?"4px 0 0 4px":4,border:`1px solid ${d.active?(activeDay===i?C.rot:C.mittelgrau):"#e0e0e0"}`,background:activeDay===i?`${C.rot}11`:d.active?C.weiss:C.hellgrau,color:d.active?C.schwarz:C.bgrau,cursor:d.active?"pointer":"default",fontSize:12,fontWeight:activeDay===i?700:500,fontFamily:FONT.sans,borderRight:d.active&&i>0?"none":undefined,opacity:!d.active&&(isLocked||isEditLocked)?0.4:1}}>Tag {i+1}{d.active&&d.date&&<span style={{marginLeft:4,fontSize:10,opacity:0.6}}>{fDate(d.date)}</span>}</button>
-              {d.active&&i>0&&!(isLocked||isEditLocked)&&<button onClick={(e)=>{e.stopPropagation();updateDay(i,"active",false);if(activeDay===i)setActiveDay(0);}} title="Tag deaktivieren" style={{padding:"6px 8px",borderRadius:"0 4px 4px 0",border:`1px solid ${activeDay===i?C.rot:C.mittelgrau}`,borderLeft:"none",background:activeDay===i?`${C.rot}11`:C.weiss,color:C.rot,cursor:"pointer",fontSize:11,fontWeight:700,lineHeight:1}}>✕</button>}
-            </div>))}</div>
           <div style={{position:"relative"}}>
           {(isLocked||isEditLocked)&&<div style={{position:"absolute",top:0,left:0,right:0,bottom:0,background:"rgba(255,255,255,0.55)",zIndex:10,borderRadius:8,pointerEvents:"all"}}/>}
+          <div style={{display:"flex",gap:4,marginBottom:12,flexWrap:"wrap"}}>{days.map((d,i)=>(<div key={i} style={{display:"inline-flex",alignItems:"center",gap:0}}>
+              <button onClick={()=>{if(!d.active)updateDay(i,"active",true);setActiveDay(i);}} style={{padding:"6px 14px",borderRadius:d.active&&i>0?"4px 0 0 4px":4,border:`1px solid ${d.active?(activeDay===i?C.rot:C.mittelgrau):"#e0e0e0"}`,background:activeDay===i?`${C.rot}11`:d.active?C.weiss:C.hellgrau,color:d.active?C.schwarz:C.bgrau,cursor:"pointer",fontSize:12,fontWeight:activeDay===i?700:500,fontFamily:FONT.sans,borderRight:d.active&&i>0?"none":undefined}}>Tag {i+1}{d.active&&d.date&&<span style={{marginLeft:4,fontSize:10,opacity:0.6}}>{fDate(d.date)}</span>}</button>
+              {d.active&&i>0&&<button onClick={(e)=>{e.stopPropagation();updateDay(i,"active",false);if(activeDay===i)setActiveDay(0);}} title="Tag deaktivieren" style={{padding:"6px 8px",borderRadius:"0 4px 4px 0",border:`1px solid ${activeDay===i?C.rot:C.mittelgrau}`,borderLeft:"none",background:activeDay===i?`${C.rot}11`:C.weiss,color:C.rot,cursor:"pointer",fontSize:11,fontWeight:700,lineHeight:1}}>✕</button>}
+            </div>))}</div>
           {(()=>{const i=activeDay,d=days[i];if(!d.active)return<Card><p style={{color:C.dunkelgrau,textAlign:"center",padding:32}}>Tag {i+1} nicht aktiv. <Btn small onClick={()=>updateDay(i,"active",true)}>Aktivieren</Btn></p></Card>;
             const calc=calcDay(d,stammdaten.rates,event.verpflegung);
             return(<div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:14}}>
