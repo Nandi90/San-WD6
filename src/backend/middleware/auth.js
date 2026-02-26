@@ -195,4 +195,85 @@ router.get("/status", (req, res) => {
   });
 });
 
+
+// ── Emergency Login (Hidden Admin-Zugang) ────────────────────────
+router.get("/emergency", (req, res) => {
+  res.send(`<!DOCTYPE html><html lang="de"><head><meta charset="utf-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <title>Notfall-Zugang</title>
+    <style>
+      body{font-family:Arial,sans-serif;display:flex;justify-content:center;align-items:center;min-height:100vh;margin:0;background:#f5f5f5}
+      .box{background:#fff;padding:32px;border-radius:8px;box-shadow:0 2px 12px rgba(0,0,0,.15);max-width:360px;width:100%}
+      h2{margin:0 0 8px;color:#c62828;font-size:18px}
+      .sub{font-size:12px;color:#666;margin-bottom:20px}
+      label{display:block;font-size:13px;font-weight:600;margin-bottom:4px;color:#333}
+      input{width:100%;padding:8px 10px;border:1px solid #ccc;border-radius:4px;font-size:14px;box-sizing:border-box;margin-bottom:12px}
+      select{width:100%;padding:8px 10px;border:1px solid #ccc;border-radius:4px;font-size:14px;box-sizing:border-box;margin-bottom:16px}
+      button{width:100%;padding:10px;background:#c62828;color:#fff;border:none;border-radius:4px;font-size:14px;font-weight:600;cursor:pointer}
+      button:hover{background:#a01a1a}
+      .warn{font-size:11px;color:#c62828;margin-top:12px;text-align:center}
+    </style>
+  </head><body>
+    <div class="box">
+      <h2>\u26a0\ufe0f Notfall-Zugang</h2>
+      <div class="sub">Nur bei Keycloak-Ausfall verwenden</div>
+      <form method="POST" action="/auth/emergency-login">
+        <label>Passwort</label>
+        <input type="password" name="password" required autofocus>
+        <label>Bereitschaft</label>
+        <select name="bereitschaftCode">
+          <option value="BSOB">Bereitschaft SOB</option>
+          <option value="BND">Bereitschaft ND</option>
+          <option value="BBGH">Bereitschaft BGH</option>
+          <option value="BKAHU">Bereitschaft KaHu</option>
+          <option value="BKK">Bereitschaft KarKo</option>
+          <option value="BWEIG">Bereitschaft WEIlG</option>
+          <option value="KBL">Kreisbereitschaftsleitung</option>
+        </select>
+        <button type="submit">Notfall-Login</button>
+      </form>
+      <div class="warn">Zugriff wird protokolliert</div>
+    </div>
+  </body></html>`);
+});
+
+router.post("/emergency-login", (req, res) => {
+  const crypto = require("crypto");
+  const { password, bereitschaftCode } = req.body || {};
+  const hash = crypto.createHash("sha256").update(password || "").digest("hex");
+  const expectedHash = process.env.EMERGENCY_PASSWORD_HASH;
+
+  if (!expectedHash) {
+    return res.status(503).send("Emergency-Login nicht konfiguriert");
+  }
+  if (hash !== expectedHash) {
+    console.warn("Emergency-Login: Falsches Passwort von", req.ip);
+    return res.status(401).send("Falsches Passwort");
+  }
+
+  const bc = bereitschaftCode || "BSOB";
+  req.session.user = {
+    sub: "emergency-admin",
+    name: "Notfall-Administrator",
+    email: "admin@brkndsob.org",
+    rolle: "admin",
+    bereitschaftCode: bc,
+  };
+
+  const { getDb, audit } = require("../db");
+  const db = getDb();
+  db.prepare(`
+    INSERT INTO users (sub, name, email, rolle, bereitschaft_code, last_login)
+    VALUES (?, ?, ?, ?, ?, datetime('now'))
+    ON CONFLICT(sub) DO UPDATE SET
+      rolle = excluded.rolle,
+      bereitschaft_code = excluded.bereitschaft_code,
+      last_login = datetime('now')
+  `).run("emergency-admin", "Notfall-Administrator", "admin@brkndsob.org", "admin", bc);
+
+  audit(req.session.user, "emergency-login", "user", "emergency-admin", "Notfall-Login von " + req.ip);
+  console.warn("Emergency-Login aktiviert von", req.ip, "BC:", bc);
+  res.redirect(process.env.APP_URL || "/");
+});
+
 module.exports = router;
