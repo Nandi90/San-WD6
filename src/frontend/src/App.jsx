@@ -62,8 +62,8 @@ const fTS=(ts)=>{if(!ts)return"";const d=typeof ts==="number"?new Date(ts):new D
 // ═══════════════════════════════════════════════════════════════════════════
 // UI COMPONENTS
 // ═══════════════════════════════════════════════════════════════════════════
-const ChangelogItem=({v,d,items})=>{
-  const [open,setOpen]=React.useState(v.includes("6.5")||v.includes("6.1"));
+const ChangelogItem=({v,d,items,defaultOpen})=>{
+  const [open,setOpen]=React.useState(!!defaultOpen);
   return(<div style={{borderBottom:`1px solid ${C.mittelgrau}20`}}>
     <div onClick={()=>setOpen(!open)} style={{display:"flex",alignItems:"center",gap:10,padding:"14px 20px",cursor:"pointer"}} onMouseEnter={e=>e.currentTarget.style.background=C.hellgrau} onMouseLeave={e=>e.currentTarget.style.background="transparent"}>
       <span style={{fontSize:12,color:C.bgrau,transition:"transform 0.2s",transform:open?"rotate(90deg)":"rotate(0deg)"}}>▶</span>
@@ -1610,7 +1610,7 @@ export default function App(){
                 "Grundlegende Kostenberechnung nach BRK-Kostensaetzen",
                 "Ausgabe als druckbares PDF-Dokument",
               ]},
-            ].map(({v,d,c:items})=><ChangelogItem key={v} v={v} d={d} items={items}/>)}
+            ].map(({v,d,c:items},i)=><ChangelogItem key={v} v={v} d={d} items={items} defaultOpen={i<2}/>)}
           </div>
         </div>
       )}
