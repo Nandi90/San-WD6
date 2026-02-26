@@ -665,11 +665,11 @@ function AngebotPDF({event,dayCalcs,totalCosts,stammdaten,activeDays,bereitschaf
       {/* UNTERSCHRIFT BRK */}
       <div style={{marginTop:30,display:"flex",justifyContent:"flex-end",fontSize:"9pt"}}>
         <div style={{textAlign:"center",minWidth:220}}>
-          {user?.signatur||event.unterschrift
-            ?<img src={user?.signatur||event.unterschrift} alt="Unterschrift" style={{height:50,width:"auto",display:"block",margin:"0 auto 2px"}}/>
+          {user?.signatur
+            ?<img src={user?.signatur} alt="Unterschrift" style={{height:50,width:"auto",display:"block",margin:"0 auto 2px"}}/>
             :<div style={{height:50}}/>}
           <div style={{borderTop:"1px solid #000",paddingTop:4,marginBottom:2}}>{unterzeichner}</div>
-          {!user?.signatur||event.unterschrift&&<div style={{fontSize:"8pt",fontStyle:"italic",color:"#555"}}>Dieses Dokument wurde maschinell erstellt<br/>und ist ohne Unterschrift gültig.</div>}
+          {!user?.signatur&&<div style={{fontSize:"8pt",fontStyle:"italic",color:"#555"}}>Dieses Dokument wurde maschinell erstellt<br/>und ist ohne Unterschrift gültig.</div>}
         </div>
       </div>
 
@@ -794,7 +794,7 @@ function VertragPDF({event,dayCalcs,totalCosts,stammdaten,activeDays,bereitschaf
     </div>
     <div style={{marginTop:30,display:"flex",justifyContent:"space-between"}}>
       <div style={{width:200,textAlign:"center"}}>
-        {user?.signatur||event.unterschrift?<img src={user?.signatur||event.unterschrift} alt="Unterschrift" style={{height:40,width:"auto",display:"block",margin:"0 auto"}}/>:<div style={{padding:"4px 0",fontSize:"8pt",fontStyle:"italic",color:"#999"}}>Dieses Dokument wurde maschinell<br/>angefertigt und ist ohne Unterschrift gültig.</div>}
+        {user?.signatur?<img src={user?.signatur} alt="Unterschrift" style={{height:40,width:"auto",display:"block",margin:"0 auto"}}/>:<div style={{padding:"4px 0",fontSize:"8pt",fontStyle:"italic",color:"#999"}}>Dieses Dokument wurde maschinell<br/>angefertigt und ist ohne Unterschrift gültig.</div>}
         <div style={{borderTop:"1px solid #000",paddingTop:4,fontSize:"8pt"}}>{vUnterzeichner}<br/>{vTitel}</div>
       </div>
       <div style={{width:10}}/>
@@ -955,7 +955,7 @@ const TABS=[{id:"events",label:"Vorgänge",icon:"📁"},{id:"event",label:"Veran
 export default function App(){
   const [user,setUser]=useState(null);
   const [authLoading,setAuthLoading]=useState(true);
-  useEffect(()=>{API.getStatus().then(d=>{if(d.authenticated){const bc=d.user.bereitschaftCode;const bIdx=BEREITSCHAFTEN.findIndex(b=>b.code===bc);const u={sub:d.user.sub,name:d.user.name,email:d.user.email,bereitschaftCode:bc,bereitschaftIdx:bIdx>=0?bIdx:0,bereitschaft:(d.user.bereitschaft&&d.user.bereitschaft.name)||bc||"",rolle:d.user.rolle,telefon:"",mobil:"",titel:""};setUser(u);API.getProfile().then(p=>{if(p)setUser(prev=>({...prev,telefon:p.telefon||prev.telefon,mobil:p.mobil||prev.mobil,titel:p.titel||prev.titel,email:p.email||prev.email,ort:p.ort||prev.ort||''}));}).catch(()=>{});}}).catch(()=>{}).finally(()=>setAuthLoading(false));},[]);
+  useEffect(()=>{API.getStatus().then(d=>{if(d.authenticated){const bc=d.user.bereitschaftCode;const bIdx=BEREITSCHAFTEN.findIndex(b=>b.code===bc);const u={sub:d.user.sub,name:d.user.name,email:d.user.email,bereitschaftCode:bc,bereitschaftIdx:bIdx>=0?bIdx:0,bereitschaft:(d.user.bereitschaft&&d.user.bereitschaft.name)||bc||"",rolle:d.user.rolle,telefon:"",mobil:"",titel:""};setUser(u);API.getProfile().then(p=>{if(p)setUser(prev=>({...prev,telefon:p.telefon||prev.telefon,mobil:p.mobil||prev.mobil,titel:p.titel||prev.titel,email:p.email||prev.email,ort:p.ort||prev.ort||'',signatur:p.unterschrift||prev.signatur||''}));}).catch(()=>{});}}).catch(()=>{}).finally(()=>setAuthLoading(false));},[]);
   const [tab,setTab]=useState("events");
   const [stammdaten,setStammdaten]=useState(DEFAULT_STAMMDATEN);
   useEffect(()=>{if(!user)return;API.getStammdaten().then(d=>{if(d){const bIdxS=user?BEREITSCHAFTEN.findIndex(b=>b.code===user.bereitschaftCode):-1;setStammdaten(prev=>({...prev,bereitschaftIdx:bIdxS>=0?bIdxS:prev.bereitschaftIdx,kvName:d.kv_name||prev.kvName,kgf:d.kgf||prev.kgf,kvAdresse:d.kv_adresse||prev.kvAdresse,kvPlzOrt:d.kv_plz_ort||prev.kvPlzOrt,bereitschaftsleiter:d.leiter_name||prev.bereitschaftsleiter,bereitschaftsleiterTitle:d.leiter_title||prev.bereitschaftsleiterTitle,telefon:d.telefon||prev.telefon,fax:d.fax||prev.fax,mobil:d.mobil||prev.mobil,email:d.email||prev.email,funkgruppe:d.funkgruppe||prev.funkgruppe,customLogo:d.logo||null,rates:d.kostensaetze?{helfer:d.kostensaetze.helfer,ktw:d.kostensaetze.ktw,rtw:d.kostensaetze.rtw,gktw:d.kostensaetze.gktw,einsatzleiter:d.kostensaetze.einsatzleiter,aerzte:0,einsatzleiterKfz:d.kostensaetze.einsatzleiter_kfz,mobileSanstation:d.kostensaetze.seg_lkw,segLkw:d.kostensaetze.seg_lkw,mtw:d.kostensaetze.mtw,zelt:d.kostensaetze.zelt,kmKtw:d.kostensaetze.km_ktw,kmRtw:d.kostensaetze.km_rtw,kmGktw:d.kostensaetze.km_gktw,kmElKfz:d.kostensaetze.km_el_kfz,kmSegLkw:d.kostensaetze.km_seg_lkw,kmMtw:d.kostensaetze.km_mtw,verpflegung:d.kostensaetze.verpflegung}:prev.rates}));}setStammdatenLoaded(true);}).catch(e=>{console.warn("Stammdaten laden:",e);setStammdatenLoaded(true);});},[user]);
@@ -1181,10 +1181,7 @@ export default function App(){
                 </div>}
                 </Card>
               </Card>
-              <Card title="Unterschrift Angebot" accent="#5c6bc0">
-                <div style={{fontSize:12,color:C.dunkelgrau,marginBottom:8}}>Leer lassen = Hinweis "maschinell erstellt" erscheint im Angebot</div>
-                <SignaturePad value={user?.signatur||event.unterschrift||null} onChange={v=>updateEvent("unterschrift",v)}/>
-              </Card>
+
               <Card title="Veranstalter / Rechnungsempfänger" accent={C.dunkelblau}>
                 {kunden.length>0&&<div style={{marginBottom:10}}>
                   <label style={{fontSize:11,fontWeight:600,color:C.dunkelgrau,display:"block",marginBottom:3}}>Aus Kundenstamm wählen</label>

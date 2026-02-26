@@ -300,12 +300,13 @@ app.get("/api/profile", (req, res) => {
 
 app.put("/api/profile", (req, res) => {
   if (!req.session?.user) return res.status(401).json({ error: "Nicht angemeldet" });
-  const { telefon, mobil, titel, email, ort, unterschrift } = req.body;
+  const { telefon, mobil, titel, email, ort, unterschrift, signatur } = req.body;
+  const _unterschrift = unterschrift || signatur || "";
   const db = require("./db").getDb();
   db.prepare("UPDATE users SET telefon=?, mobil=?, titel=?, email=?, ort=?, unterschrift=? WHERE sub=?")
-    .run(telefon||"", mobil||"", titel||"", email||"", ort||"", unterschrift||"", req.session.user.sub);
+    .run(telefon||"", mobil||"", titel||"", email||"", ort||"", _unterschrift, req.session.user.sub);
   // Session aktualisieren
-  req.session.user = { ...req.session.user, telefon, mobil, titel, email, ort, unterschrift };
+  req.session.user = { ...req.session.user, telefon, mobil, titel, email, ort, unterschrift: _unterschrift };
   res.json({ success: true });
 });
 
@@ -387,8 +388,8 @@ function buildVertragHTML(vorgang, stamm, user) {
     `<td style="padding:2px 8px">${i+1}. Tag: <strong>${d.besucher||"—"}</strong></td>`
   ).join("");
 
-  const unterschriftHtml = (user.unterschrift || ev.unterschrift)
-    ? `<img src="${user.unterschrift || ev.unterschrift}" style="height:45px;width:auto;display:block;margin:0 auto 4px">`
+  const unterschriftHtml = (user.unterschrift)
+    ? `<img src="${user.unterschrift}" style="height:45px;width:auto;display:block;margin:0 auto 4px">`
     : `<div style="height:49px"></div>`;
 
   return `<!DOCTYPE html><html lang="de"><head><meta charset="utf-8"><style>
