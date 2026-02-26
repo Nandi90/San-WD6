@@ -38,7 +38,7 @@ const CHECKLIST_ITEMS=[
 function vPts(n){if(!n)return 0;if(n<=500)return 1;if(n<1000)return 2;if(n<1500)return 3;if(n<3000)return 4;if(n<6000)return 5;if(n<10000)return 6;if(n<20000)return 7;return Math.round((n-20000)/10000)+7;}
 function calcRisk(d){const ap=d.auflagen?(d.geschlossen?vPts(d.auflagen)*2:vPts(d.auflagen)):0;const fc=d.flaeche?d.flaeche*(d.geschlossenFlaeche?2:1):0;const fp=fc>0?vPts(fc):0;const bp=d.besucher?Math.round(d.besucher/500):0;const bfp=d.besucherFlaeche?Math.round((d.besucherFlaeche*2)/500):0;const zw=ap+fp+bp+bfp;const factor=d.eventTypeId===25?(d.customFactor||0):(EVENT_TYPES.find(e=>e.id===d.eventTypeId)?.factor||0.4);const ro=zw*factor;const pp=Math.round((d.prominente||0)/5)*10;const pol=d.polizeiRisiko?10:0;return{ap,fp,bp,bfp,zw,factor,ro,pp,pol,total:ro+pp+pol};}
 function getRec(risk){const p=PERSONNEL_TABLE.find(r=>risk>=r.min&&risk<r.max)||PERSONNEL_TABLE[9];const rtw=(RTW_T.find(r=>risk>=r.min&&risk<r.max)||RTW_T[7]).v;const nef=(NEF_T.find(r=>risk>=r.min&&risk<r.max)||NEF_T[4]).v;let el="im Team";if(risk>60)el="volle stabsmäßige EL";else if(risk>30)el="stabsm. EL, reduziert";else if(p.h>=21)el="Zugführer";else if(p.h>=6)el="Gruppenführer";return{helfer:p.h,ktw:p.k,rtw,nef,el,elKfz:risk>=110?3:risk>=80?2:risk>=50?1:0,gktw:risk>=90?1:0};}
-function calcH(s,e){if(!s||!e)return 0;const[sh,sm]=s.split(":").map(Number);const[eh,em]=e.split(":").map(Number);let d=(eh*60+em)-(sh*60+sm);if(d<=0)d+=1440;return Math.ceil(d/60);}
+function calcH(s,e){if(!s||!e)return 0;const[sh,sm]=s.split(":").map(Number);const[eh,em]=e.split(":").map(Number);let d=(eh*60+em)-(sh*60+sm);if(d<=0)d+=1440;return Math.ceil(d/15)*0.25;}
 function calcDay(d,rates,verpfVA){const h=calcH(d.startTime,d.endTime);const risk=calcRisk(d);const rec=getRec(risk.total);const hc=d.oHelfer??rec.helfer,kc=d.oKtw??rec.ktw,rc=d.oRtw??rec.rtw,ac=d.oAerzte??0,gc=d.oGktw??rec.gktw,el=d.oEl??rec.el;const ec=d.oElKfz??rec.elKfz,sc=d.oSeg??0,mc=d.oMtw??0,zc=d.oZelt??0;const tp=el==="im Team"?hc+kc*2+rc*2+gc*2+ac:hc+kc*2+rc*2+gc*2+ac+1;const hfc=el==="im Team"?tp-ac:tp-ac-1;const cH=hfc*h*rates.helfer,cK=kc*rates.ktw+(d.kmKtw||0)*kc*rates.kmKtw,cR=rc*rates.rtw+(d.kmRtw||0)*rc*rates.kmRtw,cA=ac*rates.aerzte,cG=gc*rates.gktw+(d.kmGktw||0)*gc*rates.kmGktw,cE=el==="im Team"?0:h*rates.einsatzleiter,cEK=ec*rates.einsatzleiterKfz+(d.kmElKfz||0)*rates.kmElKfz,cS=sc*rates.segLkw+(d.kmSeg||0)*sc*rates.kmSegLkw,cM=mc*rates.mtw+(d.kmMtw||0)*mc*rates.kmMtw,cZ=zc*rates.zelt;const vB=verpfVA?0:Math.ceil(h/8);const cV=verpfVA?0:vB*tp*rates.verpflegung;return{h,risk,rec,hc,kc,rc,ac,gc,el,ec,sc,mc,zc,tp,hfc,cH,cK,cR,cA,cG,cE,cEK,cS,cM,cZ,cV,total:cH+cK+cR+cA+cG+cE+cEK+cS+cM+cZ+cV,vB};}
 const mkDay=(n)=>({id:n,active:n===1,date:"",startTime:"18:00",endTime:"23:00",auflagen:0,geschlossen:false,flaeche:0,geschlossenFlaeche:false,besucher:1000,besucherFlaeche:0,eventTypeId:11,customFactor:0,prominente:0,polizeiRisiko:false,oHelfer:null,oKtw:null,oRtw:null,oAerzte:null,oGktw:null,oEl:null,oElKfz:null,oSeg:null,oMtw:null,oZelt:null,kmKtw:0,kmRtw:0,kmGktw:0,kmElKfz:0,kmSeg:0,kmMtw:0,fahrzeuge:[]});
 const EMPTY_EVENT={auftragsnr:"",rechnungsnr:"",name:"",ort:"",adresse:"",veranstalter:"",ansprechpartner:"",telefon:"",email:"",rechnungsempfaenger:"",reStrasse:"",rePlzOrt:"",anrede:"Sehr geehrte Damen und Herren,",auflagen:"keine",kfzStellplatz:true,sanitaetsraum:false,strom:true,verpflegung:true,pauschalangebot:0,bemerkung:"",coords:null,w3w:"",hausnr:"",checklist:{},ilsEL:"",ilsTelefon:"",ilsFunk:"",ilsAbkoemmlich:"",ilsFzg1:"",ilsFzg2:"",ilsFzg3:"",ilsSonstige:""};
@@ -494,7 +494,7 @@ function GefahrenPDF({day,calc,eventData,stammdaten,dayNum}){
   const r=calc.risk,b=BEREITSCHAFTEN[stammdaten.bereitschaftIdx],ev=EVENT_TYPES.find(e=>e.id===day.eventTypeId);
   return(<div className="pdf-page" style={{fontFamily:"Arial,sans-serif",fontSize:"10pt",color:"#000",background:"#fff",padding:"15mm 18mm",lineHeight:1.35,pageBreakAfter:"always"}}>
     <div style={{display:"flex",justifyContent:"space-between",borderBottom:`2pt solid ${C.rot}`,paddingBottom:8,marginBottom:12}}><div>{stammdaten.customLogo&&<img src={stammdaten.customLogo} alt="Logo" style={{height:28,width:"auto",marginBottom:4,display:"block"}}/>}<div style={{fontSize:"8pt",color:"#666"}}>{stammdaten.kvName}</div><div style={{fontSize:"13pt",fontWeight:"bold"}}>Gefahrenanalyse {dayNum}. Tag</div></div><div style={{textAlign:"right",fontSize:"9pt",fontWeight:"bold",color:C.rot}}>Sanitätswachdienst</div></div>
-    <table style={{width:"100%",marginBottom:10,borderCollapse:"collapse"}}><tbody><tr><td style={{fontWeight:"bold"}}>{eventData.name}</td><td style={{textAlign:"right"}}>{fDate(day.date)} {day.startTime}—{day.endTime}</td></tr><tr><td colSpan={2} style={{textAlign:"right",fontSize:"9pt",color:"#666"}}>Einsatzdauer: <strong>{calc.h} Std.</strong></td></tr></tbody></table>
+    <table style={{width:"100%",marginBottom:10,borderCollapse:"collapse"}}><tbody><tr><td style={{fontWeight:"bold"}}>{eventData.name}</td><td style={{textAlign:"right"}}>{fDate(day.date)} {day.startTime}—{day.endTime}</td></tr><tr><td colSpan={2} style={{textAlign:"right",fontSize:"9pt",color:"#666"}}>Einsatzdauer: <strong>{calc.h.toFixed(2).replace('.',',')} Std.</strong></td></tr></tbody></table>
     <table style={{width:"100%",borderCollapse:"collapse",fontSize:"9pt",marginBottom:14}}><thead><tr style={{background:"#eee",fontWeight:"bold"}}><th style={{border:"1px solid #999",padding:"4px 6px",textAlign:"left",width:30}}>Nr.</th><th style={{border:"1px solid #999",padding:"4px 6px",textAlign:"left"}}>Kriterium</th><th style={{border:"1px solid #999",padding:"4px 6px",textAlign:"right",width:80}}>Wert</th><th style={{border:"1px solid #999",padding:"4px 6px",textAlign:"right",width:60}}>Punkte</th></tr></thead>
       <tbody>{[["1a","Max. Besucher (Auflagen)",day.auflagen||"n/a",r.ap],["","Geschlossen: "+(day.geschlossen?"JA":"NEIN"),"",""],["1b",`Fläche: ${day.flaeche||0} m²`,day.flaeche||"n/a",r.fp],["2a","Erwartete Besucher",day.besucher||"n/a",r.bp],["","Zwischensumme","",r.zw],["3",`Faktor: ${ev?.name||""}`,`×${r.factor}`,""],["4","Risiko ohne Prom./Pol.","",f2(r.ro)],["","Prominente: "+(day.prominente||0),"","+"+r.pp],["","Polizei: "+(day.polizeiRisiko?"JA":"NEIN"),"","+"+r.pol],["5","GESAMTRISIKO","",""]].map((row,i)=>(<tr key={i} style={{background:row[0]==="5"?"#ffeaea":i%2===0?"#fff":"#f8f8f8",fontWeight:row[0]==="5"||row[1].startsWith("Zwischen")?"bold":"normal"}}><td style={{border:"1px solid #ccc",padding:"3px 6px",color:"#666"}}>{row[0]}</td><td style={{border:"1px solid #ccc",padding:"3px 6px"}}>{row[1]}</td><td style={{border:"1px solid #ccc",padding:"3px 6px",textAlign:"right"}}>{row[2]}</td><td style={{border:"1px solid #ccc",padding:"3px 6px",textAlign:"right",color:row[0]==="5"?C.rot:undefined,fontWeight:row[0]==="5"?"bold":undefined}}>{row[0]==="5"?f2(r.total):row[3]}</td></tr>))}</tbody></table>
     <div style={{marginTop:14,fontWeight:"bold",fontSize:"11pt",marginBottom:6}}>Ergebnis der Berechnung:</div>
@@ -874,7 +874,7 @@ function AABPDF({stammdaten,bereitschaft}){
     <div style={{marginBottom:4,paddingLeft:16}}>2.7 Die Haftung des BRK wird auf Vorsatz und grobe Fahrlässigkeit beschränkt.</div>
 
     <div style={{fontWeight:"bold",marginTop:8,marginBottom:4}}>3. Abrechnungsmodalitäten, weitere Kosten</div>
-    <div style={{marginBottom:4,paddingLeft:16}}>3.1 Personal berechnen wir nach Einsatzstunden, ab Eintreffen am Einsatzort, angebrochene Stunden werden zur nächsten vollen Stunde aufgerundet. Entscheidend für die Berechnung sind nicht die vorgeplanten Zeiten, sondern die tatsächliche Anwesenheit. Die Fahrzeuge werden pauschal zuzüglich der gefahrenen Kilometer abgerechnet.</div>
+    <div style={{marginBottom:4,paddingLeft:16}}>3.1 Personal berechnen wir nach Einsatzstunden, ab Eintreffen am Einsatzort, angebrochene Viertelstunden werden zur nächsten vollen Viertelstunde aufgerundet. Entscheidend für die Berechnung sind nicht die vorgeplanten Zeiten, sondern die tatsächliche Anwesenheit. Die Fahrzeuge werden pauschal zuzüglich der gefahrenen Kilometer abgerechnet.</div>
     <div style={{marginBottom:4,paddingLeft:16}}>3.2 Alle Hilfeleistungen durch unser Personal sind mit den Bereitstellungskosten abgegolten. Den unvorhersehbaren Materialaufwand stellen wir dem Veranstalter/Anforderer gesondert in Rechnung. Anfallende Krankentransporte und Rettungsdiensteinsätze mit unseren Fahrzeugen rechnet der Rettungsdienst Bayern gesondert ab.</div>
     <div style={{marginBottom:4,paddingLeft:16}}>3.3 Die Verpflegung des BRK-Personals obliegt dem Veranstalter (ab 4 Stunden Warmverpflegung). Sollte dies nicht möglich sein, so berechnen wir einen höheren Stundensatz.</div>
     <div style={{marginBottom:4,paddingLeft:16}}>3.4 Die Bezahlung erfolgt gegen Rechnung, die sofort ab Zugang, ohne Abzug zu begleichen ist.</div>
@@ -987,6 +987,61 @@ function VorgaengeListe({bereitschaftCode,user,onLoad,onNew,onCopy,bereitschaft,
         </Card>);})
     )}
   </div>);
+}
+
+
+// ═══════════════════════════════════════════════════════════════════════════
+// FEEDBACK BUTTON + MODAL
+// ═══════════════════════════════════════════════════════════════════════════
+function FeedbackButton({user,currentView}){
+  const [open,setOpen]=useState(false);
+  const [kat,setKat]=useState("bug");
+  const [betreff,setBetreff]=useState("");
+  const [beschreibung,setBeschreibung]=useState("");
+  const [sending,setSending]=useState(false);
+  const [done,setDone]=useState(null);
+  const reset=()=>{setBetreff("");setBeschreibung("");setKat("bug");setDone(null);};
+  const send=async()=>{
+    if(!betreff.trim()||!beschreibung.trim()){alert("Bitte Betreff und Beschreibung ausfüllen");return;}
+    setSending(true);
+    try{
+      const r=await API.submitFeedback({kategorie:kat,betreff,beschreibung,ansicht:currentView,browser:navigator.userAgent});
+      setDone(r.ticket);
+    }catch(e){alert("Fehler: "+e.message);}
+    finally{setSending(false);}
+  };
+  if(!user)return null;
+  return(<>
+    <div onClick={()=>{setOpen(true);reset();}} style={{position:"fixed",bottom:20,right:20,zIndex:9999,background:C.rot,color:"#fff",borderRadius:"50%",width:48,height:48,display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",boxShadow:"0 4px 12px #0004",fontSize:22,transition:"transform 0.2s"}} onMouseEnter={e=>e.currentTarget.style.transform="scale(1.1)"} onMouseLeave={e=>e.currentTarget.style.transform="scale(1)"} title="Feedback senden">💬</div>
+    {open&&<div style={{position:"fixed",inset:0,zIndex:10000,background:"#0005",display:"flex",alignItems:"center",justifyContent:"center"}} onClick={e=>{if(e.target===e.currentTarget)setOpen(false);}}>
+      <div style={{background:C.weiss,borderRadius:10,padding:"24px 28px",width:"90%",maxWidth:480,maxHeight:"90vh",overflowY:"auto",boxShadow:"0 8px 32px #0003"}}>
+        {done?(<div style={{textAlign:"center",padding:20}}>
+          <div style={{fontSize:40,marginBottom:12}}>✅</div>
+          <div style={{fontSize:16,fontWeight:700,color:C.dunkelgrau,marginBottom:6}}>Ticket #{done} erstellt</div>
+          <div style={{fontSize:13,color:C.bgrau,marginBottom:16}}>Vielen Dank für dein Feedback!</div>
+          <Btn onClick={()=>setOpen(false)} variant="primary">Schließen</Btn>
+        </div>):(<>
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:16}}>
+            <h3 style={{margin:0,fontSize:16,fontWeight:700,color:C.dunkelgrau}}>Feedback senden</h3>
+            <span onClick={()=>setOpen(false)} style={{cursor:"pointer",fontSize:20,color:C.bgrau,lineHeight:1}}>✕</span>
+          </div>
+          <div style={{display:"flex",gap:8,marginBottom:14}}>
+            <Btn onClick={()=>setKat("bug")} variant={kat==="bug"?"primary":"secondary"} small>🐛 Fehler melden</Btn>
+            <Btn onClick={()=>setKat("feature")} variant={kat==="feature"?"primary":"secondary"} small>💡 Wunsch / Idee</Btn>
+          </div>
+          <Inp label="Betreff" value={betreff} onChange={setBetreff} placeholder={kat==="bug"?"Kurze Fehlerbeschreibung...":"Was wünschst du dir?"}/>
+          <label style={{display:"block",marginBottom:14}}><span style={{display:"block",fontSize:11,color:C.dunkelgrau,marginBottom:3,fontWeight:600}}>Beschreibung</span>
+            <textarea value={beschreibung} onChange={e=>setBeschreibung(e.target.value)} rows={5} placeholder={kat==="bug"?"Was ist passiert? Was hast du erwartet?\nWelche Schritte führen zum Fehler?":"Beschreibe deinen Wunsch so genau wie möglich..."} style={{width:"100%",padding:"8px 10px",background:C.weiss,border:"1px solid "+C.mittelgrau,borderRadius:4,color:C.schwarz,fontSize:13,fontFamily:FONT.sans,resize:"vertical",boxSizing:"border-box"}}/>
+          </label>
+          <div style={{fontSize:10,color:C.bgrau,marginBottom:12,lineHeight:1.4}}>Automatisch mitgesendet: dein Name, E-Mail, Bereitschaft und aktuelle Ansicht.</div>
+          <div style={{display:"flex",justifyContent:"flex-end",gap:8}}>
+            <Btn onClick={()=>setOpen(false)} variant="secondary">Abbrechen</Btn>
+            <Btn onClick={send} variant="primary" disabled={sending}>{sending?"Sende...":"Absenden"}</Btn>
+          </div>
+        </>)}
+      </div>
+    </div>}
+    </>);
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -1284,7 +1339,7 @@ export default function App(){
               <div>
                 <Card title={`Tag ${i+1}`} accent={C.mittelblau}>
                   <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:"0 10px"}}><Inp label="Datum" type="date" value={d.date} onChange={v=>updateDay(i,"date",v)}/><Inp label="Beginn" type="time" value={d.startTime} onChange={v=>updateDay(i,"startTime",v)}/><Inp label="Ende" type="time" value={d.endTime} onChange={v=>updateDay(i,"endTime",v)}/></div>
-                  <div style={{padding:"5px 10px",background:C.hellgrau,borderRadius:4,fontSize:12}}>Einsatzdauer: <strong style={{color:C.mittelblau}}>{calc.h} Stunden</strong>{!event.verpflegung&&<span style={{marginLeft:10,color:"#856404"}}>Verpfl.: {calc.vB}×8h</span>}</div>
+                  <div style={{padding:"5px 10px",background:C.hellgrau,borderRadius:4,fontSize:12}}>Einsatzdauer: <strong style={{color:C.mittelblau}}>{calc.h.toFixed(2).replace('.',',')} Stunden</strong>{!event.verpflegung&&<span style={{marginLeft:10,color:"#856404"}}>Verpfl.: {calc.vB}×8h</span>}</div>
                 </Card>
                 <Card title="Besucher & Risiko" accent="#d4920a">
                   <Inp label="Max. Besucher (Auflagen)" type="number" min={0} value={d.auflagen} onChange={v=>updateDay(i,"auflagen",v)}/>
@@ -1570,6 +1625,7 @@ export default function App(){
         </div>)}
       </main>
       <footer style={{padding:"12px 20px",borderTop:`1px solid ${C.mittelgrau}40`,textAlign:"center",fontSize:10,color:C.dunkelgrau,background:C.weiss}}>BRK Sanitätswachdienst v6.5 · {bereitschaft.name} · {stammdaten.kvName} · {year}</footer>
+      <FeedbackButton user={user} currentView={tab}/>
     </div>
   );
 }

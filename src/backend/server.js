@@ -285,6 +285,51 @@ app.use("/api/klauseln", klauselnRouter);
 
 // ── W3W Proxy ────────────────────────────────────────────────────
 // ═══════════════════════════════════════════════════════════════════
+// Feedback → Zammad Ticket
+// ═══════════════════════════════════════════════════════════════════
+app.post("/api/feedback", requireAuth, async (req, res) => {
+  const { kategorie, betreff, beschreibung, ansicht, browser } = req.body;
+  if (!betreff || !beschreibung) return res.status(400).json({ error: "Betreff und Beschreibung erforderlich" });
+  const zUrl = process.env.ZAMMAD_URL;
+  const zToken = process.env.ZAMMAD_TOKEN;
+  if (!zUrl || !zToken) return res.status(501).json({ error: "Zammad nicht konfiguriert" });
+  try {
+    const user = req.session.user || {};
+    const tag = kategorie === "bug" ? "bug" : "feature";
+    const prioId = kategorie === "bug" ? 2 : 3;
+    const body = `**Gemeldet von:** ${user.name || "Unbekannt"} (${user.email || "-"})
+**Bereitschaft:** ${user.bereitschaftCode || "-"}
+**Ansicht:** ${ansicht || "-"}
+**Browser:** ${browser || "-"}
+**Kategorie:** ${kategorie === "bug" ? "Fehler/Bug" : "Wunsch/Verbesserung"}
+
+---
+
+${beschreibung}`;
+    const resp = await fetch(zUrl + "/api/v1/tickets", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "Authorization": "Token " + zToken },
+      body: JSON.stringify({
+        title: "[SanWD " + (kategorie === "bug" ? "Bug" : "Feature") + "] " + betreff,
+        group_id: 8,
+        customer_id: "guess:" + (user.email || "sanwd@brkndsob.org"),
+        priority_id: prioId,
+        tags: "sanwd," + tag,
+        article: { subject: betreff, body: body, type: "note", internal: false, content_type: "text/plain" }
+      })
+    });
+    const data = await resp.json();
+    if (data.id) {
+      console.log("Zammad Ticket #" + data.number + " erstellt von " + (user.name || "?"));
+      res.json({ ok: true, ticket: data.number });
+    } else {
+      console.error("Zammad Fehler:", data);
+      res.status(500).json({ error: "Ticket konnte nicht erstellt werden" });
+    }
+  } catch(e) { console.error("Feedback/Zammad:", e); res.status(500).json({ error: e.message }); }
+});
+
+// ═══════════════════════════════════════════════════════════════════
 // Geocoding Proxy (HERE Fallback fuer Hausnummer-Aufloesung)
 // ═══════════════════════════════════════════════════════════════════
 app.get("/api/geocode", requireAuth, async (req, res) => {

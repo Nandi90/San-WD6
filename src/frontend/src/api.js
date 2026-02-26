@@ -213,6 +213,9 @@ const API = {
     return res.blob();
   },
 
+  submitFeedback: async function(data) {
+    return this.json("/api/feedback", { method: "POST", body: JSON.stringify(data) });
+  },
   // ── Vorgang Lock/Status ──────────────────────────────────────
   async lockVorgang(id) { return this.json("/api/vorgaenge/"+id+"/lock",{method:"POST"}); },
   async unlockVorgang(id) { return this.json("/api/vorgaenge/"+id+"/lock",{method:"DELETE"}); },
