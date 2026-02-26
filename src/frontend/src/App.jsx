@@ -107,6 +107,18 @@ function AddressAutocomplete({label,value,onChange,onResult}){
       setSuggestions(mapped);
     }catch{setSuggestions([]);}
   };
+  const buildAddrStr=(addr)=>{
+    const road=addr.road||addr.pedestrian||addr.path||addr.footway||"";
+    const hnr=addr.house_number||"";
+    const sub=addr.suburb||addr.quarter||addr.neighbourhood||"";
+    const city=addr.city||addr.town||addr.village||addr.hamlet||"";
+    const plz=addr.postcode||"";
+    const parts=[];
+    if(hnr&&road)parts.push(hnr+", "+road);else if(road)parts.push(road);
+    if(sub)parts.push(sub);if(city)parts.push(city);if(plz)parts.push(plz);
+    parts.push("Deutschland");
+    return parts.join(", ");
+  };
   const handleChange=(v)=>{onChange(v);clearTimeout(debounceRef.current);debounceRef.current=setTimeout(()=>search(v),600);};
   const selectAddr=(s)=>{onChange(s.address);setSuggestions([]);if(onResult)onResult(s);};
   return(<label style={{display:"block",marginBottom:10}}><span style={{display:"block",fontSize:11,color:C.dunkelgrau,marginBottom:3,fontWeight:600,fontFamily:FONT.sans}}>{label}</span>
@@ -142,7 +154,7 @@ function LeafletMap({coords,w3w,onChange,onW3W}){
       markerRef.current.on("dragend",async(e)=>{
         const p=e.target.getLatLng();
         onChange({lat:p.lat,lng:p.lng});
-        try{const r=await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${p.lat}&lon=${p.lng}&format=json&accept-language=de`,{headers:{"User-Agent":"BRK-SanWD/6.5"}});const d=await r.json();if(d.display_name)onChange({lat:p.lat,lng:p.lng,address:d.display_name});}catch{}
+        try{const r=await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${p.lat}&lon=${p.lng}&format=json&addressdetails=1&accept-language=de`,{headers:{"User-Agent":"BRK-SanWD/6.5"}});const d=await r.json();if(d.address){const a=buildAddrStr(d.address);onChange({lat:p.lat,lng:p.lng,address:a||d.display_name});}}catch{}
         try{const wr=await fetch(`/api/w3w?lat=${p.lat}&lng=${p.lng}`,{credentials:"include"});const wd=await wr.json();if(wd.w3w)onW3W(wd.w3w);}catch{}
       });
     }
@@ -152,12 +164,12 @@ function LeafletMap({coords,w3w,onChange,onW3W}){
       else{markerRef.current=L.marker([la,ln],{draggable:true}).addTo(map);
         markerRef.current.on("dragend",async(ev)=>{
           const p=ev.target.getLatLng();onChange({lat:p.lat,lng:p.lng});
-          try{const r=await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${p.lat}&lon=${p.lng}&format=json&accept-language=de`,{headers:{"User-Agent":"BRK-SanWD/6.5"}});const d=await r.json();if(d.display_name)onChange({lat:p.lat,lng:p.lng,address:d.display_name});}catch{}
+          try{const r=await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${p.lat}&lon=${p.lng}&format=json&addressdetails=1&accept-language=de`,{headers:{"User-Agent":"BRK-SanWD/6.5"}});const d=await r.json();if(d.address){const a=buildAddrStr(d.address);onChange({lat:p.lat,lng:p.lng,address:a||d.display_name});}}catch{}
           try{const wr=await fetch(`/api/w3w?lat=${p.lat}&lng=${p.lng}`,{credentials:"include"});const wd=await wr.json();if(wd.w3w)onW3W(wd.w3w);}catch{}
         });
       }
       onChange({lat:la,lng:ln});
-      try{const r=await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${la}&lon=${ln}&format=json&accept-language=de`,{headers:{"User-Agent":"BRK-SanWD/6.5"}});const d=await r.json();if(d.display_name)onChange({lat:la,lng:ln,address:d.display_name});}catch{}
+      try{const r=await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${la}&lon=${ln}&format=json&addressdetails=1&accept-language=de`,{headers:{"User-Agent":"BRK-SanWD/6.5"}});const d=await r.json();if(d.address){const a=buildAddrStr(d.address);onChange({lat:la,lng:ln,address:a||d.display_name});}}catch{}
       try{const wr=await fetch(`/api/w3w?lat=${la}&lng=${ln}`,{credentials:"include"});const wd=await wr.json();if(wd.w3w)onW3W(wd.w3w);}catch{}
     });
     mapInst.current=map;
