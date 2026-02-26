@@ -934,7 +934,7 @@ export default function App(){
   useEffect(()=>{
   if(!user||user.rolle==="helfer")return;
   const t=setTimeout(()=>{
-    if(user.rolle==="admin"){
+    if(user.rolle==="admin"||user.rolle==="kbl"){
       // Admin: alles speichern
       API.saveStammdaten({leiter_name:stammdaten.bereitschaftsleiter,leiter_title:stammdaten.bereitschaftsleiterTitle,telefon:stammdaten.telefon,fax:stammdaten.fax,mobil:stammdaten.mobil,email:stammdaten.email,funkgruppe:stammdaten.funkgruppe,kv_name:stammdaten.kvName,kgf:stammdaten.kgf,kv_adresse:stammdaten.kvAdresse,kv_plz_ort:stammdaten.kvPlzOrt}).catch(e=>console.warn("Stammdaten speichern:",e));
     } else {
@@ -1014,7 +1014,7 @@ export default function App(){
   const updateDay=useCallback((i,k,v)=>setDays(p=>p.map((d,j)=>j===i?{...d,[k]:v}:d)),[]);
   const updateStamm=useCallback((k,v)=>setStammdaten(p=>({...p,[k]:v})),[]);
   const updateRate=useCallback((k,v)=>setStammdaten(p=>({...p,rates:{...p.rates,[k]:v}})),[]);
-  useEffect(()=>{if(!user||user.rolle==="helfer")return;const t=setTimeout(()=>{const r=stammdaten.rates;API.saveKostensaetze({helfer:r.helfer,ktw:r.ktw,rtw:r.rtw,gktw:r.gktw,einsatzleiter:r.einsatzleiter,einsatzleiter_kfz:r.einsatzleiterKfz,seg_lkw:r.segLkw,mtw:r.mtw,zelt:r.zelt,km_ktw:r.kmKtw,km_rtw:r.kmRtw,km_gktw:r.kmGktw,km_el_kfz:r.kmElKfz,km_seg_lkw:r.kmSegLkw,km_mtw:r.kmMtw,verpflegung:r.verpflegung}).catch(e=>console.warn("Kostensätze speichern:",e));},2000);return()=>clearTimeout(t);},[stammdaten.rates,user]);
+  useEffect(()=>{if(!user||user.rolle==="helfer"||user.rolle==="bl")return;const t=setTimeout(()=>{const r=stammdaten.rates;API.saveKostensaetze({helfer:r.helfer,ktw:r.ktw,rtw:r.rtw,gktw:r.gktw,einsatzleiter:r.einsatzleiter,einsatzleiter_kfz:r.einsatzleiterKfz,seg_lkw:r.segLkw,mtw:r.mtw,zelt:r.zelt,km_ktw:r.kmKtw,km_rtw:r.kmRtw,km_gktw:r.kmGktw,km_el_kfz:r.kmElKfz,km_seg_lkw:r.kmSegLkw,km_mtw:r.kmMtw,verpflegung:r.verpflegung}).catch(e=>console.warn("Kostensätze speichern:",e));},2000);return()=>clearTimeout(t);},[stammdaten.rates,user]);
   /* stammdaten via API gespeichert */
   const updateChecklist=useCallback((cl)=>setEvent(p=>({...p,checklist:cl})),[]);
 
@@ -1416,7 +1416,7 @@ export default function App(){
       )}
       {tab==="settings"&&(<div><div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:14}}>
           <div>
-            {user?.rolle==="admin"&&<Card title="Organisation" accent={C.rot}><Inp label="Kreisverband" value={stammdaten.kvName} onChange={v=>updateStamm("kvName",v)}/><Inp label="Kreisgeschäftsführer" value={stammdaten.kgf} onChange={v=>updateStamm("kgf",v)}/><Inp label="Adresse" value={stammdaten.kvAdresse} onChange={v=>updateStamm("kvAdresse",v)}/><Inp label="PLZ Ort" value={stammdaten.kvPlzOrt} onChange={v=>updateStamm("kvPlzOrt",v)}/></Card>}
+            {(user?.rolle==="admin"||user?.rolle==="kbl")&&<Card title="Organisation" accent={C.rot}><Inp label="Kreisverband" value={stammdaten.kvName} onChange={v=>updateStamm("kvName",v)}/><Inp label="Kreisgeschäftsführer" value={stammdaten.kgf} onChange={v=>updateStamm("kgf",v)}/><Inp label="Adresse" value={stammdaten.kvAdresse} onChange={v=>updateStamm("kvAdresse",v)}/><Inp label="PLZ Ort" value={stammdaten.kvPlzOrt} onChange={v=>updateStamm("kvPlzOrt",v)}/></Card>}
             <Card title="Mein Profil" accent={C.rot} sub="Persönliche Kontaktdaten (nur für Sie)">
               <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"0 16px"}}>
               <Inp label="Titel / Funktion" value={user.titel||""} onChange={v=>setUser(p=>({...p,titel:v}))}/>
@@ -1436,7 +1436,7 @@ export default function App(){
               <Btn small variant="success" onClick={async()=>{try{const r=await API.saveProfile({telefon:user.telefon||"",mobil:user.mobil||"",titel:user.titel||"",email:user.email||"",ort:user.ort||"",signatur:user.signatur||""});if(r&&r.success){alert("Profil gespeichert!");}else{alert("Fehler: "+JSON.stringify(r));}}catch(e){alert("Fehler: "+e.message);}}}>Profil speichern</Btn>
               <div style={{fontSize:10,color:C.bgrau,marginTop:4}}>Diese Daten erscheinen als Unterzeichner im Angebot</div>
             </Card>
-            <Card title="Logo für Drucksachen" accent={C.dunkelblau} sub="Wird auf allen Dokumenten und der Website angezeigt (außer ILS)">
+            {(user?.rolle==="admin"||user?.rolle==="kbl")&&<Card title="Logo für Drucksachen" accent={C.dunkelblau} sub="Wird auf allen Dokumenten und der Website angezeigt (außer ILS)">
               <div style={{display:"flex",alignItems:"center",gap:16,marginBottom:10}}>
                 <div style={{width:120,height:60,border:`2px dashed ${C.mittelgrau}60`,borderRadius:6,display:"flex",alignItems:"center",justifyContent:"center",background:C.hellgrau,overflow:"hidden",flexShrink:0}}>
                   {stammdaten.customLogo?<img src={stammdaten.customLogo} alt="Logo" style={{maxWidth:"100%",maxHeight:"100%"}}/>:<span style={{fontSize:10,color:C.bgrau}}>Kein Logo</span>}
@@ -1448,12 +1448,12 @@ export default function App(){
                   <div style={{fontSize:10,color:C.bgrau,marginTop:4}}>Empfohlen: PNG/JPG, ca. 300×150px</div>
                 </div>
               </div>
-            </Card>
+            </Card>}
             <Card title="Bereitschaftsleitung" accent={C.mittelblau}><Inp label="Bereitschaftsleiter" value={stammdaten.bereitschaftsleiter} onChange={v=>updateStamm("bereitschaftsleiter",v)}/><Inp label="Telefon" value={stammdaten.telefon} onChange={v=>updateStamm("telefon",v)}/><Inp label="Fax" value={stammdaten.fax} onChange={v=>updateStamm("fax",v)}/><Inp label="Mobil" value={stammdaten.mobil} onChange={v=>updateStamm("mobil",v)}/><Inp label="E-Mail" value={stammdaten.email} onChange={v=>updateStamm("email",v)}/><Inp label="Funkgruppe" value={stammdaten.funkgruppe} onChange={v=>updateStamm("funkgruppe",v)}/></Card>
           </div>
           <div>
-            <Card title="Kostensätze (EUR)" sub={user?.rolle!=="admin"?"Nur Admin kann diese Daten ändern – Ansicht nur lesend":undefined} accent="#d4920a"><div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"0 10px"}}>{[["Helfer (€/Std)","helfer"],["KTW","ktw"],["RTW","rtw"],["GKTW","gktw"],["EL (€/Std)","einsatzleiter"],["EL-KFZ","einsatzleiterKfz"],["SEG-LKW","segLkw"],["MTW","mtw"],["Zelt","zelt"],["Verpfl. (€/P/8h)","verpflegung"]].map(([l,k])=><Inp key={k} small label={l} type="number" min={0} step={0.5} value={stammdaten.rates[k]} onChange={v=>updateRate(k,v)}/>)}</div></Card>
-            <Card title="km-Saetze" accent={C.mittelblau}><div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:"0 10px"}}>{[["KTW","kmKtw"],["RTW","kmRtw"],["GKTW","kmGktw"],["EL-KFZ","kmElKfz"],["SEG","kmSegLkw"],["MTW","kmMtw"]].map(([l,k])=><Inp key={k} small label={l} type="number" min={0} step={0.1} value={stammdaten.rates[k]} onChange={v=>updateRate(k,v)}/>)}</div></Card>
+            <Card title="Kostensätze (EUR)" sub={user?.rolle!=="admin"?"Nur Admin kann diese Daten ändern – Ansicht nur lesend":undefined} accent="#d4920a"><div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"0 10px"}}>{[["Helfer (€/Std)","helfer"],["KTW","ktw"],["RTW","rtw"],["GKTW","gktw"],["EL (€/Std)","einsatzleiter"],["EL-KFZ","einsatzleiterKfz"],["SEG-LKW","segLkw"],["MTW","mtw"],["Zelt","zelt"],["Verpfl. (€/P/8h)","verpflegung"]].map(([l,k])=><Inp key={k} small label={l} type="number" min={0} step={0.5} value={stammdaten.rates[k]} onChange={v=>updateRate(k,v)} disabled={user?.rolle!=="admin"}/>)}</div></Card>
+            <Card title="km-Saetze" accent={C.mittelblau}><div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:"0 10px"}}>{[["KTW","kmKtw"],["RTW","kmRtw"],["GKTW","kmGktw"],["EL-KFZ","kmElKfz"],["SEG","kmSegLkw"],["MTW","kmMtw"]].map(([l,k])=><Inp key={k} small label={l} type="number" min={0} step={0.1} value={stammdaten.rates[k]} onChange={v=>updateRate(k,v)} disabled={user?.rolle!=="admin"}/>)}</div></Card>
           </div>
         </div>
 
