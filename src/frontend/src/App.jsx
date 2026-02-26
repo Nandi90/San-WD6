@@ -87,6 +87,15 @@ const Stat=({label,value,color=C.rot})=>(<div style={{textAlign:"center",padding
 // ═══════════════════════════════════════════════════════════════════════════
 // ADDRESS AUTOCOMPLETE + what3words
 // ═══════════════════════════════════════════════════════════════════════════
+// 4-Augen-Prinzip: Planungsgrößen für Unterzeichner
+function getSignAuthority(maxStellen) {
+  if (maxStellen > 15) return { erstellt: "BL unterstützt KFDL und KBL", kontrolle: "KGF", stufe: 4 };
+  if (maxStellen >= 15) return { erstellt: "BL unterstützt KFDL", kontrolle: "KBL", stufe: 3 };
+  if (maxStellen >= 10) return { erstellt: "BL", kontrolle: "KFDL oder vergleichbare Person", stufe: 2 };
+  if (maxStellen >= 5) return { erstellt: "BL", kontrolle: "stellv. BL oder vergleichbare Person", stufe: 1 };
+  return { erstellt: "BL", kontrolle: "—", stufe: 0 };
+}
+
 function AddressAutocomplete({label,value,onChange,onResult}){
   const [suggestions,setSuggestions]=useState([]);
   const debounceRef=useRef(null);
@@ -254,7 +263,7 @@ function LeafletMap({coords,w3w,onChange,onW3W}){
 // CHECKLIST COMPONENT
 // ═══════════════════════════════════════════════════════════════════════════
 function VorgangChecklist({checklist={},onChange,eventDate}){
-  const toggle=(key)=>{if(key==="angebotVersendet"&&checklist[key])return;const now=Date.now();const cur=checklist[key];onChange({...checklist,[key]:cur?null:now});};
+  const toggle=(key)=>{if((key==="angebotVersendet"||key==="abgeschlossen")&&checklist[key])return;const now=Date.now();const cur=checklist[key];onChange({...checklist,[key]:cur?null:now});};
   // Wiedervorlage: 4 Wochen nach Event
   const wvDate=eventDate?new Date(new Date(eventDate).getTime()+28*24*60*60*1000):null;
   const wvPast=wvDate&&new Date()>=wvDate;
@@ -344,12 +353,12 @@ function LockBanner({lockInfo,onUnlock,isOwner}){
     {isOwner&&<button onClick={onUnlock} style={{padding:"4px 12px",background:"transparent",border:"1px solid #a5d6a7",borderRadius:4,fontSize:11,cursor:"pointer",color:"#2e7d32"}}>Sperre aufheben</button>}
   </div>);
 }
-function StatusBanner({angebotVersendet,onUnlock}){
+function StatusBanner({angebotVersendet,abgeschlossen,onUnlock}){
   const [showModal,setShowModal]=React.useState(false);
   const [begruendung,setBegruendung]=React.useState("");
   const [err,setErr]=React.useState("");
   const [loading,setLoading]=React.useState(false);
-  if(!angebotVersendet)return null;
+  if(!angebotVersendet && !abgeschlossen)return null;
   const doEntsperre=async()=>{
     if(begruendung.trim().length<5){setErr("Bitte mind. 5 Zeichen eingeben");return;}
     setLoading(true);setErr("");
@@ -360,8 +369,8 @@ function StatusBanner({angebotVersendet,onUnlock}){
   return(<>
     <div style={{padding:"10px 16px",background:"#e8f5e9",border:"1px solid #a5d6a7",borderRadius:6,marginBottom:12,display:"flex",alignItems:"center",justifyContent:"space-between"}}>
       <div style={{display:"flex",alignItems:"center",gap:10}}>
-        <span style={{fontSize:18}}>📨</span>
-        <div><div style={{fontSize:13,fontWeight:600,color:"#2e7d32"}}>Angebot versendet – Vorgang ist schreibgeschützt</div>
+        <span style={{fontSize:18}}>{abgeschlossen?"✅":"📨"}</span>
+        <div><div style={{fontSize:13,fontWeight:600,color:abgeschlossen?"#1a237e":"#2e7d32"}}>{abgeschlossen?"Vorgang abgeschlossen – dauerhaft gesperrt":"Angebot versendet – Vorgang ist schreibgeschützt"}</div>
           <div style={{fontSize:10,color:"#666"}}>Zum Bearbeiten entsperren (Begründung erforderlich)</div>
         </div>
       </div>
@@ -1158,7 +1167,7 @@ export default function App(){
   useEffect(()=>{if(!user||user.rolle==="helfer"||user.rolle==="bl")return;const t=setTimeout(()=>{const r=stammdaten.rates;API.saveKostensaetze({helfer:r.helfer,ktw:r.ktw,rtw:r.rtw,gktw:r.gktw,einsatzleiter:r.einsatzleiter,einsatzleiter_kfz:r.einsatzleiterKfz,seg_lkw:r.segLkw,mtw:r.mtw,zelt:r.zelt,km_ktw:r.kmKtw,km_rtw:r.kmRtw,km_gktw:r.kmGktw,km_el_kfz:r.kmElKfz,km_seg_lkw:r.kmSegLkw,km_mtw:r.kmMtw,verpflegung:r.verpflegung}).catch(e=>console.warn("Kostensätze speichern:",e));},2000);return()=>clearTimeout(t);},[stammdaten.rates,user]);
   /* stammdaten via API gespeichert */
   const updateChecklist=useCallback((cl)=>setEvent(p=>({...p,checklist:cl})),[]);
-  const isLocked=!!event?.checklist?.angebotVersendet;
+  const isLocked=!!(event?.checklist?.angebotVersendet||event?.checklist?.abgeschlossen);
   const isEditLocked=!!(lockInfo&&lockInfo.locked&&lockInfo.lockedBy!==user?.name);
 
   const activeDays=days.filter(d=>d.active);
@@ -1272,7 +1281,7 @@ export default function App(){
         {/* VERANSTALTUNG */}
         {tab==="event"&&(<div>
           <LockBanner lockInfo={lockInfo} isOwner={lockInfo?.lockedBy===user?.name} onUnlock={async()=>{try{await API.unlockVorgang(currentEventId);setLockInfo(null);}catch{}}}/>
-          <StatusBanner angebotVersendet={event?.checklist?.angebotVersendet} onUnlock={async(begruendung)=>{await API.entsperrenVorgang(currentEventId,begruendung);updateEvent("checklist",{...event.checklist,angebotVersendet:false});}}/>
+          <StatusBanner angebotVersendet={event?.checklist?.angebotVersendet} abgeschlossen={event?.checklist?.abgeschlossen} onUnlock={async(begruendung)=>{await API.entsperrenVorgang(currentEventId,begruendung);updateEvent("checklist",{...event.checklist,angebotVersendet:false,abgeschlossen:false});}}/>
           <div style={{display:"grid",gridTemplateColumns:"2fr 1fr",gap:14}}>
             <div style={{position:"relative"}}>
               {(isLocked||isEditLocked)&&<div style={{position:"absolute",top:0,left:0,right:0,bottom:0,background:"rgba(255,255,255,0.55)",zIndex:10,borderRadius:8,pointerEvents:"all"}}/>}
@@ -1352,6 +1361,14 @@ export default function App(){
                   <div style={{display:"flex",justifyContent:"space-between",padding:"4px 0",fontSize:12}}><span style={{color:C.dunkelgrau}}>Gesamtkosten</span><span style={{fontWeight:700,color:C.rot,fontFamily:FONT.mono}}>{f$(totalCosts)}</span></div>
                   {event.w3w&&<div style={{display:"flex",justifyContent:"space-between",padding:"4px 0",fontSize:12}}><span style={{color:C.dunkelgrau}}>what3words</span><span style={{fontWeight:600,color:C.rot,fontSize:11}}>{event.w3w}</span></div>}
                 </div>
+                <div style={{borderTop:"1px solid "+C.mittelgrau+"40",marginTop:10,paddingTop:10}}>
+                  <div style={{fontSize:11,fontWeight:700,color:C.dunkelgrau,marginBottom:6}}>4-Augen-Prinzip</div>
+                  {(()=>{const maxTP=Math.max(...dayCalcs.map(d=>d.tp),0);const auth=getSignAuthority(maxTP);return(<div style={{fontSize:12,lineHeight:1.6}}>
+                    <div style={{display:"flex",justifyContent:"space-between"}}><span style={{color:C.bgrau}}>Max. Stellen:</span><strong>{maxTP}</strong></div>
+                    <div style={{display:"flex",justifyContent:"space-between"}}><span style={{color:C.bgrau}}>Erstellt:</span><strong>{auth.erstellt}</strong></div>
+                    <div style={{display:"flex",justifyContent:"space-between"}}><span style={{color:C.bgrau}}>Kontrolle:</span><strong style={{color:C.rot}}>{auth.kontrolle}</strong></div>
+                  </div>);})()}
+                </div>
               </Card>
               {currentEventId&&editHistory.length>0&&<HistoryWidget history={editHistory}/>}
             </div>
@@ -1361,7 +1378,7 @@ export default function App(){
         {/* TAGE & ANALYSE */}
         {tab==="days"&&(<div>
           <LockBanner lockInfo={lockInfo} isOwner={lockInfo?.lockedBy===user?.name} onUnlock={async()=>{try{await API.unlockVorgang(currentEventId);setLockInfo(null);}catch{}}}/>
-          <StatusBanner angebotVersendet={event?.checklist?.angebotVersendet} onUnlock={async(begruendung)=>{await API.entsperrenVorgang(currentEventId,begruendung);updateEvent("checklist",{...event.checklist,angebotVersendet:false});}}/>
+          <StatusBanner angebotVersendet={event?.checklist?.angebotVersendet} abgeschlossen={event?.checklist?.abgeschlossen} onUnlock={async(begruendung)=>{await API.entsperrenVorgang(currentEventId,begruendung);updateEvent("checklist",{...event.checklist,angebotVersendet:false,abgeschlossen:false});}}/>
           <div style={{position:"relative"}}>
           {(isLocked||isEditLocked)&&<div style={{position:"absolute",top:0,left:0,right:0,bottom:0,background:"rgba(255,255,255,0.55)",zIndex:10,borderRadius:8,pointerEvents:"all"}}/>}
           <div style={{display:"flex",gap:4,marginBottom:12,flexWrap:"wrap"}}>{days.map((d,i)=>(<div key={i} style={{display:"inline-flex",alignItems:"center",gap:0}}>
@@ -1471,6 +1488,26 @@ export default function App(){
               <div><div style={{fontWeight:700,fontSize:16}}>SanWD Changelog</div><div style={{fontSize:11,opacity:0.85}}>Versionshistorie und Änderungen</div></div>
             </div>
             {[
+              {v:"v6.6",d:"26.02.2026",c:[
+                "Gefahrenanalyse: Serverseitige PDF-Generierung statt Browser-Druck",
+                "Adress-Autocomplete: Hausnummer wird korrekt übernommen und angezeigt",
+                "HERE Geocoding Fallback: Präzise Hausnummer-Koordinaten + korrekter w3w-Code",
+                "Warnung bei ungenauer Adressauflösung: Pin manuell verschieben",
+                "Berechnung: 15-Minuten-Takt statt volle Stunden (Viertelstunden-Aufrundung)",
+                "AAB: Abrechnungstext an Viertelstunden-Takt angepasst",
+                "Feedback-System: Direktes Ticket an Zammad (Bug/Feature-Request)",
+                "4-Augen-Prinzip: Planungsgrößen-Vorschlag in Zusammenfassung",
+                "Dateisperre: Gleichzeitige Bearbeitung verhindert (Lock + Heartbeat)",
+                "Lock-Banner und Overlay auf Veranstaltung, Tage & Analyse und Kosten",
+                "Checkliste: Angebot-Status nur über Entsperren-Dialog deaktivierbar",
+                "Schreibschutz: Formularfelder ausgegraut bei versendetem Angebot",
+                "Änderungsverlauf in rechte Spalte verschoben",
+                "Emergency-Login für Admin-Zugang bei Keycloak-Ausfall",
+                "Persistenter Session-Store (SQLite) gegen Login-Verlust bei Restart",
+                "ILS Rückrufnummer: Mobilnummer des Users statt Bereitschafts-Telefon",
+                "Signatur nur noch im Profil (nicht mehr pro Veranstaltung)",
+                "PDF-Buttons: Ladeanzeige während Generierung",
+              ]},
               {v:"v6.5",d:"25.02.2026",c:[
                 "Interaktive Karte (Leaflet): dauerhaft sichtbar, Klick setzt Pin mit Koordinaten + w3w + Reverse-Geocode",
                 "Karten-Pin per Drag verschiebbar für Feinpositionierung",
@@ -1659,7 +1696,7 @@ export default function App(){
 
         </div>)}
       </main>
-      <footer style={{padding:"12px 20px",borderTop:`1px solid ${C.mittelgrau}40`,textAlign:"center",fontSize:10,color:C.dunkelgrau,background:C.weiss}}>BRK Sanitätswachdienst v6.5 · {bereitschaft.name} · {stammdaten.kvName} · {year}</footer>
+      <footer style={{padding:"12px 20px",borderTop:`1px solid ${C.mittelgrau}40`,textAlign:"center",fontSize:10,color:C.dunkelgrau,background:C.weiss}}>BRK Sanitätswachdienst v6.6 · {bereitschaft.name} · {stammdaten.kvName} · {year}</footer>
       <FeedbackButton user={user} currentView={tab}/>
     </div>
   );
