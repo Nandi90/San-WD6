@@ -34,8 +34,13 @@ app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ extended: true }));
 app.use(morgan("short"));
 
-// ── Sessions ─────────────────────────────────────────────────────
+// ── Sessions (persistenter SQLite-Store) ──────────────────────────
+const SqliteStore = require("better-sqlite3-session-store")(session);
+const sessionDb = new (require("better-sqlite3"))(
+  process.env.SESSION_DB_PATH || "/data/sessions.db"
+);
 app.use(session({
+  store: new SqliteStore({ client: sessionDb, expired: { clear: true, intervalMs: 900000 } }),
   secret: process.env.SESSION_SECRET || "change-me-in-production",
   resave: false,
   saveUninitialized: false,
@@ -46,6 +51,7 @@ app.use(session({
     sameSite: "lax",
   },
 }));
+console.log("✅ Session-Store: SQLite (" + (process.env.SESSION_DB_PATH || "/data/sessions.db") + ")");
 
 // ── Health Check (kein Auth) ─────────────────────────────────────
 app.get("/api/health", (req, res) => {
