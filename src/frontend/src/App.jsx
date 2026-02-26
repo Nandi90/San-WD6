@@ -914,7 +914,7 @@ function VorgaengeListe({bereitschaftCode,user,onLoad,onNew,onCopy,bereitschaft,
   const [viewYear,setViewYear]=useState(thisYear);
   const [events,setEvents]=useState([]);
   const [loading,setLoading]=useState(true);
-  const [subTab,setSubTab]=useState("uebersicht");
+  const [searchQ,setSearchQ]=useState("");
   const [filterBereitschaft,setFilterBereitschaft]=useState(""); // liste | uebersicht
 
   const prefix=`sanwd:${bereitschaftCode}:${viewYear}`;
@@ -938,19 +938,18 @@ function VorgaengeListe({bereitschaftCode,user,onLoad,onNew,onCopy,bereitschaft,
         </h2>
         <p style={{margin:"2px 0 0",fontSize:12,color:C.dunkelgrau}}>{bereitschaft.name} · {events.length} Vorgang/Vorgänge</p>
       </div>
-      <div style={{display:"flex",gap:6}}>
-        <Btn small variant={subTab==="liste"?"primary":"secondary"} onClick={()=>setSubTab("liste")}>Liste</Btn>
-        <Btn small variant={subTab==="uebersicht"?"primary":"secondary"} onClick={()=>setSubTab("uebersicht")}>Übersicht</Btn>
+      <div style={{display:"flex",gap:6,alignItems:"center"}}>
+        <input type="text" value={searchQ} onChange={e=>setSearchQ(e.target.value)} placeholder="Suche (Name, Nr., Kunde...)" style={{padding:"5px 10px",borderRadius:4,border:"1px solid "+C.mittelgrau,fontSize:12,fontFamily:FONT.sans,width:200}}/>
         {(user?.rolle==="admin"||user?.rolle==="kbl")&&<select value={filterBereitschaft} onChange={e=>{const v=e.target.value;setFilterBereitschaft(v);loadEvents(v);if(onFilterChange)onFilterChange(v);}} style={{padding:"5px 10px",borderRadius:4,border:`1px solid ${C.mittelgrau}`,fontSize:12,fontFamily:FONT.sans}}><option value="">Alle Bereitschaften</option>{(allBereitschaften||[]).map(b=><option key={b.code} value={b.code}>{b.short} — {b.name}</option>)}</select>}
         {!isArchive&&<Btn onClick={onNew} icon="➕">Neuer Vorgang</Btn>}
       </div>
     </div>
 
     {/* ÜBERSICHT TABLE */}
-    {subTab==="uebersicht"&&(<Card title={`Angebote/Rechnungen ${viewYear}`} accent={C.mittelblau} sub={`Gesamt: ${f2(totalBetrag)} €`}>
+    {(<Card title={`Angebote/Rechnungen ${viewYear}`} accent={C.mittelblau} sub={`Gesamt: ${f2(totalBetrag)} €`}>
       <div style={{overflowX:"auto"}}><table style={{width:"100%",borderCollapse:"collapse",fontSize:11}}>
-        <thead><tr style={{background:C.hellgrau}}>{["Lfd.Nr.","Datum","Ansprechpartner","Veranstaltung","Kunde","AG","RG","Betrag","Status"].map(h=><th key={h} style={{padding:"6px 8px",textAlign:h==="Betrag"?"right":"left",borderBottom:`2px solid ${C.mittelgrau}40`,fontSize:10,color:C.dunkelgrau,whiteSpace:"nowrap"}}>{h}</th>)}</tr></thead>
-        <tbody>{events.map((ev,i)=>{const e=ev.event||{};const cl=e.checklist||{};const dc=(ev.days||[]).filter(d=>d.active);const firstDate=dc[0]?.date;let betrag=0;try{dc.forEach(d=>{betrag+=calcDay(d,DEFAULT_STAMMDATEN.rates,e.verpflegung).total;});}catch{}
+        <thead><tr style={{background:C.hellgrau}}>{["Lfd.Nr.","Datum","Ansprechpartner","Veranstaltung","Kunde","AG","RG","Betrag","Status",""].map(h=><th key={h} style={{padding:"6px 8px",textAlign:h==="Betrag"?"right":"left",borderBottom:`2px solid ${C.mittelgrau}40`,fontSize:10,color:C.dunkelgrau,whiteSpace:"nowrap"}}>{h}</th>)}</tr></thead>
+        <tbody>{events.filter(ev=>{if(!searchQ)return true;const q=searchQ.toLowerCase();const e=ev.event||{};return(e.name||"").toLowerCase().includes(q)||(e.auftragsnr||"").toLowerCase().includes(q)||(e.veranstalter||"").toLowerCase().includes(q)||(e.rechnungsempfaenger||"").toLowerCase().includes(q)||(e.ansprechpartner||"").toLowerCase().includes(q)||(e.ort||"").toLowerCase().includes(q);}).sort((a,b)=>{const na=a.event?.auftragsnr||"";const nb=b.event?.auftragsnr||"";return nb.localeCompare(na,undefined,{numeric:true});}).map((ev,i)=>{const e=ev.event||{};const cl=e.checklist||{};const dc=(ev.days||[]).filter(d=>d.active);const firstDate=dc[0]?.date;let betrag=0;try{dc.forEach(d=>{betrag+=calcDay(d,DEFAULT_STAMMDATEN.rates,e.verpflegung).total;});}catch{}
           return(<tr key={i} style={{borderBottom:`1px solid ${C.hellgrau}`,cursor:"pointer"}} onClick={()=>isArchive?onCopy(ev):onLoad(ev)}>
             <td style={{padding:"5px 8px",fontWeight:600,color:C.rot,fontFamily:FONT.mono,whiteSpace:"nowrap"}}>{e.auftragsnr||"n/a"}</td>
             <td style={{padding:"5px 8px",whiteSpace:"nowrap"}}>{firstDate?fDate(firstDate):""}</td>
@@ -961,40 +960,13 @@ function VorgaengeListe({bereitschaftCode,user,onLoad,onNew,onCopy,bereitschaft,
             <td style={{padding:"5px 8px",textAlign:"center"}}>{cl.fibuWeitergeleitet?<span style={{color:"#1a7a3a",fontSize:14}}>✅</span>:<span style={{color:"#e53935",fontSize:14}}>❌</span>}</td>
             <td style={{padding:"5px 8px",textAlign:"right",fontFamily:FONT.mono,fontWeight:600}}>{betrag>0?f2(betrag):""}</td>
             <td style={{padding:"5px 8px"}}>{cl.abgeschlossen?<span style={{color:"#1a7a3a",fontSize:10}}>✅ Abgeschl.</span>:<span style={{color:"#d4920a",fontSize:10}}>⏳ Offen</span>}</td>
+            <td style={{padding:"5px 4px",textAlign:"center"}}><button onClick={(e)=>{e.stopPropagation();del(ev.id);}} title="Vorgang löschen" style={{background:"none",border:"none",cursor:"pointer",fontSize:14,color:"#ccc",padding:"2px 4px"}} onMouseEnter={e=>e.currentTarget.style.color="#e53935"} onMouseLeave={e=>e.currentTarget.style.color="#ccc"}>🗑️</button></td>
           </tr>);})}</tbody>
-        <tfoot><tr style={{borderTop:`2px solid ${C.rot}`}}><td colSpan={7} style={{padding:"6px 8px",fontWeight:700}}>Summe</td><td style={{padding:"6px 8px",textAlign:"right",fontWeight:800,color:C.rot,fontFamily:FONT.mono}}>{f2(totalBetrag)}</td><td></td></tr></tfoot>
+        <tfoot><tr style={{borderTop:`2px solid ${C.rot}`}}><td colSpan={8} style={{padding:"6px 8px",fontWeight:700}}>Summe</td><td style={{padding:"6px 8px",textAlign:"right",fontWeight:800,color:C.rot,fontFamily:FONT.mono}}>{f2(totalBetrag)}</td><td></td></tr></tfoot>
       </table></div>
     </Card>)}
 
-    {/* LIST VIEW */}
-    {subTab==="liste"&&(loading?<Card><p style={{color:C.dunkelgrau,textAlign:"center",padding:20}}>Laden...</p></Card>:events.length===0?
-      <Card><div style={{textAlign:"center",padding:40}}><div style={{fontSize:40,marginBottom:12}}>{isArchive?"📦":"📋"}</div><p style={{color:C.dunkelgrau}}>Keine Vorgänge für {viewYear}</p>{!isArchive&&<Btn onClick={onNew} icon="➕" style={{marginTop:12}}>Ersten Vorgang erstellen</Btn>}</div></Card>:
-      events.map(ev=>{const e=ev.event||{};const cl=e.checklist||{};const done=CHECKLIST_ITEMS.filter(i=>cl[i.key]).length;
-        return(<Card key={ev.id} accent={cl.abgeschlossen?"#1a7a3a":C.mittelblau}>
-          <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start"}}>
-            <div style={{cursor:"pointer",flex:1}} onClick={()=>isArchive?null:onLoad(ev)}>
-              <div style={{display:"flex",alignItems:"center",gap:8}}>
-                <span style={{fontSize:15,fontWeight:700,color:C.schwarz}}>{e.name||"Unbenannt"}</span>
-                {cl.abgeschlossen&&<span style={{fontSize:9,background:"#d4edda",color:"#155724",padding:"2px 6px",borderRadius:10,fontWeight:600}}>Abgeschlossen</span>}
-              </div>
-              <div style={{fontSize:12,color:C.dunkelgrau,marginTop:2}}>
-                {e.auftragsnr&&<span style={{marginRight:12,color:C.rot,fontWeight:600}}>Nr. {e.auftragsnr}</span>}
-                {e.ort&&<span style={{marginRight:12}}>📍 {e.ort}</span>}
-                {e.veranstalter&&<span>👤 {e.veranstalter}</span>}
-              </div>
-              <div style={{fontSize:11,color:C.bgrau,marginTop:4}}>
-                {ev.activeDays||0} Tag(e) · {fTS(ev.updatedAt)}
-                <span style={{marginLeft:12}}>Checkliste: {done}/{CHECKLIST_ITEMS.length}</span>
-              </div>
-            </div>
-            <div style={{display:"flex",gap:4}}>
-              {isArchive?<Btn small variant="blue" onClick={()=>onCopy(ev)} icon="📋">Kopieren</Btn>
-                :<Btn small variant="secondary" onClick={()=>onLoad(ev)}>Öffnen</Btn>}
-              {!isArchive&&(user?.rolle==="admin"||true)&&<Btn small variant="ghost" onClick={()=>del(ev.id)} style={{color:C.rot}}>✕</Btn>}
-            </div>
-          </div>
-        </Card>);})
-    )}
+    
   </div>);
 }
 
@@ -1267,7 +1239,7 @@ export default function App(){
             {event.auftragsnr&&<span style={{color:C.rot,fontWeight:700,whiteSpace:"nowrap"}}>&nbsp;·&nbsp;{event.auftragsnr}</span>}
           </span>}
           {!currentEventId&&!saving&&tab!=="events"&&<span style={{fontSize:11,color:C.dunkelgrau,fontStyle:"italic"}}>Kein Vorgang geöffnet</span>}
-          <div style={{display:"flex",alignItems:"center",gap:8}}><div style={{width:30,height:30,borderRadius:15,background:C.rot,display:"flex",alignItems:"center",justifyContent:"center",fontSize:13,fontWeight:700,color:"#fff"}}>{user.name.charAt(0)}</div><div><div style={{fontSize:12,fontWeight:600}}>{user.name}</div><div style={{fontSize:10,color:C.dunkelgrau}}>{user.bereitschaft}{user.rolle==="admin"?" (Admin)":user.rolle==="bl"?" (BL)":""}</div></div></div>
+          <div onClick={()=>setTab("settings")} style={{display:"flex",alignItems:"center",gap:8,cursor:"pointer"}} title="Mein Profil"><div style={{width:30,height:30,borderRadius:15,background:C.rot,display:"flex",alignItems:"center",justifyContent:"center",fontSize:13,fontWeight:700,color:"#fff"}}>{user.name.charAt(0)}</div><div><div style={{fontSize:12,fontWeight:600}}>{user.name}</div><div style={{fontSize:10,color:C.dunkelgrau}}>{user.bereitschaft}{user.rolle==="admin"?" (Admin)":user.rolle==="bl"?" (BL)":""}</div></div></div>
           <Btn small variant="ghost" onClick={()=>window.location.href="/auth/logout"}>Abmelden</Btn>
         </div>
       </header>
