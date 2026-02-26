@@ -953,7 +953,7 @@ function PapierkorbTab({user,bereitschaft,allBereitschaften,stammdaten,onRestore
           {items.map(v=>{
             const left=daysLeft(v.deletedAt);
             const urgent=left<=7;
-            const name=(v.auftragsnr?v.auftragsnr+"-del":null)||v.veranstaltungsname||v.titel||v.id;
+            const name=(v.event?.auftragsnr?v.event.auftragsnr+"-del":null)||v.event?.name||v.id;
             const bc=allBereitschaften?.find(b=>b.code===v._bc);
             return(
               <div key={v.id} style={{background:C.weiss,borderRadius:8,border:`1px solid ${urgent?"#e53e3e40":C.mittelgrau+"40"}`,padding:"14px 16px",display:"flex",alignItems:"center",gap:16,boxShadow:"0 1px 3px rgba(0,0,0,0.05)"}}>
