@@ -57,7 +57,7 @@ const buildAddrStr=(addr)=>{
   parts.push("Deutschland");
   return parts.join(", ");
 };
-const fTS=(ts)=>{if(!ts)return"";const s=String(ts);const d=new Date(s.includes("T")||s.endsWith("Z")?s:s.replace(" ","T")+"Z");return d.toLocaleDateString("de-DE",{day:"2-digit",month:"2-digit",year:"numeric",hour:"2-digit",minute:"2-digit"})};
+const fTS=(ts)=>{if(!ts)return"";const d=typeof ts==="number"?new Date(ts):new Date(String(ts).includes("T")||String(ts).endsWith("Z")?ts:String(ts).replace(" ","T")+"Z");if(isNaN(d))return"";return d.toLocaleDateString("de-DE",{day:"2-digit",month:"2-digit",year:"numeric",hour:"2-digit",minute:"2-digit"})};
 
 // ═══════════════════════════════════════════════════════════════════════════
 // UI COMPONENTS
@@ -1507,6 +1507,7 @@ export default function App(){
                 "ILS Rückrufnummer: Mobilnummer des Users statt Bereitschafts-Telefon",
                 "Signatur nur noch im Profil (nicht mehr pro Veranstaltung)",
                 "PDF-Buttons: Ladeanzeige während Generierung",
+                "Beginn erweiterter Testbetrieb in den Bereitschaften",
               ]},
               {v:"v6.5",d:"25.02.2026",c:[
                 "Interaktive Karte (Leaflet): dauerhaft sichtbar, Klick setzt Pin mit Koordinaten + w3w + Reverse-Geocode",
@@ -1585,27 +1586,23 @@ export default function App(){
                 "Vollstaendige Mandantentrennung je Bereitschaft",
                 "PDF-Export aller Dokumente serverseitig via wkhtmltopdf",
                 "Angebotsmappe als zusammengefuehrtes Gesamtdokument eingefuehrt",
-                "Abgeschlossener Beta-Betrieb mit allen aktiven Bereitschaften des KV",
               ]},
               {v:"v4.0",d:"2023",c:[
                 "Vollstaendige Ueberarbeitung des Kostenkalkulationsmoduls",
                 "Pauschalangebot-Option neben Einzelpostenabrechnung eingefuehrt",
                 "Mehrtages-Veranstaltungen mit tagesbezogener Einzelberechnung",
                 "Verbessertes Drucklayout fuer Angebot und Vertrag",
-                "Erweiterter Pilotbetrieb in drei Bereitschaften",
               ]},
               {v:"v3.0",d:"2022",c:[
                 "Einfuehrung der digitalen AAB (Allgemeine Auftragsbedingungen)",
                 "Gefahrenanalyse nach Maurer-Algorithmus implementiert",
                 "Automatische Ressourcenempfehlung (Helfer, Fahrzeuge, Einsatzleitung)",
                 "Erste Unterstuetzung fuer mehrere Bereitschaften",
-                "Beginn erweiterter Testbetrieb ausgewaehlter Bereitschaften",
               ]},
               {v:"v2.0",d:"2020",c:[
                 "Einfuehrung Benutzerverwaltung und rollenbasierter Zugriffskontrolle",
                 "Kundenstammdaten-Verwaltung und Wiederverwendung",
                 "Erweiterte Kostenkalkulation mit km-Saetzen und Verpflegungspauschale",
-                "Ausweitung auf mehrere Bereitschaften des KV Neuburg-Schrobenhausen",
               ]},
               {v:"v1.0",d:"2018",c:[
                 "Initiale Entwicklung als internes Werkzeug der Bereitschaft Schrobenhausen",
