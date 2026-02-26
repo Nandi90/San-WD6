@@ -1286,7 +1286,11 @@ export default function App(){
                 <div style={{fontSize:11,color:C.dunkelgrau}}>Helferausdruck für den Einsatz · Pro Tag oder Gesamt</div></div>
               </div>
               <div style={{display:"flex",flexWrap:"wrap",gap:8}}>
-                <Btn variant="primary" onClick={async()=>{if(!currentEventId){alert("Bitte zuerst Vorgang speichern");return;}await saveEvent();try{const blob=await API.getEinsatzprotokollPDF(currentEventId,dayCalcs);const url=URL.createObjectURL(blob);window.open(url,"_blank");}catch(e){alert("Fehler: "+e.message);}}} icon="🖨️">Einsatzprotokoll drucken</Btn>
+                {(days||[]).filter(d=>d.active!==false).map((d,i)=>(
+                  <Btn key={i} variant="primary" onClick={async()=>{if(!currentEventId){alert("Bitte zuerst Vorgang speichern");return;}await saveEvent();try{const blob=await API.getEinsatzprotokollPDF(currentEventId,i);const url=URL.createObjectURL(blob);window.open(url,"_blank");}catch(e){alert("Fehler: "+e.message);}}} icon="🖨️">
+                    Einsatzprotokoll Tag {d.id||i+1}{d.date?" ("+new Date(d.date).toLocaleDateString("de-DE")+")":""}
+                  </Btn>
+                ))}
               </div>
             </Card>}
             

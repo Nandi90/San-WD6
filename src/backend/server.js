@@ -479,12 +479,12 @@ function buildVertragHTML(vorgang, stamm, user) {
 // ═══════════════════════════════════════════════════════════════════
 // HTML-Builder: Einsatzprotokoll
 // ═══════════════════════════════════════════════════════════════════
-function buildEinsatzprotokollHTML(vorgang, stamm, user, dayCalcs) {
+function buildEinsatzprotokollHTML(vorgang, stamm, dayIdx) {
   const ev = vorgang.event || vorgang;
-  const days = (vorgang.days || []).filter(d => d.active !== false);
+  const allDays = (vorgang.days || []).filter(d => d.active !== false);
+  const day = dayIdx !== undefined ? allDays[dayIdx] : allDays[0];
   const esc = s => String(s||"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
 
-  // Datum formatieren
   const fDate = d => {
     if (!d) return "";
     const dt = new Date(d);
@@ -492,50 +492,9 @@ function buildEinsatzprotokollHTML(vorgang, stamm, user, dayCalcs) {
     return dt.toLocaleDateString("de-DE", {weekday:"long", day:"2-digit", month:"2-digit", year:"numeric"});
   };
 
-  // Fahrzeuge eines Tages als String
-  const fzgStr = (day) => {
-    const fzg = day.fahrzeuge || [];
-    if (fzg.length === 0) return "keine Fahrzeuge eingeplant";
-    return fzg.map(f => typeof f === "string" ? f : (f.kennzeichen || f.name || JSON.stringify(f))).join(", ");
-  };
-
-  // Material eines Tages (Sonstiges)
-  const matStr = (day) => {
-    const mat = day.material || day.sonstiges || [];
-    if (!mat || mat.length === 0) return "kein Material eingeplant";
-    return Array.isArray(mat) ? mat.join(", ") : String(mat);
-  };
-
-  // Helfer-Anzahl aus dayCalcs oder Berechnung
-  const getHelfer = (dayIdx) => {
-    if (dayCalcs && dayCalcs[dayIdx]) return dayCalcs[dayIdx].tp || "";
-    return "";
-  };
-
-  // Uhrzeit aller Tage für Übersicht
-  const timeRange = days.length > 0
-    ? `${days[0].startTime||""} - ${days[days.length-1].endTime||""}`
-    : "";
-
-  // Datum des ersten Tags
-  const firstDate = days.length > 0 ? fDate(days[0].date) : "";
-
-  // Material/Fahrzeug-Sektionen pro Tag
-  let matSections = `<p><strong>Material: </strong><br>`;
-  matSections += `<strong>für alle Schichten / Abschnitte:</strong><br>${esc(matStr({material: ev.materialAllgemein}))}<br><br>`;
-  days.forEach((day, i) => {
-    const dateLabel = day.date ? fDate(day.date) : `Tag ${day.id||i+1}`;
-    matSections += `<strong>zusätzlich für ${esc(dateLabel)}, ${esc(day.startTime||"")} - ${esc(day.endTime||"")} Uhr:</strong><br>${esc(matStr(day))}<br><br>`;
-  });
-  matSections += `</p>`;
-
-  let fzgSections = `<p><strong>Fahrzeuge:</strong><br>`;
-  fzgSections += `<strong>für alle Schichten / Abschnitte:</strong><br>keine Fahrzeuge eingeplant<br><br>`;
-  days.forEach((day, i) => {
-    const dateLabel = day.date ? fDate(day.date) : `Tag ${day.id||i+1}`;
-    fzgSections += `<strong>zusätzlich für ${esc(dateLabel)}, ${esc(day.startTime||"")} - ${esc(day.endTime||"")} Uhr:</strong><br>${esc(fzgStr(day))}<br><br>`;
-  });
-  fzgSections += `</p>`;
+  const dayDate = day?.date ? fDate(day.date) : "";
+  const dayTime = day ? `${day.startTime||""} - ${day.endTime||""}` : "";
+  const dayLabel = dayDate || (day ? `Tag ${day.id||1}` : "");
 
   // Logo aus bereitschaften.logo (Binary → Base64)
   let logoImg;
@@ -553,17 +512,12 @@ function buildEinsatzprotokollHTML(vorgang, stamm, user, dayCalcs) {
 <style>
   body { font-family: Arial, sans-serif; font-size: 13px; margin: 0; padding: 20px; color: #000; }
   table { width: 100%; border-collapse: collapse; }
-  .header-table td { border: 1px solid #000; padding: 8px; vertical-align: middle; }
-  .header-logo { text-align: center; width: 33%; }
-  .header-title { text-align: center; width: 33%; font-size: 18px; }
-  .header-orga { text-align: center; width: 33%; font-size: 13px; }
-  .header-title h2 { margin: 4px 0; font-size: 20px; }
-  .header-orga h3 { margin: 4px 0; font-size: 13px; }
-  .info-table { margin-top: 16px; }
+  .header-table td { border: 1px solid #000; padding: 8px; vertical-align: middle; text-align: center; }
   .info-table td { padding: 4px 8px; vertical-align: top; }
-  .sig-box { background: #d3d3d3; border: 1px solid #000; padding: 16px; text-align: center; }
+  .sig-box { background: #d3d3d3; border: 1px solid #000; padding: 16px; text-align: center; height: 100%; }
   hr { border: none; border-top: 2px solid #000; margin: 12px 0; }
-  .bemerkung-box { background: #d3d3d3; border: 1px solid #000; padding: 10px; margin-top: 8px; }
+  .freitext-box { border: 1px solid #000; padding: 10px; margin-top: 4px; min-height: 50px; }
+  .bemerkung-box { background: #d3d3d3; border: 1px solid #000; padding: 10px; margin-top: 4px; min-height: 120px; }
   strong { font-weight: bold; }
   @media print { body { margin: 0; padding: 10mm; } }
 </style>
@@ -571,16 +525,14 @@ function buildEinsatzprotokollHTML(vorgang, stamm, user, dayCalcs) {
 <body>
 <table class="header-table">
 <tr>
-  <td class="header-logo">
-    ${logoImg}
+  <td style="width:33%;">${logoImg}</td>
+  <td style="width:33%;font-size:18px;">
+    <strong>Einsatzprotokoll</strong><br/>
+    <span style="font-size:14px;">${esc(ev.auftragsnr||"")}</span>
   </td>
-  <td class="header-title">
-    <h2>Einsatzprotokoll</h2>
-    <p>${esc(ev.auftragsnr||"")}</p>
-  </td>
-  <td class="header-orga">
-    <h3>BRK Kreisverband Neuburg-Schrobenhausen</h3>
-    <h3>${esc(stamm.name||"BRK Bereitschaft")}</h3>
+  <td style="width:33%;font-size:13px;">
+    <strong>BRK Kreisverband Neuburg-Schrobenhausen</strong><br/>
+    ${esc(stamm.name||"BRK Bereitschaft")}
   </td>
 </tr>
 </table>
@@ -589,22 +541,19 @@ function buildEinsatzprotokollHTML(vorgang, stamm, user, dayCalcs) {
 
 <table class="info-table">
 <tr>
-  <td style="width:50%;padding:4px 8px;vertical-align:top;">
+  <td style="width:50%;vertical-align:top;">
     <p><strong>Kunde:</strong> ${esc(ev.veranstalter||ev.rechnungsempfaenger||"")}, ${esc(ev.ansprechpartner||"")}</p>
     <p><strong>Veranstaltung:</strong> ${esc(ev.name||"")}</p>
     <p><strong>Ort:</strong> ${esc(ev.ort||"")}${ev.adresse?", "+esc(ev.adresse):""}</p>
-    <p><strong>Datum:</strong> ${esc(firstDate)}</p>
-    <p><strong>Uhrzeit:</strong> ${esc(timeRange)}</p>
+    <p><strong>Datum:</strong> ${esc(dayLabel)}</p>
+    <p><strong>Uhrzeit:</strong> ${esc(dayTime)}</p>
     <p><strong>Ansprechpartner vor Ort:</strong> ${esc(ev.ansprechpartner||"")}</p>
-    <p><strong>Bekleidung:</strong> Kleiderordnung: Einsatzkleidung nach DBO</p>
     <p><strong>Helferverpflegung:</strong> ${ev.verpflegung?"kostenfrei durch den Veranstalter":"Selbstverpflegung"}</p>
   </td>
   <td style="width:50%;vertical-align:top;">
     <div class="sig-box">
       <p><strong>Der Sanitätsdienst wurde korrekt durchgeführt:</strong></p>
-      <p>&nbsp;</p>
-      <p>&nbsp;</p>
-      <p>&nbsp;</p>
+      <p>&nbsp;</p><p>&nbsp;</p><p>&nbsp;</p>
       <p>________________________________<br/>Unterschrift Veranstalter</p>
     </div>
   </td>
@@ -618,12 +567,12 @@ function buildEinsatzprotokollHTML(vorgang, stamm, user, dayCalcs) {
 <p><strong>Einsatzkräfte:</strong> __________________________________________________</p>
 <hr/>
 
-${matSections}
-${fzgSections}
+<p><strong>Fahrzeuge:</strong></p>
+<div class="freitext-box"></div>
 
-<div class="bemerkung-box">
-  <p><strong>Bemerkungen zum Einsatz:</strong> ${esc(ev.bemerkung||"")}</p>
-</div>
+<p style="margin-top:12px;"><strong>Bemerkungen zum Einsatz:</strong></p>
+<div class="bemerkung-box">${esc(ev.bemerkung||"")}</div>
+
 </body>
 </html>`;
 }
@@ -642,8 +591,8 @@ app.post("/api/pdf/einsatzprotokoll/:id", requireAuth, async (req, res) => {
     const bc = row.bereitschaft_code || req.session.user.bereitschaftCode;
     const stamm = db.prepare("SELECT * FROM bereitschaften WHERE code=?").get(bc) || {};
     const user = db.prepare("SELECT name, titel FROM users WHERE sub=?").get(req.session.user.sub) || {};
-    const { dayCalcs } = req.body;
-    const html = buildEinsatzprotokollHTML(vorgang, stamm, user, dayCalcs || []);
+    const { dayIdx } = req.body;
+    const html = buildEinsatzprotokollHTML(vorgang, stamm, dayIdx !== undefined ? dayIdx : 0);
     const browser = await puppeteer.launch({
       executablePath: process.env.CHROMIUM_PATH || "/usr/bin/chromium-browser",
       args: ["--no-sandbox","--disable-setuid-sandbox","--disable-dev-shm-usage","--disable-gpu"],
