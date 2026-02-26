@@ -17,7 +17,11 @@ router.post("/ils/:vorgangId", requireBL, async (req, res) => {
     if (!vorgang) return res.status(404).json({ error: "Vorgang nicht gefunden" });
 
     const bereitschaft = getDb().prepare("SELECT * FROM bereitschaften WHERE code = ?").get(bc);
-    const pdfBuffer = await fillILS(JSON.parse(vorgang.data), bereitschaft, req.session.user);
+    // User aus DB laden (Session hat mobil/telefon nur nach Profil-Speichern)
+    const { getDb } = require("../db");
+    const userDb = getDb().prepare("SELECT name, titel, mobil, telefon FROM users WHERE sub=?").get(req.session.user.sub) || {};
+    const user = { ...req.session.user, ...userDb };
+    const pdfBuffer = await fillILS(JSON.parse(vorgang.data), bereitschaft, user);
 
     res.setHeader("Content-Type", "application/pdf");
     res.setHeader("Content-Disposition", `inline; filename="ILS_Anmeldung_${req.params.vorgangId}.pdf"`);

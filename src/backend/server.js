@@ -321,7 +321,7 @@ app.post("/api/pdf/vertrag/:id", requireAuth, async (req, res) => {
     const vorgang = JSON.parse(row.data);
     const stamm = db.prepare("SELECT * FROM bereitschaften WHERE code=?").get(req.session.user.bereitschaftCode) || {};
     const kosten = db.prepare("SELECT * FROM kostensaetze WHERE bereitschaft_code=?").get(req.session.user.bereitschaftCode) || {};
-    const user = db.prepare("SELECT name, titel, ort, email, unterschrift FROM users WHERE sub=?").get(req.session.user.sub) || {};
+    const user = db.prepare("SELECT name, titel, ort, email, telefon, mobil, unterschrift FROM users WHERE sub=?").get(req.session.user.sub) || {};
     const html = buildVertragHTML(vorgang, stamm, user);
     const browser = await puppeteer.launch({
       executablePath: process.env.CHROMIUM_PATH || "/usr/bin/chromium-browser",
