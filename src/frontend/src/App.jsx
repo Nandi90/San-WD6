@@ -489,8 +489,12 @@ function SignaturePad({value,onChange}){
   useEffect(()=>{
     if(value&&canvasRef.current){
       const img=new Image();img.onload=()=>{const ctx=canvasRef.current.getContext("2d");ctx.clearRect(0,0,300,100);ctx.drawImage(img,0,0);};img.src=value;
+      setHasSignature(true);
+    } else if(!value&&canvasRef.current){
+      const ctx=canvasRef.current.getContext("2d");ctx.clearRect(0,0,300,100);
+      setHasSignature(false);
     }
-  },[]);
+  },[value]);
   const getPos=(e,canvas)=>{const r=canvas.getBoundingClientRect();const src=e.touches?e.touches[0]:e;return{x:(src.clientX-r.left)*(canvas.width/r.width),y:(src.clientY-r.top)*(canvas.height/r.height)};};
   const startDraw=(e)=>{e.preventDefault();drawing.current=true;const canvas=canvasRef.current;const ctx=canvas.getContext("2d");const p=getPos(e,canvas);ctx.beginPath();ctx.moveTo(p.x,p.y);};
   const draw=(e)=>{e.preventDefault();if(!drawing.current)return;const canvas=canvasRef.current;const ctx=canvas.getContext("2d");ctx.strokeStyle="#000";ctx.lineWidth=2;ctx.lineCap="round";const p=getPos(e,canvas);ctx.lineTo(p.x,p.y);ctx.stroke();setHasSignature(true);};
