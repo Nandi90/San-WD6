@@ -563,7 +563,7 @@ function buildEinsatzprotokollHTML(vorgang, stamm, user, dayCalcs) {
 <table class="header-table">
 <tr>
   <td class="header-logo">
-    ${logoData ? `<img src="${logoData}" style="width:180px;height:auto;vertical-align:top;" />` : `<div style="font-weight:bold;font-size:14px;">BRK Bereitschaft</div>`}
+    ${logoImg}
   </td>
   <td class="header-title">
     <h2>Einsatzprotokoll</h2>
