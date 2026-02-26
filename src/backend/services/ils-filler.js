@@ -75,61 +75,83 @@ async function fillILS(vorgang, bereitschaft, user) {
   const lastDay = days[days.length - 1] || firstDay;
   const ils = event.ils || {};
 
-  // Datum DD.MM.YYYY formatieren
+  // Datum DD.MM.YYYY formatieren – UTC-sicher (T12:00:00 verhindert Off-by-one)
   const fmtDate = s => {
     if (!s) return "";
-    const d = new Date(s);
+    // Nur Datum ohne Zeit? → Mittag anhängen damit Zeitzone keine Rolle spielt
+    const iso = /^\d{4}-\d{2}-\d{2}$/.test(s) ? s + "T12:00:00" : s;
+    const d = new Date(iso);
     if (isNaN(d)) return s;
-    return d.toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit", year: "numeric" });
+    const dd = String(d.getDate()).padStart(2,"0");
+    const mm = String(d.getMonth()+1).padStart(2,"0");
+    const yyyy = d.getFullYear();
+    return `${dd}.${mm}.${yyyy}`;
   };
 
-  // Adresse parsen - zwei Formate:
-  // 1. Nominatim: "15, Aichacher Straße, Ortsteil, Stadt, Landkreis, Bayern, 86529, Deutschland"
-  // 2. Manuell:   "Aichacher Straße 15 86529 Schrobenhausen"
+  // Adresse parsen – Nominatim Formate:
+  // MIT Hausnr:  "15, Aichacher Straße, Ortsteil, Stadt, Landkreis, Bayern, 86529, Deutschland"
+  // OHNE Hausnr: "Dreiweiherweg, Ortsteil, Stadt, Landkreis, Bayern, 86529, Deutschland"
   const adresse = event.adresse || "";
   let strasseAuto = "", hausnrAuto = "", plzAuto = "", ortAuto = "", ortsteilAuto = "";
 
-  const nominatimMatch = adresse.match(/^(\d+[a-zA-Z]?),\s*([^,]+),(.*)$/);
-  if (nominatimMatch) {
-    // Nominatim-Format
-    hausnrAuto = nominatimMatch[1].trim();
-    strasseAuto = nominatimMatch[2].trim();
-    const rest = nominatimMatch[3].split(",").map(s => s.trim()).filter(Boolean);
-    // PLZ suchen
-    const plzIdx = rest.findIndex(s => /^\d{5}$/.test(s));
+  // Gemeinsamer Nominatim-Parser
+  const parseNominatim = (parts) => {
+    // PLZ finden
+    const plzIdx = parts.findIndex(s => /^\d{5}$/.test(s));
     if (plzIdx >= 0) {
-      plzAuto = rest[plzIdx];
-      // Stadt = letzter Teil vor PLZ der kein Landkreis/Land ist
-      const vorPlz = rest.slice(0, plzIdx).filter(s =>
+      plzAuto = parts[plzIdx];
+      const candidates = parts.slice(0, plzIdx).filter(s =>
         !s.match(/^(Landkreis|Bayern|Oberbayern|Schwaben|Franken|Deutschland|Germany)/i)
       );
-      ortAuto = vorPlz[vorPlz.length - 1] || "";
-      ortsteilAuto = vorPlz.slice(0, -1).join(", ");
+      ortAuto = candidates[candidates.length - 1] || "";
+      ortsteilAuto = candidates.slice(0, -1).join(", ");
     } else {
-      ortAuto = rest.find(s => !s.match(/^(Landkreis|Bayern|Deutschland)/i)) || "";
+      const candidates = parts.filter(s =>
+        !s.match(/^(Landkreis|Bayern|Oberbayern|Schwaben|Franken|Deutschland|Germany)/i)
+      );
+      ortAuto = candidates[candidates.length - 1] || "";
     }
-  } else {
-    // Manuelles Format: "Straße Hausnr PLZ Ort"
-    const m = adresse.match(/^(.+?)\s+(\d+[a-zA-Z]?)(?:\s+(\d{5}))?(?:\s+(.+))?$/);
-    if (m) {
-      strasseAuto = m[1].trim();
-      hausnrAuto = m[2].trim();
-      plzAuto = m[3] || "";
-      ortAuto = m[4] || event.ort || "";
+  };
+
+  if (adresse) {
+    const parts = adresse.split(",").map(s => s.trim()).filter(Boolean);
+    if (parts.length >= 3) {
+      // Erstes Element: Hausnummer oder Straße?
+      if (/^\d+[a-zA-Z]?$/.test(parts[0])) {
+        // Format: "15, Aichacher Straße, ..."
+        hausnrAuto = parts[0];
+        strasseAuto = parts[1];
+        parseNominatim(parts.slice(2));
+      } else {
+        // Format: "Dreiweiherweg, Ortsteil, Stadt, ..."
+        strasseAuto = parts[0];
+        hausnrAuto = "";
+        parseNominatim(parts.slice(1));
+      }
     } else {
-      strasseAuto = adresse;
-      ortAuto = event.ort || "";
+      // Manuelles Format: "Straße Hausnr PLZ Ort"
+      const m = adresse.match(/^(.+?)\s+(\d+[a-zA-Z]?)(?:\s+(\d{5}))?(?:\s+(.+))?$/);
+      if (m) {
+        strasseAuto = m[1].trim();
+        hausnrAuto = m[2].trim();
+        plzAuto = m[3] || "";
+        ortAuto = m[4] || event.ort || "";
+      } else {
+        strasseAuto = adresse;
+        ortAuto = event.ort || "";
+      }
     }
   }
-  // Fallback PLZ/Ort aus event.ort
-  if (!plzAuto || !ortAuto) {
+
+  // Fallback: PLZ/Ort aus event.ort
+  if (!ortAuto) {
     const ortStr = event.ort || "";
     const ortParts = ortStr.trim().split(/\s+/);
     if (/^\d{5}$/.test(ortParts[0])) {
       if (!plzAuto) plzAuto = ortParts[0];
-      if (!ortAuto) ortAuto = ortParts.slice(1).join(" ");
+      ortAuto = ortParts.slice(1).join(" ");
     } else {
-      if (!ortAuto) ortAuto = ortStr;
+      ortAuto = ortStr;
     }
   }
 
