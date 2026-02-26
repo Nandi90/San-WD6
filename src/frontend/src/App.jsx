@@ -44,6 +44,19 @@ const mkDay=(n)=>({id:n,active:n===1,date:"",startTime:"18:00",endTime:"23:00",a
 const EMPTY_EVENT={auftragsnr:"",rechnungsnr:"",name:"",ort:"",adresse:"",veranstalter:"",ansprechpartner:"",telefon:"",email:"",rechnungsempfaenger:"",reStrasse:"",rePlzOrt:"",anrede:"Sehr geehrte Damen und Herren,",auflagen:"keine",kfzStellplatz:true,sanitaetsraum:false,strom:true,verpflegung:true,pauschalangebot:0,bemerkung:"",coords:null,w3w:"",hausnr:"",checklist:{},ilsEL:"",ilsTelefon:"",ilsFunk:"",ilsAbkoemmlich:"",ilsFzg1:"",ilsFzg2:"",ilsFzg3:"",ilsSonstige:""};
 const f2=(v)=>new Intl.NumberFormat("de-DE",{minimumFractionDigits:2,maximumFractionDigits:2}).format(v);
 const fDate=(d)=>d?new Date(d).toLocaleDateString("de-DE"):"";
+const buildAddrStr=(addr)=>{
+  if(!addr)return"";
+  const road=addr.road||addr.pedestrian||addr.path||addr.footway||"";
+  const hnr=addr.house_number||"";
+  const sub=addr.suburb||addr.quarter||addr.neighbourhood||"";
+  const city=addr.city||addr.town||addr.village||addr.hamlet||"";
+  const plz=addr.postcode||"";
+  const parts=[];
+  if(road&&hnr)parts.push(road+" "+hnr);else if(road)parts.push(road);
+  if(sub)parts.push(sub);if(city)parts.push(city);if(plz)parts.push(plz);
+  parts.push("Deutschland");
+  return parts.join(", ");
+};
 const fTS=(ts)=>{if(!ts)return"";const s=String(ts);const d=new Date(s.includes("T")||s.endsWith("Z")?s:s.replace(" ","T")+"Z");return d.toLocaleDateString("de-DE",{day:"2-digit",month:"2-digit",year:"numeric",hour:"2-digit",minute:"2-digit"})};
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -101,23 +114,11 @@ function AddressAutocomplete({label,value,onChange,onResult}){
         if (city) parts.push(city);
         if (plz) parts.push(plz);
         parts.push("Deutschland");
-        const addrStr = parts.join(", ") || r.display_name;
+        const addrStr = buildAddrStr(r.address) || r.display_name;
         return{address:addrStr,display:r.display_name,lat,lng,w3w};
       }));
       setSuggestions(mapped);
     }catch{setSuggestions([]);}
-  };
-  const buildAddrStr=(addr)=>{
-    const road=addr.road||addr.pedestrian||addr.path||addr.footway||"";
-    const hnr=addr.house_number||"";
-    const sub=addr.suburb||addr.quarter||addr.neighbourhood||"";
-    const city=addr.city||addr.town||addr.village||addr.hamlet||"";
-    const plz=addr.postcode||"";
-    const parts=[];
-    if(road&&hnr)parts.push(road+" "+hnr);else if(road)parts.push(road);
-    if(sub)parts.push(sub);if(city)parts.push(city);if(plz)parts.push(plz);
-    parts.push("Deutschland");
-    return parts.join(", ");
   };
   const handleChange=(v)=>{onChange(v);clearTimeout(debounceRef.current);debounceRef.current=setTimeout(()=>search(v),600);};
   const selectAddr=(s)=>{onChange(s.address);setSuggestions([]);if(onResult)onResult(s);};
@@ -1159,7 +1160,7 @@ export default function App(){
                 <Inp label="Name der Veranstaltung" value={event.name} onChange={v=>updateEvent("name",v)}/>
                 <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"0 16px"}}>
                   <Inp label="Veranstaltungsort" value={event.ort} onChange={v=>updateEvent("ort",v)}/>
-                  <div style={{display:"flex",gap:8,alignItems:"flex-end"}}><div style={{flex:1}}><AddressAutocomplete label="Adresse inkl. Hausnummer (z.B. Dreiweiherweg 8)" value={event.adresse} onChange={v=>updateEvent("adresse",v)} onResult={s=>{updateEvent("coords",{lat:s.lat,lng:s.lng});if(s.w3w)updateEvent("w3w",s.w3w);}}/></div><div style={{width:80}}><Inp label="Hausnr." value={event.hausnr||""} onChange={v=>{updateEvent("hausnr",v);}} placeholder="z.B. 8"/></div></div>
+                  <AddressAutocomplete label="Adresse inkl. Hausnummer (z.B. Dreiweiherweg 8)" value={event.adresse} onChange={v=>updateEvent("adresse",v)} onResult={s=>{updateEvent("coords",{lat:s.lat,lng:s.lng});if(s.w3w)updateEvent("w3w",s.w3w);}}/>
                 </div>
                 <LeafletMap coords={event.coords} w3w={event.w3w} onChange={r=>{updateEvent("coords",{lat:r.lat,lng:r.lng});if(r.address)updateEvent("adresse",r.address);}} onW3W={w=>updateEvent("w3w",w)}/>
                 <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"0 16px",marginTop:10}}>
