@@ -43,7 +43,10 @@ router.get("/:vorgangId/:dayIdx", requireBL, async (req, res) => {
       }
     };
 
-    const pdfBuffer = await fillILS(vorgangDay, bereitschaft, req.session.user);
+    // User aus DB laden (Session hat mobil/telefon nur nach Profil-Speichern)
+    const userDb = getDb().prepare("SELECT name, titel, mobil, telefon FROM users WHERE sub=?").get(req.session.user.sub) || {};
+    const user = { ...req.session.user, ...userDb };
+    const pdfBuffer = await fillILS(vorgangDay, bereitschaft, user);
     const datum = day.date ? day.date.replace(/-/g, "") : `tag${dayIdx + 1}`;
     const filename = `ILS_${req.params.vorgangId}_Tag${dayIdx + 1}_${datum}.pdf`;
 
