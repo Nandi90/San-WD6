@@ -18,7 +18,6 @@ router.post("/ils/:vorgangId", requireBL, async (req, res) => {
 
     const bereitschaft = getDb().prepare("SELECT * FROM bereitschaften WHERE code = ?").get(bc);
     // User aus DB laden (Session hat mobil/telefon nur nach Profil-Speichern)
-    const { getDb } = require("../db");
     const userDb = getDb().prepare("SELECT name, titel, mobil, telefon FROM users WHERE sub=?").get(req.session.user.sub) || {};
     const user = { ...req.session.user, ...userDb };
     const pdfBuffer = await fillILS(JSON.parse(vorgang.data), bereitschaft, user);
