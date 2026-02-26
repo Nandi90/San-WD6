@@ -179,7 +179,8 @@ async function fillILS(vorgang, bereitschaft, user) {
     datum_bis: fmtDate(lastDay.date || firstDay.date),
     zeit_bis: lastDay.endTime || firstDay.endTime || "",
     strasse: strasseAuto,
-    hausnr: hausnrAuto,
+    // Direkt eingetragene Hausnummer hat Vorrang
+    hausnr: event.hausnr || hausnrAuto,
     objekt: "",
     plz: plzAuto,
     ortsteil: ortsteilAuto,
