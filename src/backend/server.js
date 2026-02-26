@@ -1360,6 +1360,22 @@ app.use((err, req, res, next) => {
 
 // ── Start ────────────────────────────────────────────────────────
 db.init();
+
+// ── Papierkorb Auto-Cleanup (60 Tage) ───────────────────────────
+function runPapierkorbCleanup() {
+  try {
+    const result = db.getDb().prepare(
+      "DELETE FROM vorgaenge WHERE deleted_at IS NOT NULL AND deleted_at < datetime('now', '-60 days')"
+    ).run();
+    if (result.changes > 0) {
+      console.log(`🗑️  Papierkorb-Cleanup: ${result.changes} Vorgang/Vorgänge endgültig gelöscht`);
+    }
+  } catch(e) {
+    console.error("Papierkorb-Cleanup Fehler:", e);
+  }
+}
+runPapierkorbCleanup(); // Beim Start einmal ausführen
+setInterval(runPapierkorbCleanup, 24 * 60 * 60 * 1000); // Täglich
 app.listen(PORT, "0.0.0.0", () => {
   console.log(`🚑 BRK SanWD v6 gestartet auf Port ${PORT}`);
   console.log(`   Nextcloud: ${process.env.NEXTCLOUD_URL || "nicht konfiguriert"}`);

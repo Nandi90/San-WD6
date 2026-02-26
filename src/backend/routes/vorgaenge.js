@@ -118,25 +118,55 @@ router.get("/:id/history", (req, res) => {
 // ═════════════════════════════════════════════════════════════════
 
 // ── Liste ───────────────────────────────────────────────────────
+// ── Papierkorb: gelöschte Vorgänge anzeigen ─────────────────────
+router.get("/papierkorb/liste", (req, res) => {
+  const isAdmin = req.session.user.rolle === "admin";
+  const bc = getBereitschaftCode(req);
+  try {
+    let rows;
+    if (isAdmin && req.query.bc === "ALL") {
+      rows = getDb().prepare(
+        "SELECT id, bereitschaft_code, data, status, created_at, updated_at, deleted_at FROM vorgaenge WHERE deleted_at IS NOT NULL ORDER BY deleted_at DESC"
+      ).all();
+    } else {
+      rows = getDb().prepare(
+        "SELECT id, bereitschaft_code, data, status, created_at, updated_at, deleted_at FROM vorgaenge WHERE bereitschaft_code = ? AND deleted_at IS NOT NULL ORDER BY deleted_at DESC"
+      ).all(bc);
+    }
+    res.json(rows.map(r => ({
+      id: r.id,
+      status: r.status,
+      _bc: r.bereitschaft_code,
+      ...JSON.parse(r.data),
+      createdAt: r.created_at,
+      updatedAt: r.updated_at,
+      deletedAt: r.deleted_at
+    })));
+  } catch(e) {
+    console.error("Papierkorb error:", e);
+    res.status(500).json({ error: e.message });
+  }
+});
+
 router.get("/:year", (req, res) => {
   const year = parseInt(req.params.year);
   const isAdmin = req.session.user.rolle === "admin";
 
   // Admin mit bc=ALL -> alle Bereitschaften
   if (isAdmin && req.query.bc === "ALL") {
-    const rows = getDb().prepare("SELECT id, bereitschaft_code, data, status, created_at, updated_at, synced_at, created_by FROM vorgaenge WHERE year = ? ORDER BY updated_at DESC").all(year);
+    const rows = getDb().prepare("SELECT id, bereitschaft_code, data, status, created_at, updated_at, synced_at, created_by FROM vorgaenge WHERE year = ? AND deleted_at IS NULL ORDER BY updated_at DESC").all(year);
     return res.json(rows.map(r => ({ id: r.id, status: r.status, _bc: r.bereitschaft_code, ...JSON.parse(r.data), createdAt: r.created_at, updatedAt: r.updated_at, syncedAt: r.synced_at, createdBy: r.created_by })));
   }
 
   const bc = getBereitschaftCode(req);
-  const rows = getDb().prepare("SELECT id, bereitschaft_code, data, status, created_at, updated_at, synced_at, created_by FROM vorgaenge WHERE bereitschaft_code = ? AND year = ? ORDER BY updated_at DESC").all(bc, year);
+  const rows = getDb().prepare("SELECT id, bereitschaft_code, data, status, created_at, updated_at, synced_at, created_by FROM vorgaenge WHERE bereitschaft_code = ? AND year = ? AND deleted_at IS NULL ORDER BY updated_at DESC").all(bc, year);
   res.json(rows.map(r => ({ id: r.id, status: r.status, _bc: r.bereitschaft_code, ...JSON.parse(r.data), createdAt: r.created_at, updatedAt: r.updated_at, syncedAt: r.synced_at, createdBy: r.created_by })));
 });
 
 // ── Einzelner Vorgang ───────────────────────────────────────────
 router.get("/:year/:id", (req, res) => {
   const bc = getBereitschaftCode(req);
-  const row = getDb().prepare("SELECT * FROM vorgaenge WHERE id = ? AND bereitschaft_code = ?").get(req.params.id, bc);
+  const row = getDb().prepare("SELECT * FROM vorgaenge WHERE id = ? AND bereitschaft_code = ? AND deleted_at IS NULL").get(req.params.id, bc);
   if (!row) return res.status(404).json({ error: "Nicht gefunden" });
   const activeLock = getActiveLock(req.params.id, req.session.user.sub);
   res.json({ id: row.id, status: row.status, ...JSON.parse(row.data), syncedAt: row.synced_at, _lock: activeLock ? { user: activeLock.user_name, since: activeLock.locked_at } : null, _isVersendet: row.status === "versendet" });
@@ -193,16 +223,58 @@ router.delete("/:id", requireWriteAccess, (req, res) => {
   const isAdmin = req.session.user.rolle === "admin";
   const bc = getBereitschaftCode(req);
   try {
-    getDb().prepare("DELETE FROM vorgang_locks WHERE vorgang_id = ?").run(req.params.id);
+    const now = new Date().toISOString();
     if (isAdmin) {
-      getDb().prepare("DELETE FROM vorgaenge WHERE id = ?").run(req.params.id);
+      getDb().prepare("UPDATE vorgaenge SET deleted_at = ? WHERE id = ? AND deleted_at IS NULL").run(now, req.params.id);
     } else {
-      getDb().prepare("DELETE FROM vorgaenge WHERE id = ? AND bereitschaft_code = ?").run(req.params.id, bc);
+      getDb().prepare("UPDATE vorgaenge SET deleted_at = ? WHERE id = ? AND bereitschaft_code = ? AND deleted_at IS NULL").run(now, req.params.id, bc);
     }
-    audit(req.session.user, "delete", "vorgang", req.params.id);
+    audit(req.session.user, "soft_delete", "vorgang", req.params.id);
     res.json({ success: true });
   } catch(e) {
     console.error("DELETE error:", e);
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// ── Papierkorb: Wiederherstellen ────────────────────────────────
+router.put("/:id/restore", requireWriteAccess, (req, res) => {
+  const isAdmin = req.session.user.rolle === "admin";
+  const bc = getBereitschaftCode(req);
+  try {
+    let result;
+    if (isAdmin) {
+      result = getDb().prepare(
+        "UPDATE vorgaenge SET deleted_at = NULL WHERE id = ? AND deleted_at IS NOT NULL"
+      ).run(req.params.id);
+    } else {
+      result = getDb().prepare(
+        "UPDATE vorgaenge SET deleted_at = NULL WHERE id = ? AND bereitschaft_code = ? AND deleted_at IS NOT NULL"
+      ).run(req.params.id, bc);
+    }
+    if (result.changes === 0) return res.status(404).json({ error: "Nicht gefunden oder nicht im Papierkorb" });
+    audit(req.session.user, "restore", "vorgang", req.params.id);
+    res.json({ success: true });
+  } catch(e) {
+    console.error("Restore error:", e);
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// ── Papierkorb: Endgültig löschen (nur Admin) ───────────────────
+router.delete("/:id/purge", requireBL, (req, res) => {
+  const isAdmin = req.session.user.rolle === "admin";
+  if (!isAdmin) return res.status(403).json({ error: "Nur Admins dürfen endgültig löschen" });
+  try {
+    getDb().prepare("DELETE FROM vorgang_locks WHERE vorgang_id = ?").run(req.params.id);
+    const result = getDb().prepare(
+      "DELETE FROM vorgaenge WHERE id = ? AND deleted_at IS NOT NULL"
+    ).run(req.params.id);
+    if (result.changes === 0) return res.status(404).json({ error: "Nicht gefunden oder nicht im Papierkorb" });
+    audit(req.session.user, "purge", "vorgang", req.params.id);
+    res.json({ success: true });
+  } catch(e) {
+    console.error("Purge error:", e);
     res.status(500).json({ error: e.message });
   }
 });

@@ -238,3 +238,7 @@ const API = {
   },
 };
 export default API;
+// Papierkorb
+export const getPapierkorb = (bcAll) => API.json(`/api/vorgaenge/papierkorb/liste${bcAll ? "?bc=ALL" : ""}`);
+export const restoreVorgang = (id) => API.json(`/api/vorgaenge/${id}/restore`, { method: "PUT" });
+export const purgeVorgang   = (id) => API.json(`/api/vorgaenge/${id}/purge`,   { method: "DELETE" });

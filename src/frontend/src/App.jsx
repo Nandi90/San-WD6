@@ -1,6 +1,6 @@
 import React from "react";
 import { useState, useMemo, useCallback, useEffect, useRef } from "react";
-import API from "./api";
+import API, { getPapierkorb, restoreVorgang, purgeVorgang } from "./api";
 
 // ═══════════════════════════════════════════════════════════════════════════
 // DRK CORPORATE IDENTITY
@@ -909,7 +909,84 @@ function AABPDF({stammdaten,bereitschaft}){
 // ═══════════════════════════════════════════════════════════════════════════
 // VORGÄNGE LIST with ARCHIVE + ÜBERSICHT
 // ═══════════════════════════════════════════════════════════════════════════
+function PapierkorbTab({user,bereitschaft,allBereitschaften,stammdaten,onRestore}){
+  const [items,setItems]=React.useState([]);
+  const [loading,setLoading]=React.useState(true);
+  const [error,setError]=React.useState(null);
+  const isAdmin=user.rolle==="admin";
+  const load=async()=>{
+    setLoading(true);setError(null);
+    try{const data=await getPapierkorb(isAdmin);setItems(data);}
+    catch(e){setError(e.message);}
+    setLoading(false);
+  };
+  useEffect(()=>{load();},[]);
+  const restore=async(id,name)=>{
+    if(!confirm(`"${name}" wiederherstellen?`))return;
+    try{await restoreVorgang(id);if(onRestore)onRestore();else load();}
+    catch(e){alert("Fehler: "+e.message);}
+  };
+  const purge=async(id,name)=>{
+    if(!confirm(`"${name}" ENDGÜLTIG löschen? Dies kann nicht rückgängig gemacht werden!`))return;
+    try{await purgeVorgang(id);load();}
+    catch(e){alert("Fehler: "+e.message);}
+  };
+  const daysLeft=(deletedAt)=>{
+    const d=new Date(deletedAt);
+    d.setDate(d.getDate()+60);
+    const diff=Math.ceil((d-new Date())/(1000*60*60*24));
+    return Math.max(0,diff);
+  };
+  if(loading)return <div style={{padding:32,textAlign:"center",color:C.dunkelgrau,fontFamily:FONT.sans}}>Lade Papierkorb…</div>;
+  if(error)return <div style={{padding:32,color:C.rot,fontFamily:FONT.sans}}>Fehler: {error}</div>;
+  return(
+    <div style={{maxWidth:900,margin:"0 auto",padding:"24px 16px"}}>
+      <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:20}}>
+        <div>
+          <h2 style={{margin:0,fontFamily:FONT.serif,color:C.schwarz,fontSize:20}}>🗑️ Papierkorb</h2>
+          <div style={{fontSize:12,color:C.dunkelgrau,marginTop:4,fontFamily:FONT.sans}}>Gelöschte Vorgänge werden nach 60 Tagen automatisch endgültig entfernt.</div>
+        </div>
+        <button onClick={load} style={{padding:"6px 14px",borderRadius:4,border:`1px solid ${C.mittelgrau}`,background:C.weiss,cursor:"pointer",fontSize:12,fontFamily:FONT.sans}}>↻ Aktualisieren</button>
+      </div>
+      {items.length===0?(
+        <div style={{textAlign:"center",padding:48,color:C.dunkelgrau,fontFamily:FONT.sans,background:C.weiss,borderRadius:8,border:`1px solid ${C.mittelgrau}40`}}>
+          <div style={{fontSize:40,marginBottom:12}}>🗑️</div>
+          <div style={{fontSize:15,fontWeight:600}}>Papierkorb ist leer</div>
+          <div style={{fontSize:13,marginTop:6}}>Gelöschte Vorgänge erscheinen hier.</div>
+        </div>
+      ):(
+        <div style={{display:"flex",flexDirection:"column",gap:8}}>
+          {items.map(v=>{
+            const left=daysLeft(v.deletedAt);
+            const urgent=left<=7;
+            const name=v.veranstaltungsname||v.titel||v.id;
+            const bc=allBereitschaften?.find(b=>b.code===v._bc);
+            return(
+              <div key={v.id} style={{background:C.weiss,borderRadius:8,border:`1px solid ${urgent?"#e53e3e40":C.mittelgrau+"40"}`,padding:"14px 16px",display:"flex",alignItems:"center",gap:16,boxShadow:"0 1px 3px rgba(0,0,0,0.05)"}}>
+                <div style={{flex:1,minWidth:0}}>
+                  <div style={{fontWeight:600,fontSize:14,fontFamily:FONT.sans,color:C.schwarz,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{name}</div>
+                  <div style={{fontSize:12,color:C.dunkelgrau,marginTop:3,fontFamily:FONT.sans,display:"flex",gap:12,flexWrap:"wrap"}}>
+                    {bc&&<span>📍 {bc.name}</span>}
+                    {v.datum&&<span>📅 {v.datum}</span>}
+                    {v.deletedAt&&<span>🗑️ Gelöscht: {new Date(v.deletedAt).toLocaleDateString("de-DE")}</span>}
+                    <span style={{color:urgent?"#e53e3e":C.dunkelgrau,fontWeight:urgent?700:400}}>⏳ Noch {left} Tag{left!==1?"e":""}</span>
+                  </div>
+                </div>
+                <div style={{display:"flex",gap:8,flexShrink:0}}>
+                  <button onClick={()=>restore(v.id,name)} style={{padding:"6px 14px",borderRadius:4,border:`1px solid #1a7a3a`,background:"#f0fff4",color:"#1a7a3a",cursor:"pointer",fontSize:12,fontWeight:600,fontFamily:FONT.sans}}>↩ Wiederherstellen</button>
+                  {isAdmin&&<button onClick={()=>purge(v.id,name)} style={{padding:"6px 14px",borderRadius:4,border:`1px solid ${C.rot}`,background:`${C.rot}11`,color:C.rot,cursor:"pointer",fontSize:12,fontWeight:600,fontFamily:FONT.sans}}>✕ Endgültig löschen</button>}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function VorgaengeListe({bereitschaftCode,user,onLoad,onNew,onCopy,bereitschaft,allBereitschaften,onFilterChange}){
+  const [showPapierkorb,setShowPapierkorb]=useState(false);
   const thisYear=new Date().getFullYear();
   const [viewYear,setViewYear]=useState(thisYear);
   const [events,setEvents]=useState([]);
@@ -920,7 +997,7 @@ function VorgaengeListe({bereitschaftCode,user,onLoad,onNew,onCopy,bereitschaft,
   const prefix=`sanwd:${bereitschaftCode}:${viewYear}`;
   useEffect(()=>{loadEvents();},[prefix]);
   const loadEvents=async(bcFilter)=>{setLoading(true);try{const bc=bcFilter!==undefined?bcFilter:filterBereitschaft;const data=await API.getVorgaenge(viewYear,bc);setEvents(data.map(v=>({...v,id:v.id})));}catch{setEvents([]);}setLoading(false);};
-  const del=async(id)=>{if(!confirm("Vorgang löschen?"))return;try{await API.deleteVorgang(id);}catch{}loadEvents();};
+  const del=async(id)=>{if(!confirm("Vorgang in den Papierkorb verschieben? Er kann innerhalb von 60 Tagen wiederhergestellt werden."))return;try{await API.deleteVorgang(id);loadEvents();}catch(e){alert("Fehler beim Löschen: "+e.message);}};
   const years=[];for(let y=thisYear;y>=2025;y--)years.push(y);
   const isArchive=viewYear<thisYear;
   const totalBetrag=events.reduce((s,ev)=>{const e=ev.event;if(!e)return s;const dc=(ev.days||[]).filter(d=>d.active);let t=0;try{dc.forEach(d=>{const c=calcDay(d,DEFAULT_STAMMDATEN.rates,e.verpflegung);t+=c.total;});}catch{}return s+t;},0);
@@ -967,6 +1044,23 @@ function VorgaengeListe({bereitschaftCode,user,onLoad,onNew,onCopy,bereitschaft,
     </Card>)}
 
     
+    {/* Papierkorb Button unten rechts */}
+    <div style={{background:"red",color:"white",padding:8,marginTop:16}}>DEBUG PAPIERKORB</div>
+    <div style={{display:"flex",justifyContent:"flex-end",marginTop:16}}>
+      <button onClick={()=>setShowPapierkorb(true)} style={{padding:"7px 16px",borderRadius:4,border:`1px solid ${C.mittelgrau}`,background:C.weiss,cursor:"pointer",fontSize:12,color:C.dunkelgrau,fontFamily:FONT.sans,display:"flex",alignItems:"center",gap:6}}>🗑️ Papierkorb</button>
+    </div>
+    {/* Papierkorb Modal */}
+    {showPapierkorb&&(
+      <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.45)",zIndex:1000,display:"flex",alignItems:"center",justifyContent:"center"}} onClick={()=>setShowPapierkorb(false)}>
+        <div style={{background:C.weiss,borderRadius:10,boxShadow:"0 8px 32px rgba(0,0,0,0.18)",width:"min(860px,95vw)",maxHeight:"85vh",overflowY:"auto"}} onClick={e=>e.stopPropagation()}>
+          <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"16px 20px",borderBottom:`1px solid ${C.mittelgrau}40`}}>
+            <span style={{fontWeight:700,fontSize:16,fontFamily:FONT.sans}}>🗑️ Papierkorb</span>
+            <button onClick={()=>setShowPapierkorb(false)} style={{background:"none",border:"none",fontSize:20,cursor:"pointer",color:C.dunkelgrau,lineHeight:1}}>✕</button>
+          </div>
+          <PapierkorbTab user={user} bereitschaft={bereitschaftCode} allBereitschaften={allBereitschaften} stammdaten={{}} onRestore={()=>{setShowPapierkorb(false);loadEvents();}}/>
+        </div>
+      </div>
+    )}
   </div>);
 }
 

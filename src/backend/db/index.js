@@ -33,6 +33,13 @@ function init() {
     try {
       getDb().prepare("ALTER TABLE users ADD COLUMN ort TEXT DEFAULT ''").run();
     } catch {}
+    // ── Papierkorb: Soft-Delete ──────────────────────────────────
+    try {
+      getDb().prepare("ALTER TABLE vorgaenge ADD COLUMN deleted_at TEXT DEFAULT NULL").run();
+    } catch {}
+    try {
+      getDb().prepare("ALTER TABLE anfragen ADD COLUMN deleted_at TEXT DEFAULT NULL").run();
+    } catch {}
 
   console.log("✅ Datenbank initialisiert:", DB_PATH);
 }
