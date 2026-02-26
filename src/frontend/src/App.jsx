@@ -103,25 +103,48 @@ function AddressAutocomplete({label,value,onChange,onResult}){
         // Strukturierte Adresse mit Hausnummer aufbauen
         const addr = r.address || {};
         const road = addr.road || addr.pedestrian || addr.path || addr.footway || "";
-        const hnr  = addr.house_number || "";
+        let hnr = addr.house_number || "";
+        // Wenn Nominatim keine Hausnummer liefert, aus User-Input extrahieren
+        if (!hnr && q) {
+          const hnrMatch = q.match(/\b(\d+\s*[a-zA-Z]?)\b/);
+          if (hnrMatch && road && q.toLowerCase().includes(road.toLowerCase().substring(0,5))) hnr = hnrMatch[1].trim();
+        }
         const sub  = addr.suburb || addr.quarter || addr.neighbourhood || "";
         const city = addr.city || addr.town || addr.village || addr.hamlet || "";
         const plz  = addr.postcode || "";
         const parts = [];
-        if (hnr && road) parts.push(hnr + ", " + road);
+        if (road && hnr) parts.push(road + " " + hnr);
         else if (road) parts.push(road);
-        if (sub) parts.push(sub);
-        if (city) parts.push(city);
-        if (plz) parts.push(plz);
-        parts.push("Deutschland");
-        const addrStr = buildAddrStr(r.address) || r.display_name;
-        return{address:addrStr,display:r.display_name,lat,lng,w3w};
+        if (plz && city) parts.push(plz + " " + city);
+        else if (city) parts.push(city);
+        const addrStr = parts.length > 0 ? parts.join(", ") : r.display_name;
+        return{address:addrStr,display:r.display_name,lat,lng,w3w,hnr,road,city,plz};
       }));
       setSuggestions(mapped);
     }catch{setSuggestions([]);}
   };
   const handleChange=(v)=>{onChange(v);clearTimeout(debounceRef.current);debounceRef.current=setTimeout(()=>search(v),600);};
-  const selectAddr=(s)=>{onChange(s.address);setSuggestions([]);if(onResult)onResult(s);};
+  const selectAddr=async(s)=>{
+    onChange(s.address);setSuggestions([]);
+    // Wenn Hausnummer vorhanden, strukturierte Suche fuer praezise Coords+w3w
+    if(s.hnr && s.road){
+      try{
+        const params=new URLSearchParams({street:s.hnr+" "+s.road,format:"json",addressdetails:"1",limit:"1",countrycodes:"de","accept-language":"de"});
+        if(s.city)params.set("city",s.city);
+        if(s.plz)params.set("postalcode",s.plz);
+        const rr=await fetch(`https://nominatim.openstreetmap.org/search?${params}`,{headers:{"User-Agent":"BRK-SanWD/6.0"}});
+        const rd=await rr.json();
+        if(rd[0]){
+          const rlat=parseFloat(rd[0].lat),rlng=parseFloat(rd[0].lon);
+          let rw3w=null;
+          try{const wr=await fetch(`/api/w3w?lat=${rlat}&lng=${rlng}`,{credentials:"include"});const wd=await wr.json();rw3w=wd.w3w||null;}catch{}
+          if(onResult)onResult({...s,lat:rlat,lng:rlng,w3w:rw3w||s.w3w});
+          return;
+        }
+      }catch{}
+    }
+    if(onResult)onResult(s);
+  };
   return(<label style={{display:"block",marginBottom:10}}><span style={{display:"block",fontSize:11,color:C.dunkelgrau,marginBottom:3,fontWeight:600,fontFamily:FONT.sans}}>{label}</span>
     <input type="text" value={value} onChange={e=>handleChange(e.target.value)} placeholder="Adresse eingeben..." style={{width:"100%",padding:"8px 10px",background:C.weiss,border:`1px solid ${C.mittelgrau}`,borderRadius:4,color:C.schwarz,fontSize:13,fontFamily:FONT.sans,outline:"none",boxSizing:"border-box"}} onFocus={e=>e.target.style.borderColor=C.mittelblau} onBlur={e=>{setTimeout(()=>setSuggestions([]),200);e.target.style.borderColor=C.mittelgrau}}/>
     {suggestions.length>0&&<div style={{background:C.weiss,border:`1px solid ${C.mittelgrau}`,borderRadius:4,marginTop:2,maxHeight:180,overflowY:"auto",boxShadow:"0 4px 12px #0002",position:"absolute",zIndex:999,minWidth:"100%"}}>{suggestions.map((s,i)=>(<div key={i} onClick={()=>selectAddr(s)} style={{padding:"8px 12px",cursor:"pointer",fontSize:12,borderBottom:`1px solid ${C.hellgrau}`,color:C.schwarz}} onMouseEnter={e=>e.currentTarget.style.background=C.hellblau} onMouseLeave={e=>e.currentTarget.style.background=C.weiss}>{s.address}{s.w3w&&<span style={{marginLeft:8,color:"#e60005",fontSize:10,fontWeight:600}}>{s.w3w}</span>}</div>))}</div>}
