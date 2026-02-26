@@ -115,21 +115,31 @@ async function fillILS(vorgang, bereitschaft, user) {
 
   if (adresse) {
     const parts = adresse.split(",").map(s => s.trim()).filter(Boolean);
-    if (parts.length >= 3) {
-      // Erstes Element: Hausnummer oder Straße?
-      if (/^\d+[a-zA-Z]?$/.test(parts[0])) {
-        // Format: "15, Aichacher Straße, ..."
-        hausnrAuto = parts[0];
+    if (parts.length >= 2) {
+      // Erstes Element kann sein:
+      // "Dreiweiherweg 8"  → Straße + Hausnummer zusammen (neues DE-Format)
+      // "15, Aichacher Straße" → alte Nominatim-Reihenfolge
+      // "Dreiweiherweg" → nur Straße ohne Hausnummer
+      const first = parts[0];
+      if (/^\d+[a-zA-Z]?$/.test(first)) {
+        // Altes Format: "15, Aichacher Straße, ..."
+        hausnrAuto = first;
         strasseAuto = parts[1];
         parseNominatim(parts.slice(2));
       } else {
-        // Format: "Dreiweiherweg, Ortsteil, Stadt, ..."
-        strasseAuto = parts[0];
-        hausnrAuto = "";
+        // Neues DE-Format: "Straße 8" oder nur "Straße"
+        const m = first.match(/^(.+?)\s+(\d+[a-zA-Z]?)$/);
+        if (m) {
+          strasseAuto = m[1].trim();
+          hausnrAuto = m[2].trim();
+        } else {
+          strasseAuto = first;
+          hausnrAuto = "";
+        }
         parseNominatim(parts.slice(1));
       }
     } else {
-      // Manuelles Format: "Straße Hausnr PLZ Ort"
+      // Einzelner Wert: versuche Straße+Hausnr zu trennen
       const m = adresse.match(/^(.+?)\s+(\d+[a-zA-Z]?)(?:\s+(\d{5}))?(?:\s+(.+))?$/);
       if (m) {
         strasseAuto = m[1].trim();

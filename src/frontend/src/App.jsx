@@ -114,7 +114,7 @@ function AddressAutocomplete({label,value,onChange,onResult}){
     const city=addr.city||addr.town||addr.village||addr.hamlet||"";
     const plz=addr.postcode||"";
     const parts=[];
-    if(hnr&&road)parts.push(hnr+", "+road);else if(road)parts.push(road);
+    if(road&&hnr)parts.push(road+" "+hnr);else if(road)parts.push(road);
     if(sub)parts.push(sub);if(city)parts.push(city);if(plz)parts.push(plz);
     parts.push("Deutschland");
     return parts.join(", ");
@@ -1159,7 +1159,7 @@ export default function App(){
                 <Inp label="Name der Veranstaltung" value={event.name} onChange={v=>updateEvent("name",v)}/>
                 <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"0 16px"}}>
                   <Inp label="Veranstaltungsort" value={event.ort} onChange={v=>updateEvent("ort",v)}/>
-                  <div style={{display:"flex",gap:8,alignItems:"flex-end"}}><div style={{flex:1}}><AddressAutocomplete label="Adresse (Autocomplete + w3w)" value={event.adresse} onChange={v=>updateEvent("adresse",v)} onResult={s=>{updateEvent("coords",{lat:s.lat,lng:s.lng});if(s.w3w)updateEvent("w3w",s.w3w);}}/></div><div style={{width:80}}><Inp label="Hausnr." value={event.hausnr||""} onChange={v=>{updateEvent("hausnr",v);}} placeholder="z.B. 8"/></div></div>
+                  <div style={{display:"flex",gap:8,alignItems:"flex-end"}}><div style={{flex:1}}><AddressAutocomplete label="Adresse inkl. Hausnummer (z.B. Dreiweiherweg 8)" value={event.adresse} onChange={v=>updateEvent("adresse",v)} onResult={s=>{updateEvent("coords",{lat:s.lat,lng:s.lng});if(s.w3w)updateEvent("w3w",s.w3w);}}/></div><div style={{width:80}}><Inp label="Hausnr." value={event.hausnr||""} onChange={v=>{updateEvent("hausnr",v);}} placeholder="z.B. 8"/></div></div>
                 </div>
                 <LeafletMap coords={event.coords} w3w={event.w3w} onChange={r=>{updateEvent("coords",{lat:r.lat,lng:r.lng});if(r.address)updateEvent("adresse",r.address);}} onW3W={w=>updateEvent("w3w",w)}/>
                 <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"0 16px",marginTop:10}}>
