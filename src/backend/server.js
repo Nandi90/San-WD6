@@ -785,7 +785,7 @@ app.post("/api/pdf/einsatzprotokoll/:id", requireAuth, async (req, res) => {
     const vorgang = JSON.parse(row.data);
     const bc = row.bereitschaft_code || req.session.user.bereitschaftCode;
     const stamm = db.prepare("SELECT * FROM bereitschaften WHERE code=?").get(bc) || {};
-    const user = db.prepare("SELECT name, titel FROM users WHERE sub=?").get(req.session.user.sub) || {};
+    const user = db.prepare("SELECT name, titel, mobil, telefon FROM users WHERE sub=?").get(req.session.user.sub) || {};
     const { dayIdx } = req.body;
     const html = buildEinsatzprotokollHTML(vorgang, stamm, dayIdx !== undefined ? dayIdx : 0);
     const browser = await puppeteer.launch({
