@@ -326,7 +326,11 @@ function ILSPreview({event,days,stammdaten,user,updateEvent,currentEventId,saveE
             await saveEvent();
             const blob=await API.getILSPDF(currentEventId,i);
             const url=URL.createObjectURL(blob);
-            window.open(url,"_blank");
+            const a=document.createElement("a");
+            a.href=url;
+            const nr=(event.auftragsnr||"ILS").replace(/[^a-zA-Z0-9_-]/g,"_");
+            a.download=nr+"_ILS-Anmeldung_Tag"+(i+1)+".pdf";
+            a.click();
           }catch(e){alert("Fehler: "+e.message);}
         }}>
           ILS-Anmeldung Tag {i+1}{d.date?" ("+new Date(d.date).toLocaleDateString("de-DE")+")":""}
@@ -1532,7 +1536,7 @@ export default function App(){
               </div>
               <div style={{display:"flex",flexWrap:"wrap",gap:8}}>
                 {(days||[]).filter(d=>d.active!==false).map((d,i)=>(
-                  <Btn key={i} variant="primary" onClick={async()=>{if(!currentEventId){alert("Bitte zuerst Vorgang speichern");return;}await saveEvent();try{const blob=await API.getEinsatzprotokollPDF(currentEventId,i);const url=URL.createObjectURL(blob);window.open(url,"_blank");}catch(e){alert("Fehler: "+e.message);}}} icon="🖨️">
+                  <Btn key={i} variant="primary" onClick={async()=>{if(!currentEventId){alert("Bitte zuerst Vorgang speichern");return;}await saveEvent();try{const blob=await API.getEinsatzprotokollPDF(currentEventId,i);const url=URL.createObjectURL(blob);const a=document.createElement("a");a.href=url;const nr=(event.auftragsnr||"EP").replace(/[^a-zA-Z0-9_-]/g,"_");a.download=nr+"_Einsatzprotokoll_Tag"+(i+1)+".pdf";a.click();}catch(e){alert("Fehler: "+e.message);}}} icon="🖨️">
                     Einsatzprotokoll Tag {d.id||i+1}{d.date?" ("+new Date(d.date).toLocaleDateString("de-DE")+")":""}
                   </Btn>
                 ))}
@@ -1555,6 +1559,23 @@ export default function App(){
             </div>
             {[
               {v:"v6.6",d:"26.02.2026",c:[
+                "Papierkorb: Soft-Delete statt Hard-Delete – gelöschte Vorgänge 60 Tage wiederherstellbar",
+                "Papierkorb: Modal in Vorgangsliste (unten rechts), Anzeige mit Auftragsnr + Restlaufzeit",
+                "Papierkorb: Wiederherstellen für alle Nutzer, Endgültig löschen nur Admin",
+                "Papierkorb: Auto-Cleanup täglich + beim Serverstart (>60 Tage endgültig gelöscht)",
+                "ILS-Anmeldung: Download mit Dateiname Auftragsnr_ILS-Anmeldung_Tag1.pdf",
+                "Einsatzprotokoll: Download mit Dateiname Auftragsnr_Einsatzprotokoll_Tag1.pdf",
+                "Checkliste: +3 neue Items (Angebot signiert, ILS-Anmeldung, Einsatzprotokoll gedruckt)",
+                "Infrastruktur: Einheitliches deploy.sh (Build + Deploy in einem Schritt)",
+                "Infrastruktur: Test-Namespace (sanwd-test/30099) entfernt, nginx auf Port 30092 korrigiert",
+                "Papierkorb: Soft-Delete statt Hard-Delete – gelöschte Vorgänge 60 Tage wiederherstellbar",
+                "Papierkorb: Modal in Vorgangsliste (unten rechts), Anzeige mit Restlaufzeit",
+                "Papierkorb: Endgültig löschen nur für Admins, Wiederherstellen für alle",
+                "Papierkorb: Auto-Cleanup täglich + beim Serverstart (>60 Tage endgültig gelöscht)",
+                "Infrastruktur: Einheitliches deploy.sh (Build + Deploy in einem Schritt)",
+                "Infrastruktur: Test-Namespace (sanwd-test/30099) entfernt, nginx auf Port 30092",
+                "Einsatzprotokoll: Serverseitige PDF-Generierung pro Tag",
+                "Checkliste: +3 neue Items (Angebot signiert, ILS-Anmeldung, Einsatzprotokoll gedruckt)",
                 "Gefahrenanalyse: Serverseitige PDF-Generierung statt Browser-Druck",
                 "Adress-Autocomplete: Hausnummer wird korrekt übernommen und angezeigt",
                 "HERE Geocoding Fallback: Präzise Hausnummer-Koordinaten + korrekter w3w-Code",
