@@ -941,11 +941,7 @@ function PapierkorbTab({user,bereitschaft,allBereitschaften,stammdaten,onRestore
   if(error)return <div style={{padding:32,color:C.rot,fontFamily:FONT.sans}}>Fehler: {error}</div>;
   return(
     <div style={{maxWidth:900,margin:"0 auto",padding:"24px 16px"}}>
-      <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:20}}>
-        <div>
-          <h2 style={{margin:0,fontFamily:FONT.serif,color:C.schwarz,fontSize:20}}>🗑️ Papierkorb</h2>
-          <div style={{fontSize:12,color:C.dunkelgrau,marginTop:4,fontFamily:FONT.sans}}>Gelöschte Vorgänge werden nach 60 Tagen automatisch endgültig entfernt.</div>
-        </div>
+      <div style={{display:"flex",justifyContent:"flex-end",marginBottom:12}}>
         <button onClick={load} style={{padding:"6px 14px",borderRadius:4,border:`1px solid ${C.mittelgrau}`,background:C.weiss,cursor:"pointer",fontSize:12,fontFamily:FONT.sans}}>↻ Aktualisieren</button>
       </div>
       {items.length===0?(
@@ -959,7 +955,7 @@ function PapierkorbTab({user,bereitschaft,allBereitschaften,stammdaten,onRestore
           {items.map(v=>{
             const left=daysLeft(v.deletedAt);
             const urgent=left<=7;
-            const name=v.veranstaltungsname||v.titel||v.id;
+            const name=(v.auftragsnr?v.auftragsnr+"-del":null)||v.veranstaltungsname||v.titel||v.id;
             const bc=allBereitschaften?.find(b=>b.code===v._bc);
             return(
               <div key={v.id} style={{background:C.weiss,borderRadius:8,border:`1px solid ${urgent?"#e53e3e40":C.mittelgrau+"40"}`,padding:"14px 16px",display:"flex",alignItems:"center",gap:16,boxShadow:"0 1px 3px rgba(0,0,0,0.05)"}}>
