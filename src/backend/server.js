@@ -391,10 +391,14 @@ function buildVertragHTML(vorgang, stamm, user) {
     ? `<img src="${user.unterschrift || ev.unterschrift}" style="height:45px;width:auto;display:block;margin:0 auto 4px">`
     : `<div style="height:49px"></div>`;
 
-  // Logo: entweder aus DB oder BRK-Standard-Logo als Fallback
-  const logoImg = logoData
-    ? `<img src="${logoData}" style="max-width:200px;max-height:90px;object-fit:contain;" />`
-    : `<img src="https://www.brk-erding.de/images/ueber-uns/BRK-Bereitschaften_1252x626.jpg" style="max-width:200px;max-height:90px;object-fit:contain;" />`;
+  // Logo aus bereitschaften.logo (Binary → Base64)
+  let logoImg;
+  if (stamm.logo) {
+    const b64 = Buffer.from(stamm.logo).toString("base64");
+    logoImg = `<img src="data:image/png;base64,${b64}" style="max-width:200px;max-height:90px;object-fit:contain;" />`;
+  } else {
+    logoImg = `<div style="font-weight:bold;font-size:16px;text-align:center;">BRK<br/>Bereitschaft</div>`;
+  }
 
   return `<!DOCTYPE html>
 <html lang="de">
@@ -475,7 +479,7 @@ function buildVertragHTML(vorgang, stamm, user) {
 // ═══════════════════════════════════════════════════════════════════
 // HTML-Builder: Einsatzprotokoll
 // ═══════════════════════════════════════════════════════════════════
-function buildEinsatzprotokollHTML(vorgang, stamm, user, dayCalcs, logoData) {
+function buildEinsatzprotokollHTML(vorgang, stamm, user, dayCalcs) {
   const ev = vorgang.event || vorgang;
   const days = (vorgang.days || []).filter(d => d.active !== false);
   const esc = s => String(s||"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
@@ -629,10 +633,8 @@ app.post("/api/pdf/einsatzprotokoll/:id", requireAuth, async (req, res) => {
     const bc = row.bereitschaft_code || req.session.user.bereitschaftCode;
     const stamm = db.prepare("SELECT * FROM bereitschaften WHERE code=?").get(bc) || {};
     const user = db.prepare("SELECT name, titel FROM users WHERE sub=?").get(req.session.user.sub) || {};
-    const logoRow = db.prepare("SELECT data FROM logos WHERE bereitschaft_code=?").get(bc);
-    const logoData = logoRow?.data || null;
     const { dayCalcs } = req.body;
-    const html = buildEinsatzprotokollHTML(vorgang, stamm, user, dayCalcs || [], logoData);
+    const html = buildEinsatzprotokollHTML(vorgang, stamm, user, dayCalcs || []);
     const browser = await puppeteer.launch({
       executablePath: process.env.CHROMIUM_PATH || "/usr/bin/chromium-browser",
       args: ["--no-sandbox","--disable-setuid-sandbox","--disable-dev-shm-usage","--disable-gpu"],
