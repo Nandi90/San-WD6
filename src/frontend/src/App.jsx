@@ -1044,8 +1044,7 @@ function VorgaengeListe({bereitschaftCode,user,onLoad,onNew,onCopy,bereitschaft,
     </Card>)}
 
     
-    {/* Papierkorb Button unten rechts */}
-    <div style={{background:"red",color:"white",padding:8,marginTop:16}}>DEBUG PAPIERKORB</div>
+{/* Papierkorb Button unten rechts */}
     <div style={{display:"flex",justifyContent:"flex-end",marginTop:16}}>
       <button onClick={()=>setShowPapierkorb(true)} style={{padding:"7px 16px",borderRadius:4,border:`1px solid ${C.mittelgrau}`,background:C.weiss,cursor:"pointer",fontSize:12,color:C.dunkelgrau,fontFamily:FONT.sans,display:"flex",alignItems:"center",gap:6}}>🗑️ Papierkorb</button>
     </div>
