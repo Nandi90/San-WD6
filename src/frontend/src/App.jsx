@@ -254,7 +254,7 @@ function LeafletMap({coords,w3w,onChange,onW3W}){
 // CHECKLIST COMPONENT
 // ═══════════════════════════════════════════════════════════════════════════
 function VorgangChecklist({checklist={},onChange,eventDate}){
-  const toggle=(key)=>{const now=Date.now();const cur=checklist[key];onChange({...checklist,[key]:cur?null:now});};
+  const toggle=(key)=>{if(key==="angebotVersendet"&&checklist[key])return;const now=Date.now();const cur=checklist[key];onChange({...checklist,[key]:cur?null:now});};
   // Wiedervorlage: 4 Wochen nach Event
   const wvDate=eventDate?new Date(new Date(eventDate).getTime()+28*24*60*60*1000):null;
   const wvPast=wvDate&&new Date()>=wvDate;
@@ -361,7 +361,7 @@ function StatusBanner({angebotVersendet,onUnlock}){
     <div style={{padding:"10px 16px",background:"#e8f5e9",border:"1px solid #a5d6a7",borderRadius:6,marginBottom:12,display:"flex",alignItems:"center",justifyContent:"space-between"}}>
       <div style={{display:"flex",alignItems:"center",gap:10}}>
         <span style={{fontSize:18}}>📨</span>
-        <div><div style={{fontSize:13,fontWeight:600,color:"#2e7d32"}}>Angebot versendet – Felder gesperrt</div>
+        <div><div style={{fontSize:13,fontWeight:600,color:"#2e7d32"}}>Angebot versendet – Vorgang ist schreibgeschützt</div>
           <div style={{fontSize:10,color:"#666"}}>Zum Bearbeiten entsperren (Begründung erforderlich)</div>
         </div>
       </div>
@@ -1087,6 +1087,18 @@ export default function App(){
   const [saving,setSaving]=useState(false);
   const [kunden,setKunden]=useState([]);
   const [lockInfo,setLockInfo]=useState(null);
+  // Lock-Heartbeat: alle 30s verlängern
+  useEffect(()=>{
+    if(!currentEventId||lockInfo?.lockedBy)return;
+    const iv=setInterval(()=>{API.lockVorgang(currentEventId).catch(()=>{});},30000);
+    return()=>clearInterval(iv);
+  },[currentEventId,lockInfo]);
+  // Lock freigeben bei Verlassen
+  useEffect(()=>{
+    const cleanup=()=>{if(currentEventId)navigator.sendBeacon("/api/vorgaenge/"+currentEventId+"/lock-release");};
+    window.addEventListener("beforeunload",cleanup);
+    return()=>{window.removeEventListener("beforeunload",cleanup);if(currentEventId)API.unlockVorgang(currentEventId).catch(()=>{});};
+  },[currentEventId]);
   const [vorgangStatus,setVorgangStatus]=useState(null);
   const [editHistory,setEditHistory]=useState([]);
   const [stammdatenLoaded,setStammdatenLoaded]=useState(false);
@@ -1146,6 +1158,8 @@ export default function App(){
   useEffect(()=>{if(!user||user.rolle==="helfer"||user.rolle==="bl")return;const t=setTimeout(()=>{const r=stammdaten.rates;API.saveKostensaetze({helfer:r.helfer,ktw:r.ktw,rtw:r.rtw,gktw:r.gktw,einsatzleiter:r.einsatzleiter,einsatzleiter_kfz:r.einsatzleiterKfz,seg_lkw:r.segLkw,mtw:r.mtw,zelt:r.zelt,km_ktw:r.kmKtw,km_rtw:r.kmRtw,km_gktw:r.kmGktw,km_el_kfz:r.kmElKfz,km_seg_lkw:r.kmSegLkw,km_mtw:r.kmMtw,verpflegung:r.verpflegung}).catch(e=>console.warn("Kostensätze speichern:",e));},2000);return()=>clearTimeout(t);},[stammdaten.rates,user]);
   /* stammdaten via API gespeichert */
   const updateChecklist=useCallback((cl)=>setEvent(p=>({...p,checklist:cl})),[]);
+  const isLocked=!!event?.checklist?.angebotVersendet;
+  const isEditLocked=!!(lockInfo&&lockInfo.locked&&lockInfo.lockedBy!==user?.name);
 
   const activeDays=days.filter(d=>d.active);
   const dayCalcs=useMemo(()=>activeDays.map(d=>calcDay(d,stammdaten.rates,event.verpflegung)),[activeDays,stammdaten.rates,event.verpflegung]);
@@ -1196,8 +1210,24 @@ export default function App(){
       alert("Textvorlagen gespeichert");
     }catch(e){alert("Fehler: "+e.message);}finally{setKlauselnSaving(false);}
   };
+  // Lock freigeben beim Vorgang-Wechsel
+  const releaseLock=useCallback(async()=>{if(currentEventId){try{await API.unlockVorgang(currentEventId);}catch{}setLockInfo(null);}},[currentEventId]);
   const newEvent=useCallback(()=>{setCurrentEventId(null);setEvent({...EMPTY_EVENT});setDays(Array.from({length:8},(_,i)=>mkDay(i+1)));setActiveDay(0);setTab("event");},[]);
-  const loadEvent=useCallback((ev)=>{setCurrentEventId(ev.id);setEvent({...EMPTY_EVENT,...(ev.event||{})});setDays(ev.days||Array.from({length:8},(_,i)=>mkDay(i+1)));setTab("event");setActiveDay(0);},[]);
+  const loadEvent=useCallback(async(ev)=>{
+    setCurrentEventId(ev.id);setEvent({...EMPTY_EVENT,...(ev.event||{})});setDays(ev.days||Array.from({length:8},(_,i)=>mkDay(i+1)));setTab("event");setActiveDay(0);
+    // Lock prüfen und setzen
+    try{
+      const status=await API.getLockStatus(ev.id);
+      if(status.locked&&status.lockedBy!==user?.name){
+        setLockInfo(status);
+      }else{
+        await API.lockVorgang(ev.id);
+        setLockInfo(null);
+      }
+    }catch{setLockInfo(null);}
+    // History laden
+    try{const h=await API.json("/api/vorgaenge/"+ev.id+"/history");setEditHistory(h||[]);}catch{setEditHistory([]);}
+  },[user]);
   const copyEvent=useCallback((ev)=>{setCurrentEventId(null);const e={...EMPTY_EVENT,...(ev.event||{}),auftragsnr:"",rechnungsnr:"",checklist:{}};setEvent(e);setDays((ev.days||Array.from({length:8},(_,i)=>mkDay(i+1))).map(d=>({...d,date:""})));setActiveDay(0);setTab("event");},[]);
 
   // LOGIN
@@ -1232,7 +1262,7 @@ export default function App(){
           <Btn small variant="ghost" onClick={()=>window.location.href="/auth/logout"}>Abmelden</Btn>
         </div>
       </header>
-      <nav style={{display:"flex",gap:1,padding:"0 12px",background:C.weiss,borderBottom:`1px solid ${C.mittelgrau}40`,overflowX:"auto"}}>{TABS.map(t=>(<button key={t.id} onClick={()=>{if(t.id==="events"){setCurrentEventId(null);setEvent({...EMPTY_EVENT});setDays(Array.from({length:8},(_,i)=>mkDay(i+1)));}setTab(t.id);}} style={{padding:"10px 14px",background:"none",border:"none",color:tab===t.id?C.rot:C.dunkelgrau,fontSize:12,fontWeight:tab===t.id?700:500,cursor:"pointer",display:"flex",alignItems:"center",gap:5,borderBottom:tab===t.id?`2px solid ${C.rot}`:"2px solid transparent",fontFamily:FONT.sans,whiteSpace:"nowrap"}}><span style={{fontSize:13}}>{t.icon}</span> {t.label}</button>))}</nav>
+      <nav style={{display:"flex",gap:1,padding:"0 12px",background:C.weiss,borderBottom:`1px solid ${C.mittelgrau}40`,overflowX:"auto"}}>{TABS.map(t=>(<button key={t.id} onClick={()=>{if(t.id==="events"){releaseLock();setCurrentEventId(null);setEvent({...EMPTY_EVENT});setDays(Array.from({length:8},(_,i)=>mkDay(i+1)));}setTab(t.id);}} style={{padding:"10px 14px",background:"none",border:"none",color:tab===t.id?C.rot:C.dunkelgrau,fontSize:12,fontWeight:tab===t.id?700:500,cursor:"pointer",display:"flex",alignItems:"center",gap:5,borderBottom:tab===t.id?`2px solid ${C.rot}`:"2px solid transparent",fontFamily:FONT.sans,whiteSpace:"nowrap"}}><span style={{fontSize:13}}>{t.icon}</span> {t.label}</button>))}</nav>
 
       <main style={{maxWidth:1100,margin:"0 auto",padding:"16px 14px"}}>
 
@@ -1244,8 +1274,9 @@ export default function App(){
           <LockBanner lockInfo={lockInfo} isOwner={lockInfo?.lockedBy===user?.name} onUnlock={async()=>{try{await API.unlockVorgang(currentEventId);setLockInfo(null);}catch{}}}/>
           <StatusBanner angebotVersendet={event?.checklist?.angebotVersendet} onUnlock={async(begruendung)=>{await API.entsperrenVorgang(currentEventId,begruendung);updateEvent("checklist",{...event.checklist,angebotVersendet:false});}}/>
           <div style={{display:"grid",gridTemplateColumns:"2fr 1fr",gap:14}}>
-            <div>
-              <Card title="Auftrag" accent={C.rot} sub={event.auftragsnr?`Nr. ${event.auftragsnr}`:"Noch keine Nummer"} action={<div style={{display:"flex",gap:6}}><Btn small onClick={generateNr} icon="🔢">Nr. generieren</Btn><Btn small variant="success" onClick={saveEvent} icon="💾" disabled={event._isVersendet}>Speichern</Btn></div>}>
+            <div style={{position:"relative"}}>
+              {(isLocked||isEditLocked)&&<div style={{position:"absolute",top:0,left:0,right:0,bottom:0,background:"rgba(255,255,255,0.55)",zIndex:10,borderRadius:8,pointerEvents:"all"}}/>}
+              <Card title="Auftrag" accent={C.rot} sub={event.auftragsnr?`Nr. ${event.auftragsnr}`:"Noch keine Nummer"} action={<div style={{display:"flex",gap:6}}><Btn small onClick={generateNr} icon="🔢">Nr. generieren</Btn><Btn small variant="success" onClick={saveEvent} icon="💾" disabled={isLocked}>Speichern</Btn></div>}>
                 <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:"0 16px"}}>
                   <Sel label="Bereitschaft" value={stammdaten.bereitschaftIdx} onChange={v=>updateStamm("bereitschaftIdx",v)} options={BEREITSCHAFTEN.map((b,i)=>({value:i,label:`${b.code} — ${b.name}`}))}/>
                   <Inp label="Auftragsnummer" value={event.auftragsnr} onChange={v=>updateEvent("auftragsnr",v)} placeholder="Auto-generiert"/>
@@ -1257,19 +1288,19 @@ export default function App(){
                   <span style={{color:C.bgrau}}>Speicherung: {bereitschaft.code} / {year}</span>
                 </div>
               </Card>
-              <Card title="Veranstaltung" accent="#1a7a3a">
-                <Inp label="Name der Veranstaltung" value={event.name} onChange={v=>updateEvent("name",v)}/>
+              <Card title="Veranstaltung" accent={isLocked?"#a5d6a7":"#1a7a3a"}>
+                <Inp label="Name der Veranstaltung" value={event.name} onChange={v=>updateEvent("name",v)} disabled={isLocked}/>
                 <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"0 16px"}}>
-                  <Inp label="Veranstaltungsort" value={event.ort} onChange={v=>updateEvent("ort",v)}/>
+                  <Inp label="Veranstaltungsort" value={event.ort} onChange={v=>updateEvent("ort",v)} disabled={isLocked}/>
                   <AddressAutocomplete label="Adresse inkl. Hausnummer (z.B. Karl-Konrad-Str. 3)" value={event.adresse} onChange={v=>updateEvent("adresse",v)} onResult={s=>{updateEvent("coords",{lat:s.lat,lng:s.lng});if(s.w3w)updateEvent("w3w",s.w3w);updateEvent("addrImprecise",!!s.imprecise);}}/>
                 </div>
                 <LeafletMap coords={event.coords} w3w={event.w3w} onChange={r=>{updateEvent("coords",{lat:r.lat,lng:r.lng});if(r.address)updateEvent("adresse",r.address);updateEvent("addrImprecise",false);}} onW3W={w=>updateEvent("w3w",w)}/>
                 {event.addrImprecise&&<div style={{background:"#fff3cd",border:"1px solid #ffc107",borderRadius:4,padding:"8px 12px",marginTop:6,fontSize:12,color:"#856404",display:"flex",alignItems:"center",gap:8}}>⚠️ <span>Hausnummer konnte nicht exakt aufgelöst werden. <strong>Bitte Pin auf der Karte zur genauen Position verschieben</strong> – der what3words-Code wird automatisch aktualisiert.</span></div>}
                 <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"0 16px",marginTop:10}}>
-                  <Chk label="Kfz-Stellplatz vorhanden" checked={event.kfzStellplatz} onChange={v=>updateEvent("kfzStellplatz",v)}/>
-                  <Chk label="Sanitätsraum vorhanden" checked={event.sanitaetsraum} onChange={v=>updateEvent("sanitaetsraum",v)}/>
-                  <Chk label="Stromanschluss vorhanden" checked={event.strom} onChange={v=>updateEvent("strom",v)}/>
-                  <Chk label="Verpflegung durch Veranstalter" checked={event.verpflegung} onChange={v=>updateEvent("verpflegung",v)}/>
+                  <Chk label="Kfz-Stellplatz vorhanden" checked={event.kfzStellplatz} onChange={v=>{if(!isLocked)updateEvent("kfzStellplatz",v)}}/>
+                  <Chk label="Sanitätsraum vorhanden" checked={event.sanitaetsraum} onChange={v=>{if(!isLocked)updateEvent("sanitaetsraum",v)}}/>
+                  <Chk label="Stromanschluss vorhanden" checked={event.strom} onChange={v=>{if(!isLocked)updateEvent("strom",v)}}/>
+                  <Chk label="Verpflegung durch Veranstalter" checked={event.verpflegung} onChange={v=>{if(!isLocked)updateEvent("verpflegung",v)}}/>
                 </div>
                 {!event.verpflegung&&<div style={{padding:"8px 12px",background:"#fff3cd",border:"1px solid #ffc10744",borderRadius:4,fontSize:12,color:"#856404",marginTop:6}}>Verpflegungspauschale: {stammdaten.rates.verpflegung}€/Person/8h wird automatisch berechnet</div>}
                 <Card accent="#ff6f00"><div style={{fontSize:13,fontWeight:700,marginBottom:8,color:"#e65100"}}>✉ Pauschalangebot</div>
@@ -1322,13 +1353,17 @@ export default function App(){
                   {event.w3w&&<div style={{display:"flex",justifyContent:"space-between",padding:"4px 0",fontSize:12}}><span style={{color:C.dunkelgrau}}>what3words</span><span style={{fontWeight:600,color:C.rot,fontSize:11}}>{event.w3w}</span></div>}
                 </div>
               </Card>
+              {currentEventId&&editHistory.length>0&&<HistoryWidget history={editHistory}/>}
             </div>
           </div>
-          {currentEventId&&editHistory.length>0&&<HistoryWidget history={editHistory}/>}
         </div>)}
 
         {/* TAGE & ANALYSE */}
         {tab==="days"&&(<div>
+          <LockBanner lockInfo={lockInfo} isOwner={lockInfo?.lockedBy===user?.name} onUnlock={async()=>{try{await API.unlockVorgang(currentEventId);setLockInfo(null);}catch{}}}/>
+          <StatusBanner angebotVersendet={event?.checklist?.angebotVersendet} onUnlock={async(begruendung)=>{await API.entsperrenVorgang(currentEventId,begruendung);updateEvent("checklist",{...event.checklist,angebotVersendet:false});}}/>
+          <div style={{position:"relative"}}>
+          {(isLocked||isEditLocked)&&<div style={{position:"absolute",top:0,left:0,right:0,bottom:0,background:"rgba(255,255,255,0.55)",zIndex:10,borderRadius:8,pointerEvents:"all"}}/>}
           <div style={{display:"flex",gap:4,marginBottom:12,flexWrap:"wrap"}}>{days.map((d,i)=>(<div key={i} style={{display:"inline-flex",alignItems:"center",gap:0}}>
               <button onClick={()=>{if(!d.active)updateDay(i,"active",true);setActiveDay(i);}} style={{padding:"6px 14px",borderRadius:d.active&&i>0?"4px 0 0 4px":4,border:`1px solid ${d.active?(activeDay===i?C.rot:C.mittelgrau):"#e0e0e0"}`,background:activeDay===i?`${C.rot}11`:d.active?C.weiss:C.hellgrau,color:d.active?C.schwarz:C.bgrau,cursor:"pointer",fontSize:12,fontWeight:activeDay===i?700:500,fontFamily:FONT.sans,borderRight:d.active&&i>0?"none":undefined}}>Tag {i+1}{d.active&&d.date&&<span style={{marginLeft:4,fontSize:10,opacity:0.6}}>{fDate(d.date)}</span>}</button>
               {d.active&&i>0&&<button onClick={(e)=>{e.stopPropagation();updateDay(i,"active",false);if(activeDay===i)setActiveDay(0);}} title="Tag deaktivieren" style={{padding:"6px 8px",borderRadius:"0 4px 4px 0",border:`1px solid ${activeDay===i?C.rot:C.mittelgrau}`,borderLeft:"none",background:activeDay===i?`${C.rot}11`:C.weiss,color:C.rot,cursor:"pointer",fontSize:11,fontWeight:700,lineHeight:1}}>✕</button>}
@@ -1372,10 +1407,10 @@ export default function App(){
               </div>
             </div>);
           })()}
-        </div>)}
+        </div></div>)}
 
         {/* KOSTEN */}
-        {tab==="costs"&&(<div>
+        {tab==="costs"&&(<div><LockBanner lockInfo={lockInfo} isOwner={lockInfo?.lockedBy===user?.name} onUnlock={async()=>{try{await API.unlockVorgang(currentEventId);setLockInfo(null);}catch{}}}/>
           <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:12,marginBottom:14}}><Card><Stat label="Personal" value={dayCalcs.reduce((s,d)=>s+d.tp,0)}/></Card><Card><Stat label="Stunden" value={dayCalcs.reduce((s,d)=>s+d.h,0)} color="#1a7a3a"/></Card><Card><Stat label="Gesamtkosten" value={f$(totalCosts)} color={C.rot}/></Card></div>
           <Card title="Kostenübersicht" accent={C.mittelblau}>
             <div style={{overflowX:"auto"}}><table style={{width:"100%",borderCollapse:"collapse",fontSize:12}}><thead><tr style={{borderBottom:`2px solid ${C.mittelgrau}40`}}><th style={{textAlign:"left",padding:"6px 10px",color:C.dunkelgrau}}>Position</th>{activeDays.map((d,i)=><th key={i} style={{textAlign:"right",padding:"6px 10px",color:C.dunkelgrau}}>Tag {d.id}</th>)}<th style={{textAlign:"right",padding:"6px 10px",color:C.rot,fontWeight:700}}>Gesamt</th></tr></thead>
