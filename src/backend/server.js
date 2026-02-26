@@ -537,6 +537,15 @@ function buildEinsatzprotokollHTML(vorgang, stamm, user, dayCalcs) {
   });
   fzgSections += `</p>`;
 
+  // Logo aus bereitschaften.logo (Binary → Base64)
+  let logoImg;
+  if (stamm.logo) {
+    const b64 = Buffer.from(stamm.logo).toString("base64");
+    logoImg = `<img src="data:image/png;base64,${b64}" style="max-width:200px;max-height:90px;object-fit:contain;" />`;
+  } else {
+    logoImg = `<div style="font-weight:bold;font-size:16px;text-align:center;">BRK<br/>Bereitschaft</div>`;
+  }
+
   return `<!DOCTYPE html>
 <html lang="de">
 <head>
