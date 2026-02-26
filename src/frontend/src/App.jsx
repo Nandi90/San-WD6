@@ -941,9 +941,7 @@ function PapierkorbTab({user,bereitschaft,allBereitschaften,stammdaten,onRestore
   if(error)return <div style={{padding:32,color:C.rot,fontFamily:FONT.sans}}>Fehler: {error}</div>;
   return(
     <div style={{maxWidth:900,margin:"0 auto",padding:"24px 16px"}}>
-      <div style={{display:"flex",justifyContent:"flex-end",marginBottom:12}}>
-        <button onClick={load} style={{padding:"6px 14px",borderRadius:4,border:`1px solid ${C.mittelgrau}`,background:C.weiss,cursor:"pointer",fontSize:12,fontFamily:FONT.sans}}>↻ Aktualisieren</button>
-      </div>
+
       {items.length===0?(
         <div style={{textAlign:"center",padding:48,color:C.dunkelgrau,fontFamily:FONT.sans,background:C.weiss,borderRadius:8,border:`1px solid ${C.mittelgrau}40`}}>
           <div style={{fontSize:40,marginBottom:12}}>🗑️</div>
@@ -983,6 +981,7 @@ function PapierkorbTab({user,bereitschaft,allBereitschaften,stammdaten,onRestore
 
 function VorgaengeListe({bereitschaftCode,user,onLoad,onNew,onCopy,bereitschaft,allBereitschaften,onFilterChange}){
   const [showPapierkorb,setShowPapierkorb]=useState(false);
+  const [papierkorbKey,setPapierkorbKey]=useState(0);
   const thisYear=new Date().getFullYear();
   const [viewYear,setViewYear]=useState(thisYear);
   const [events,setEvents]=useState([]);
@@ -1049,10 +1048,16 @@ function VorgaengeListe({bereitschaftCode,user,onLoad,onNew,onCopy,bereitschaft,
       <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.45)",zIndex:1000,display:"flex",alignItems:"center",justifyContent:"center"}} onClick={()=>setShowPapierkorb(false)}>
         <div style={{background:C.weiss,borderRadius:10,boxShadow:"0 8px 32px rgba(0,0,0,0.18)",width:"min(860px,95vw)",maxHeight:"85vh",overflowY:"auto"}} onClick={e=>e.stopPropagation()}>
           <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"16px 20px",borderBottom:`1px solid ${C.mittelgrau}40`}}>
-            <span style={{fontWeight:700,fontSize:16,fontFamily:FONT.sans}}>🗑️ Papierkorb</span>
-            <button onClick={()=>setShowPapierkorb(false)} style={{background:"none",border:"none",fontSize:20,cursor:"pointer",color:C.dunkelgrau,lineHeight:1}}>✕</button>
+            <div>
+              <div style={{fontWeight:700,fontSize:16,fontFamily:FONT.sans}}>🗑️ Papierkorb</div>
+              <div style={{fontSize:12,color:C.dunkelgrau,marginTop:3,fontFamily:FONT.sans}}>Gelöschte Vorgänge werden nach 60 Tagen automatisch entfernt.</div>
+            </div>
+            <div style={{display:"flex",alignItems:"center",gap:10}}>
+              <button onClick={()=>setPapierkorbKey(k=>k+1)} style={{padding:"6px 14px",borderRadius:4,border:`1px solid ${C.mittelgrau}`,background:C.weiss,cursor:"pointer",fontSize:12,fontFamily:FONT.sans}}>↻ Aktualisieren</button>
+              <button onClick={()=>setShowPapierkorb(false)} style={{background:"none",border:"none",fontSize:20,cursor:"pointer",color:C.dunkelgrau,lineHeight:1}}>✕</button>
+            </div>
           </div>
-          <PapierkorbTab user={user} bereitschaft={bereitschaftCode} allBereitschaften={allBereitschaften} stammdaten={{}} onRestore={()=>{setShowPapierkorb(false);loadEvents();}}/>
+          <PapierkorbTab key={papierkorbKey} user={user} bereitschaft={bereitschaftCode} allBereitschaften={allBereitschaften} stammdaten={{}} onRestore={()=>{setShowPapierkorb(false);loadEvents();}}/>
         </div>
       </div>
     )}
