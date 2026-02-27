@@ -3,15 +3,6 @@ import { useState, useMemo, useCallback, useEffect, useRef } from "react";
 import API, { getPapierkorb, restoreVorgang, purgeVorgang } from "./api";
 
 // ═══════════════════════════════════════════════════════════════════════════
-// RESPONSIVE HOOK
-// ═══════════════════════════════════════════════════════════════════════════
-function useResponsive(){
-  const [w,setW]=useState(typeof window!=="undefined"?window.innerWidth:1200);
-  useEffect(()=>{const h=()=>setW(window.innerWidth);window.addEventListener("resize",h);return()=>window.removeEventListener("resize",h);},[]);
-  return{mob:w<=768,tab:w>768&&w<=1024};
-}
-
-// ═══════════════════════════════════════════════════════════════════════════
 // DRK CORPORATE IDENTITY
 // ═══════════════════════════════════════════════════════════════════════════
 const C={rot:"#E60005",softrot:"#E46450",dunkelrot:"#A51E0F",dunkelblau:"#002F5F",hellblau:"#D9E8F5",mittelblau:"#004B91",dunkelgrau:"#554F4A",mittelgrau:"#B4B4B4",hellgrau:"#EFEEEA",weiss:"#FFFFFF",schwarz:"#1A1A1A",bgrau:"#A0A0A0"};
@@ -89,7 +80,7 @@ const Card=({children,title,accent,sub,action})=>(<div style={{background:C.weis
 const Inp=({label,value,onChange,type="text",min,max,step,disabled,suffix,small,placeholder})=>(<label style={{display:"block",marginBottom:small?6:10}}><span style={{display:"block",fontSize:11,color:C.dunkelgrau,marginBottom:3,fontWeight:600,fontFamily:FONT.sans}}>{label}</span><div style={{display:"flex",alignItems:"center",gap:6}}><input type={type} value={value} placeholder={placeholder} onChange={e=>onChange(type==="number"?(e.target.value===""?"":Number(e.target.value)):e.target.value)} min={min} max={max} step={step} disabled={disabled} style={{width:"100%",padding:"8px 10px",background:C.weiss,border:`1px solid ${C.mittelgrau}`,borderRadius:4,color:C.schwarz,fontSize:13,outline:"none",fontFamily:FONT.sans,boxSizing:"border-box"}} onFocus={e=>e.target.style.borderColor=C.mittelblau} onBlur={e=>e.target.style.borderColor=C.mittelgrau}/>{suffix&&<span style={{color:C.dunkelgrau,fontSize:12}}>{suffix}</span>}</div></label>);
 const Sel=({label,value,onChange,options,small})=>(<label style={{display:"block",marginBottom:small?6:10}}><span style={{display:"block",fontSize:11,color:C.dunkelgrau,marginBottom:3,fontWeight:600,fontFamily:FONT.sans}}>{label}</span><select value={value} onChange={e=>onChange(isNaN(e.target.value)?e.target.value:Number(e.target.value))} style={{width:"100%",padding:"8px 10px",background:C.weiss,border:`1px solid ${C.mittelgrau}`,borderRadius:4,color:C.schwarz,fontSize:13,fontFamily:FONT.sans,cursor:"pointer",boxSizing:"border-box"}}>{options.map(o=><option key={o.value} value={o.value}>{o.label}</option>)}</select></label>);
 const Chk=({label,checked,onChange})=>(<label style={{display:"flex",alignItems:"center",gap:8,cursor:"pointer",marginBottom:6,fontSize:13,color:C.dunkelgrau,fontFamily:FONT.sans}}><div onClick={()=>onChange(!checked)} style={{width:18,height:18,borderRadius:3,border:`2px solid ${checked?C.rot:C.mittelgrau}`,background:checked?C.rot:"transparent",display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",flexShrink:0}}>{checked&&<svg width="10" height="10" viewBox="0 0 12 12" fill="none"><path d="M2 6l3 3 5-5" stroke="#fff" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/></svg>}</div>{label}</label>);
-const Btn=({children,onClick,variant="primary",small,icon,style:sx,disabled,className})=>{const st={primary:{background:C.rot,color:C.weiss,border:"none"},secondary:{background:C.weiss,color:C.dunkelgrau,border:`1px solid ${C.mittelgrau}`},ghost:{background:"transparent",color:C.dunkelgrau,border:"none"},blue:{background:C.mittelblau,color:C.weiss,border:"none"},success:{background:"#1a7a3a",color:C.weiss,border:"none"}};return(<button className={className} onClick={onClick} disabled={disabled} style={{padding:small?"5px 12px":"9px 18px",borderRadius:4,fontSize:small?12:13,fontWeight:600,cursor:disabled?"not-allowed":"pointer",fontFamily:FONT.sans,display:"inline-flex",alignItems:"center",gap:6,opacity:disabled?0.5:1,...st[variant],...sx}}>{icon&&<span>{icon}</span>}{children}</button>);};
+const Btn=({children,onClick,variant="primary",small,icon,style:sx,disabled})=>{const st={primary:{background:C.rot,color:C.weiss,border:"none"},secondary:{background:C.weiss,color:C.dunkelgrau,border:`1px solid ${C.mittelgrau}`},ghost:{background:"transparent",color:C.dunkelgrau,border:"none"},blue:{background:C.mittelblau,color:C.weiss,border:"none"},success:{background:"#1a7a3a",color:C.weiss,border:"none"}};return(<button onClick={onClick} disabled={disabled} style={{padding:small?"5px 12px":"9px 18px",borderRadius:4,fontSize:small?12:13,fontWeight:600,cursor:disabled?"not-allowed":"pointer",fontFamily:FONT.sans,display:"inline-flex",alignItems:"center",gap:6,opacity:disabled?0.5:1,...st[variant],...sx}}>{icon&&<span>{icon}</span>}{children}</button>);};
 const Gauge=({value})=>{const pct=Math.min(value/120*100,100);const c=pct<20?"#1a7a3a":pct<50?"#d4920a":C.rot;return(<div style={{margin:"8px 0"}}><div style={{display:"flex",justifyContent:"space-between",alignItems:"baseline",marginBottom:4}}><span style={{fontSize:12,color:C.dunkelgrau,fontFamily:FONT.sans}}>Gesamtrisiko</span><span style={{fontSize:28,fontWeight:800,color:c,fontFamily:FONT.mono}}>{value.toFixed(1)}</span></div><div style={{height:6,background:C.hellgrau,borderRadius:3,overflow:"hidden"}}><div style={{height:"100%",width:`${pct}%`,background:`linear-gradient(90deg,#1a7a3a,${c})`,borderRadius:3,transition:"width 0.5s"}}/></div></div>);};
 const Stat=({label,value,color=C.rot})=>(<div style={{textAlign:"center",padding:"12px 8px"}}><div style={{fontSize:10,color:C.dunkelgrau,textTransform:"uppercase",letterSpacing:1,marginBottom:4,fontFamily:FONT.sans}}>{label}</div><div style={{fontSize:22,fontWeight:800,color,fontFamily:FONT.mono}}>{value}</div></div>);
 
@@ -502,7 +493,7 @@ function KundenManager({kunden,setKunden,user,toast,showConfirm}){
     {csvMsg&&<div style={{padding:"8px 14px",background:"#e8f5e9",borderRadius:6,marginBottom:10,fontSize:12,color:"#2e7d32"}}>{csvMsg}</div>}
     <div style={{marginBottom:10}}><input type="text" value={search} onChange={e=>setSearch(e.target.value)} placeholder="Kunden suchen..." style={{width:"100%",padding:"8px 12px",border:`1px solid ${C.mittelgrau}`,borderRadius:4,fontSize:13,fontFamily:FONT.sans,boxSizing:"border-box"}}/></div>
     {edit&&<Card title={edit.name?"Kunde bearbeiten":"Neuer Kunde"} accent="#1a7a3a">
-      <div className="rg2" style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"0 16px"}}>
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"0 16px"}}>
         <Inp label="Firma / Name *" value={edit.name} onChange={v=>setEdit(p=>({...p,name:v}))}/>
         <Inp label="Kundennummer" value={edit.kundennummer||""} onChange={v=>setEdit(p=>({...p,kundennummer:v}))}/>
         <Inp label="Ansprechpartner" value={edit.ansprechpartner} onChange={v=>setEdit(p=>({...p,ansprechpartner:v}))}/>
@@ -1049,14 +1040,14 @@ function VorgaengeListe({bereitschaftCode,user,onLoad,onNew,onCopy,bereitschaft,
       {years.map(y=>(<button key={y} onClick={()=>setViewYear(y)} style={{padding:"5px 12px",borderRadius:4,border:`1px solid ${y===viewYear?C.rot:C.mittelgrau+"60"}`,background:y===viewYear?`${C.rot}11`:C.weiss,color:y===viewYear?C.rot:y<thisYear?C.bgrau:C.schwarz,cursor:"pointer",fontSize:12,fontWeight:y===viewYear?700:400,fontFamily:FONT.sans}}>{y}{y===thisYear?" ●":""}</button>))}
     </div>
 
-    <div className="r-vorg-bar" style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}>
+    <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}>
       <div>
         <h2 style={{margin:0,fontSize:18,fontWeight:700,color:C.schwarz}}>
           {isArchive?"📦 Archiv":"📁 Vorgänge"} {viewYear}
         </h2>
         <p style={{margin:"2px 0 0",fontSize:12,color:C.dunkelgrau}}>{bereitschaft.name} · {events.length} Vorgang/Vorgänge</p>
       </div>
-      <div className="r-vorg-actions" style={{display:"flex",gap:6,alignItems:"center"}}>
+      <div style={{display:"flex",gap:6,alignItems:"center"}}>
         <input type="text" value={searchQ} onChange={e=>setSearchQ(e.target.value)} placeholder="Suche (Name, Nr., Kunde...)" style={{padding:"5px 10px",borderRadius:4,border:"1px solid "+C.mittelgrau,fontSize:12,fontFamily:FONT.sans,width:200}}/>
         {(user?.rolle==="admin"||user?.rolle==="kbl")&&<select value={filterBereitschaft} onChange={e=>{const v=e.target.value;setFilterBereitschaft(v);loadEvents(v);if(onFilterChange)onFilterChange(v);}} style={{padding:"5px 10px",borderRadius:4,border:`1px solid ${C.mittelgrau}`,fontSize:12,fontFamily:FONT.sans}}><option value="">Alle Bereitschaften</option>{(allBereitschaften||[]).map(b=><option key={b.code} value={b.code}>{b.short} — {b.name}</option>)}</select>}
         {!isArchive&&<Btn onClick={onNew} icon="➕">Neuer Vorgang</Btn>}
@@ -1066,16 +1057,16 @@ function VorgaengeListe({bereitschaftCode,user,onLoad,onNew,onCopy,bereitschaft,
     {/* ÜBERSICHT TABLE */}
     {(<Card title={`Angebote/Rechnungen ${viewYear}`} accent={C.mittelblau} sub={`Gesamt: ${f2(totalBetrag)} €`}>
       <div style={{overflowX:"auto"}}><table style={{width:"100%",borderCollapse:"collapse",fontSize:11}}>
-        <thead><tr style={{background:C.hellgrau}}>{[{l:"Lfd.Nr."},{l:"Datum"},{l:"Ansprechpartner",hide:true},{l:"Veranstaltung"},{l:"Kunde",hide:true},{l:"AG",hide:true},{l:"RG",hide:true},{l:"Betrag",right:true},{l:"Status"},{l:""}].map((h,hi)=><th key={hi} className={h.hide?"mob-hide":""} style={{padding:"6px 8px",textAlign:h.right?"right":"left",borderBottom:`2px solid ${C.mittelgrau}40`,fontSize:10,color:C.dunkelgrau,whiteSpace:"nowrap"}}>{h.l}</th>)}</tr></thead>
+        <thead><tr style={{background:C.hellgrau}}>{["Lfd.Nr.","Datum","Ansprechpartner","Veranstaltung","Kunde","AG","RG","Betrag","Status",""].map(h=><th key={h} style={{padding:"6px 8px",textAlign:h==="Betrag"?"right":"left",borderBottom:`2px solid ${C.mittelgrau}40`,fontSize:10,color:C.dunkelgrau,whiteSpace:"nowrap"}}>{h}</th>)}</tr></thead>
         <tbody>{events.filter(ev=>{if(!searchQ)return true;const q=searchQ.toLowerCase();const e=ev.event||{};return(e.name||"").toLowerCase().includes(q)||(e.auftragsnr||"").toLowerCase().includes(q)||(e.veranstalter||"").toLowerCase().includes(q)||(e.rechnungsempfaenger||"").toLowerCase().includes(q)||(e.ansprechpartner||"").toLowerCase().includes(q)||(e.ort||"").toLowerCase().includes(q);}).sort((a,b)=>{const na=a.event?.auftragsnr||"";const nb=b.event?.auftragsnr||"";return nb.localeCompare(na,undefined,{numeric:true});}).map((ev,i)=>{const e=ev.event||{};const cl=e.checklist||{};const dc=(ev.days||[]).filter(d=>d.active);const firstDate=dc[0]?.date;let betrag=0;try{dc.forEach(d=>{betrag+=calcDay(d,DEFAULT_STAMMDATEN.rates,e.verpflegung).total;});}catch{}
           return(<tr key={i} style={{borderBottom:`1px solid ${C.hellgrau}`,cursor:"pointer"}} onClick={()=>isArchive?onCopy(ev):onLoad(ev)}>
             <td style={{padding:"5px 8px",fontWeight:600,color:C.rot,fontFamily:FONT.mono,whiteSpace:"nowrap"}}>{e.auftragsnr||"n/a"}</td>
             <td style={{padding:"5px 8px",whiteSpace:"nowrap"}}>{firstDate?fDate(firstDate):""}</td>
-            <td className="mob-hide" style={{padding:"5px 8px"}}>{e.ansprechpartner||""}</td>
+            <td style={{padding:"5px 8px"}}>{e.ansprechpartner||""}</td>
             <td style={{padding:"5px 8px",fontWeight:600}}>{e.name||"n/a"}</td>
-            <td className="mob-hide" style={{padding:"5px 8px"}}>{e.veranstalter||e.rechnungsempfaenger||""}</td>
-            <td className="mob-hide" style={{padding:"5px 8px",textAlign:"center"}}>{cl.angebotVersendet?<span style={{color:"#1a7a3a",fontSize:14}}>✅</span>:<span style={{color:"#e53935",fontSize:14}}>❌</span>}</td>
-            <td className="mob-hide" style={{padding:"5px 8px",textAlign:"center"}}>{cl.fibuWeitergeleitet?<span style={{color:"#1a7a3a",fontSize:14}}>✅</span>:<span style={{color:"#e53935",fontSize:14}}>❌</span>}</td>
+            <td style={{padding:"5px 8px"}}>{e.veranstalter||e.rechnungsempfaenger||""}</td>
+            <td style={{padding:"5px 8px",textAlign:"center"}}>{cl.angebotVersendet?<span style={{color:"#1a7a3a",fontSize:14}}>✅</span>:<span style={{color:"#e53935",fontSize:14}}>❌</span>}</td>
+            <td style={{padding:"5px 8px",textAlign:"center"}}>{cl.fibuWeitergeleitet?<span style={{color:"#1a7a3a",fontSize:14}}>✅</span>:<span style={{color:"#e53935",fontSize:14}}>❌</span>}</td>
             <td style={{padding:"5px 8px",textAlign:"right",fontFamily:FONT.mono,fontWeight:600}}>{betrag>0?f2(betrag):""}</td>
             <td style={{padding:"5px 8px"}}>{cl.abgeschlossen?<span style={{color:"#1a7a3a",fontSize:10}}>✅ Abgeschl.</span>:<span style={{color:"#d4920a",fontSize:10}}>⏳ Offen</span>}</td>
             <td style={{padding:"5px 4px",textAlign:"center"}}><button onClick={(e)=>{e.stopPropagation();del(ev.id);}} title="Vorgang löschen" style={{background:"none",border:"none",cursor:"pointer",fontSize:14,color:"#ccc",padding:"2px 4px"}} onMouseEnter={e=>e.currentTarget.style.color="#e53935"} onMouseLeave={e=>e.currentTarget.style.color="#ccc"}>🗑️</button></td>
@@ -1205,7 +1196,6 @@ export default function App(){
   const [aabPending,setAabPending]=useState(false);
   const [vertragPending,setVertragPending]=useState(false);
   const [pdfView,setPdfView]=useState("gefahren");
-  const {mob,tab:isTablet}=useResponsive();
   const [saving,setSaving]=useState(false);
   const [kunden,setKunden]=useState([]);
   // Toast notification system
@@ -1384,65 +1374,24 @@ export default function App(){
   return(
     <div style={{minHeight:"100vh",background:C.hellgrau,color:C.schwarz,fontFamily:FONT.sans}}>
       <link href="https://fonts.googleapis.com/css2?family=Merriweather:wght@400;700&family=Open+Sans:wght@400;600;700;800&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet"/>
-      <style>{`
-        /* ═══ RESPONSIVE v7 ═══ */
-        @media(max-width:768px){
-          .rg2,.rg3,.rg21{grid-template-columns:1fr!important}
-          .rg3s{grid-template-columns:1fr 1fr!important}
-          .mob-hide{display:none!important}
-          .top-nav{display:none!important}
-          .r-main{padding-bottom:72px!important;padding-left:8px!important;padding-right:8px!important}
-          .r-header{padding:8px 12px!important}
-          .r-header-right .r-user-name,.r-header-right .r-abmelden{display:none!important}
-          .r-header-right .r-event-badge{display:none!important}
-          .r-vorg-bar{flex-direction:column!important;align-items:stretch!important;gap:8px!important}
-          .r-vorg-bar input{width:100%!important}
-          .r-vorg-bar select{width:100%!important}
-          .r-vorg-actions{flex-direction:column!important;gap:6px!important}
-          .r-vorg-actions button{width:100%!important;justify-content:center!important}
-          .r-tab-content{overflow-x:auto!important}
-          .pdf-page{width:100%!important;min-height:auto!important;padding:8mm 6mm!important;transform:none!important}
-          .r-modal{width:95vw!important;max-height:90vh!important}
-          .r-stat-grid{grid-template-columns:1fr 1fr 1fr!important;gap:6px!important}
-          .r-card{padding:12px 14px!important}
-        }
-        @media(min-width:769px)and(max-width:1024px){
-          .rg3{grid-template-columns:1fr 1fr!important}
-          .rg21{grid-template-columns:1fr 1fr!important}
-          .r-main{padding-left:10px!important;padding-right:10px!important}
-        }
-        @media(min-width:769px){
-          .mob-show{display:none!important}
-          .btm-bar{display:none!important}
-        }
-        /* Bottom Tab Bar */
-        .btm-bar{position:fixed;bottom:0;left:0;right:0;z-index:200;background:#fff;border-top:1px solid #ddd;box-shadow:0 -2px 8px rgba(0,0,0,0.08);display:flex;justify-content:space-around;padding:4px 0 env(safe-area-inset-bottom,4px) 0}
-        .btm-item{display:flex;flex-direction:column;align-items:center;gap:1px;padding:4px 2px;border:none;background:none;cursor:pointer;font-size:9px;color:#554F4A;font-family:'Open Sans',sans-serif;min-width:0;flex:1}
-        .btm-item.active{color:#E60005}
-        .btm-item .btm-icon{font-size:18px;line-height:1}
-        .btm-item .btm-label{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:64px;font-weight:600}
-      `}</style>
       <div style={{height:4,background:C.rot}}/>
-      <header className="r-header" style={{background:C.weiss,borderBottom:`1px solid ${C.mittelgrau}40`,padding:"10px 20px",display:"flex",alignItems:"center",justifyContent:"space-between",position:"sticky",top:0,zIndex:100,boxShadow:"0 1px 4px #0001"}}>
-        <div style={{display:"flex",alignItems:"center",gap:mob?8:12}}>
-          <BRKLogo size={mob?28:36} full customLogo={stammdaten.customLogo}/>
-          {!mob&&<div><div style={{fontSize:15,fontWeight:700,color:C.schwarz}}>Bayerisches Rotes Kreuz</div><div style={{fontSize:11,color:C.dunkelgrau}}>{bereitschaft.name} · Sanitätswachdienst</div></div>}
-          {mob&&<div style={{fontSize:13,fontWeight:700,color:C.schwarz}}>SanWD</div>}
-        </div>
-        <div className="r-header-right" style={{display:"flex",alignItems:"center",gap:mob?8:14}}>
-          {saving&&<span style={{fontSize:11,color:"#1a7a3a"}}>💾</span>}
-          {currentEventId&&!saving&&<span className="r-event-badge" style={{fontSize:11,color:C.dunkelgrau,display:"flex",alignItems:"center",gap:6,background:"#f5f5f5",padding:"3px 10px",borderRadius:12,maxWidth:280,overflow:"hidden"}}>
+      <header style={{background:C.weiss,borderBottom:`1px solid ${C.mittelgrau}40`,padding:"10px 20px",display:"flex",alignItems:"center",justifyContent:"space-between",position:"sticky",top:0,zIndex:100,boxShadow:"0 1px 4px #0001"}}>
+        <div style={{display:"flex",alignItems:"center",gap:12}}><BRKLogo size={36} full customLogo={stammdaten.customLogo}/><div><div style={{fontSize:15,fontWeight:700,color:C.schwarz}}>Bayerisches Rotes Kreuz</div><div style={{fontSize:11,color:C.dunkelgrau}}>{bereitschaft.name} · Sanitätswachdienst</div></div></div>
+        <div style={{display:"flex",alignItems:"center",gap:14}}>
+          {saving&&<span style={{fontSize:11,color:"#1a7a3a"}}>💾 Speichert...</span>}
+          {currentEventId&&!saving&&<span style={{fontSize:11,color:C.dunkelgrau,display:"flex",alignItems:"center",gap:6,background:"#f5f5f5",padding:"3px 10px",borderRadius:12,maxWidth:280,overflow:"hidden"}}>
             <span style={{color:"#27ae60"}}>✓</span>
             <span style={{fontWeight:600,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{event.name||"Unbenannte Veranstaltung"}</span>
             {event.auftragsnr&&<span style={{color:C.rot,fontWeight:700,whiteSpace:"nowrap"}}>&nbsp;·&nbsp;{event.auftragsnr}</span>}
           </span>}
-          <div onClick={()=>setTab("settings")} style={{display:"flex",alignItems:"center",gap:mob?4:8,cursor:"pointer"}} title="Mein Profil"><div style={{width:30,height:30,borderRadius:15,background:C.rot,display:"flex",alignItems:"center",justifyContent:"center",fontSize:13,fontWeight:700,color:"#fff"}}>{user.name.charAt(0)}</div>{!mob&&<div className="r-user-name"><div style={{fontSize:12,fontWeight:600}}>{user.name}</div><div style={{fontSize:10,color:C.dunkelgrau}}>{user.bereitschaft}{user.rolle==="admin"?" (Admin)":user.rolle==="bl"?" (BL)":""}</div></div>}</div>
-          <Btn className="r-abmelden" small variant="ghost" onClick={()=>window.location.href="/auth/logout"}>{mob?"⏻":"Abmelden"}</Btn>
+          {!currentEventId&&!saving&&tab!=="events"&&<span style={{fontSize:11,color:C.dunkelgrau,fontStyle:"italic"}}>Kein Vorgang geöffnet</span>}
+          <div onClick={()=>setTab("settings")} style={{display:"flex",alignItems:"center",gap:8,cursor:"pointer"}} title="Mein Profil"><div style={{width:30,height:30,borderRadius:15,background:C.rot,display:"flex",alignItems:"center",justifyContent:"center",fontSize:13,fontWeight:700,color:"#fff"}}>{user.name.charAt(0)}</div><div><div style={{fontSize:12,fontWeight:600}}>{user.name}</div><div style={{fontSize:10,color:C.dunkelgrau}}>{user.bereitschaft}{user.rolle==="admin"?" (Admin)":user.rolle==="bl"?" (BL)":""}</div></div></div>
+          <Btn small variant="ghost" onClick={()=>window.location.href="/auth/logout"}>Abmelden</Btn>
         </div>
       </header>
-      <nav className="top-nav" style={{display:"flex",gap:1,padding:"0 12px",background:C.weiss,borderBottom:`1px solid ${C.mittelgrau}40`,overflowX:"auto"}}>{TABS.map(t=>(<button key={t.id} onClick={()=>{if(t.id==="events"){releaseLock();setCurrentEventId(null);setEvent({...EMPTY_EVENT});setDays(Array.from({length:8},(_,i)=>mkDay(i+1)));}setTab(t.id);}} style={{padding:"10px 14px",background:"none",border:"none",color:tab===t.id?C.rot:C.dunkelgrau,fontSize:12,fontWeight:tab===t.id?700:500,cursor:"pointer",display:"flex",alignItems:"center",gap:5,borderBottom:tab===t.id?`2px solid ${C.rot}`:"2px solid transparent",fontFamily:FONT.sans,whiteSpace:"nowrap"}}><span style={{fontSize:13}}>{t.icon}</span> {t.label}</button>))}</nav>
+      <nav style={{display:"flex",gap:1,padding:"0 12px",background:C.weiss,borderBottom:`1px solid ${C.mittelgrau}40`,overflowX:"auto"}}>{TABS.map(t=>(<button key={t.id} onClick={()=>{if(t.id==="events"){releaseLock();setCurrentEventId(null);setEvent({...EMPTY_EVENT});setDays(Array.from({length:8},(_,i)=>mkDay(i+1)));}setTab(t.id);}} style={{padding:"10px 14px",background:"none",border:"none",color:tab===t.id?C.rot:C.dunkelgrau,fontSize:12,fontWeight:tab===t.id?700:500,cursor:"pointer",display:"flex",alignItems:"center",gap:5,borderBottom:tab===t.id?`2px solid ${C.rot}`:"2px solid transparent",fontFamily:FONT.sans,whiteSpace:"nowrap"}}><span style={{fontSize:13}}>{t.icon}</span> {t.label}</button>))}</nav>
 
-      <main className="r-main" style={{maxWidth:1100,margin:"0 auto",padding:"16px 14px"}}>
+      <main style={{maxWidth:1100,margin:"0 auto",padding:"16px 14px"}}>
 
         {/* VORGÄNGE + ARCHIV */}
         {tab==="events"&&<VorgaengeListe bereitschaftCode={BEREITSCHAFTEN[stammdaten.bereitschaftIdx].code} user={user} onLoad={loadEvent} onNew={newEvent} onCopy={copyEvent} bereitschaft={bereitschaft} allBereitschaften={BEREITSCHAFTEN} toast={toast} showConfirm={showConfirm}/>}
@@ -1451,11 +1400,11 @@ export default function App(){
         {tab==="event"&&(<div>
           <LockBanner lockInfo={lockInfo} isOwner={lockInfo?.lockedBy===user?.name} onUnlock={async()=>{try{await API.unlockVorgang(currentEventId);setLockInfo(null);}catch{}}}/>
           <StatusBanner angebotVersendet={event?.checklist?.angebotVersendet} abgeschlossen={event?.checklist?.abgeschlossen} onUnlock={async(begruendung)=>{await API.entsperrenVorgang(currentEventId,begruendung);updateEvent("checklist",{...event.checklist,angebotVersendet:false,abgeschlossen:false});}}/>
-          <div className="rg21" style={{display:"grid",gridTemplateColumns:"2fr 1fr",gap:14}}>
+          <div style={{display:"grid",gridTemplateColumns:"2fr 1fr",gap:14}}>
             <div style={{position:"relative"}}>
               {(isLocked||isEditLocked)&&<div style={{position:"absolute",top:0,left:0,right:0,bottom:0,background:"rgba(255,255,255,0.55)",zIndex:10,borderRadius:8,pointerEvents:"all"}}/>}
               <Card title="Auftrag" accent={C.rot} sub={event.auftragsnr?`Nr. ${event.auftragsnr}`:"Noch keine Nummer"} action={<div style={{display:"flex",gap:6}}><Btn small onClick={generateNr} icon="🔢">Nr. generieren</Btn><Btn small variant="success" onClick={saveEvent} icon="💾" disabled={isLocked}>Speichern</Btn></div>}>
-                <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:"0 16px",className:"rg3"}}>
+                <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:"0 16px"}}>
                   <Sel label="Bereitschaft" value={stammdaten.bereitschaftIdx} onChange={v=>updateStamm("bereitschaftIdx",v)} options={BEREITSCHAFTEN.map((b,i)=>({value:i,label:`${b.code} — ${b.name}`}))}/>
                   <Inp label="Auftragsnummer" value={event.auftragsnr} onChange={v=>updateEvent("auftragsnr",v)} placeholder="Auto-generiert"/>
                   <Inp label="Rechnungsnummer" value={event.rechnungsnr} onChange={v=>updateEvent("rechnungsnr",v)}/>
@@ -1468,13 +1417,13 @@ export default function App(){
               </Card>
               <Card title="Veranstaltung" accent={isLocked?"#a5d6a7":"#1a7a3a"}>
                 <Inp label="Name der Veranstaltung" value={event.name} onChange={v=>updateEvent("name",v)} disabled={isLocked}/>
-                <div className="rg2" style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"0 16px"}}>
+                <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"0 16px"}}>
                   <Inp label="Veranstaltungsort" value={event.ort} onChange={v=>updateEvent("ort",v)} disabled={isLocked}/>
                   <AddressAutocomplete label="Adresse inkl. Hausnummer (z.B. Karl-Konrad-Str. 3)" value={event.adresse} onChange={v=>updateEvent("adresse",v)} onResult={s=>{updateEvent("coords",{lat:s.lat,lng:s.lng});if(s.w3w)updateEvent("w3w",s.w3w);updateEvent("addrImprecise",!!s.imprecise);}}/>
                 </div>
                 <LeafletMap coords={event.coords} w3w={event.w3w} onChange={r=>{updateEvent("coords",{lat:r.lat,lng:r.lng});if(r.address)updateEvent("adresse",r.address);updateEvent("addrImprecise",false);}} onW3W={w=>updateEvent("w3w",w)}/>
                 {event.addrImprecise&&<div style={{background:"#fff3cd",border:"1px solid #ffc107",borderRadius:4,padding:"8px 12px",marginTop:6,fontSize:12,color:"#856404",display:"flex",alignItems:"center",gap:8}}>⚠️ <span>Hausnummer konnte nicht exakt aufgelöst werden. <strong>Bitte Pin auf der Karte zur genauen Position verschieben</strong> – der what3words-Code wird automatisch aktualisiert.</span></div>}
-                <div className="rg2" style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"0 16px",marginTop:10}}>
+                <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"0 16px",marginTop:10}}>
                   <Chk label="Kfz-Stellplatz vorhanden" checked={event.kfzStellplatz} onChange={v=>{if(!isLocked)updateEvent("kfzStellplatz",v)}}/>
                   <Chk label="Sanitätsraum vorhanden" checked={event.sanitaetsraum} onChange={v=>{if(!isLocked)updateEvent("sanitaetsraum",v)}}/>
                   <Chk label="Stromanschluss vorhanden" checked={event.strom} onChange={v=>{if(!isLocked)updateEvent("strom",v)}}/>
@@ -1502,7 +1451,7 @@ export default function App(){
                   </select>
                   <div style={{fontSize:10,color:C.bgrau,marginTop:2}}>💡 Kundendaten werden automatisch beim Speichern aktualisiert</div>
                 </div>}
-                <div className="rg2" style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"0 16px"}}>
+                <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"0 16px"}}>
                   <Inp label="Veranstalter" value={event.veranstalter} onChange={v=>updateEvent("veranstalter",v)}/>
                   <Inp label="Rechnungsempfänger" value={event.rechnungsempfaenger} onChange={v=>updateEvent("rechnungsempfaenger",v)}/>
                   <Inp label="Ansprechpartner" value={event.ansprechpartner} onChange={v=>updateEvent("ansprechpartner",v)}/>
@@ -1556,10 +1505,10 @@ export default function App(){
           {(isLocked||isEditLocked)&&<div style={{position:"absolute",top:0,left:0,right:0,bottom:0,background:"rgba(255,255,255,0.55)",zIndex:10,borderRadius:8,pointerEvents:"all"}}/>}
           {(()=>{const i=activeDay,d=days[i];if(!d.active)return<Card><p style={{color:C.dunkelgrau,textAlign:"center",padding:32}}>Tag {i+1} nicht aktiv. <Btn small onClick={()=>updateDay(i,"active",true)}>Aktivieren</Btn></p></Card>;
             const calc=calcDay(d,stammdaten.rates,event.verpflegung);
-            return(<div className="rg21" style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:14}}>
+            return(<div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:14}}>
               <div>
                 <Card title={`Tag ${i+1}`} accent={C.mittelblau}>
-                  <div className="rg3s" style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:"0 10px"}}><Inp label="Datum" type="date" value={d.date} onChange={v=>updateDay(i,"date",v)}/><Inp label="Beginn" type="time" value={d.startTime} onChange={v=>updateDay(i,"startTime",v)}/><Inp label="Ende" type="time" value={d.endTime} onChange={v=>updateDay(i,"endTime",v)}/></div>
+                  <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:"0 10px"}}><Inp label="Datum" type="date" value={d.date} onChange={v=>updateDay(i,"date",v)}/><Inp label="Beginn" type="time" value={d.startTime} onChange={v=>updateDay(i,"startTime",v)}/><Inp label="Ende" type="time" value={d.endTime} onChange={v=>updateDay(i,"endTime",v)}/></div>
                   <div style={{padding:"5px 10px",background:C.hellgrau,borderRadius:4,fontSize:12}}>Einsatzdauer: <strong style={{color:C.mittelblau}}>{calc.h.toFixed(2).replace('.',',')} Stunden</strong>{!event.verpflegung&&<span style={{marginLeft:10,color:"#856404"}}>Verpfl.: {calc.vB}×8h</span>}</div>
                 </Card>
                 <Card title="Besucher & Risiko" accent="#d4920a">
@@ -1586,7 +1535,7 @@ export default function App(){
                 </Card>
                 <Card title="Personal" accent="#1a7a3a">
                   {showOverrides?(<div>
-                    <div className="rg3s" style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:"0 6px"}}>
+                    <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:"0 6px"}}>
                       {[["Helfer","oHelfer",calc.rec.helfer],["KTW","oKtw",calc.rec.ktw],["RTW","oRtw",calc.rec.rtw],["Ärzte","oAerzte",0],["GKTW","oGktw",calc.rec.gktw],["EL-KFZ","oElKfz",calc.rec.elKfz],["SEG","oSeg",0],["MTW","oMtw",0],["Zelt","oZelt",0]].map(([l,k,rec])=><Inp key={k} small label={`${l} (empf. ${rec})`} type="number" min={0} value={d[k]!=null?d[k]:rec} onChange={v=>updateDay(i,k,v===""?null:v)}/>)}
                     </div>
                     <div style={{display:"flex",gap:6,marginTop:10}}>
@@ -1612,7 +1561,7 @@ export default function App(){
 
         {/* KOSTEN */}
         {tab==="costs"&&(<div><LockBanner lockInfo={lockInfo} isOwner={lockInfo?.lockedBy===user?.name} onUnlock={async()=>{try{await API.unlockVorgang(currentEventId);setLockInfo(null);}catch{}}}/>
-          <div className="r-stat-grid" style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:12,marginBottom:14}}><Card><Stat label="Personal" value={dayCalcs.reduce((s,d)=>s+d.tp,0)}/></Card><Card><Stat label="Stunden" value={dayCalcs.reduce((s,d)=>s+d.h,0)} color="#1a7a3a"/></Card><Card><Stat label="Gesamtkosten" value={f$(totalCosts)} color={C.rot}/></Card></div>
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:12,marginBottom:14}}><Card><Stat label="Personal" value={dayCalcs.reduce((s,d)=>s+d.tp,0)}/></Card><Card><Stat label="Stunden" value={dayCalcs.reduce((s,d)=>s+d.h,0)} color="#1a7a3a"/></Card><Card><Stat label="Gesamtkosten" value={f$(totalCosts)} color={C.rot}/></Card></div>
           <Card title="Kostenübersicht" accent={C.mittelblau}>
             <div style={{overflowX:"auto"}}><table style={{width:"100%",borderCollapse:"collapse",fontSize:12}}><thead><tr style={{borderBottom:`2px solid ${C.mittelgrau}40`}}><th style={{textAlign:"left",padding:"6px 10px",color:C.dunkelgrau}}>Position</th>{activeDays.map((d,i)=><th key={i} style={{textAlign:"right",padding:"6px 10px",color:C.dunkelgrau}}>Tag {d.id}</th>)}<th style={{textAlign:"right",padding:"6px 10px",color:C.rot,fontWeight:700}}>Gesamt</th></tr></thead>
               <tbody>{[{l:"Helfer",k:"cH"},{l:"KTW",k:"cK"},{l:"RTW",k:"cR"},{l:"GKTW",k:"cG"},{l:"EL",k:"cE"},{l:"EL-KFZ",k:"cEK"},{l:"Zelt",k:"cZ"},...(!event.verpflegung?[{l:"Verpflegung",k:"cV",hl:true}]:[])].map((r,ri)=>(<tr key={ri} style={{borderBottom:`1px solid ${C.hellgrau}`}}><td style={{padding:"5px 10px",color:r.hl?"#856404":C.dunkelgrau}}>{r.l}</td>{dayCalcs.map((dc,di)=><td key={di} style={{textAlign:"right",padding:"5px 10px",fontFamily:FONT.mono,fontSize:11}}>{dc[r.k]>0?f$(dc[r.k]):"n/a"}</td>)}<td style={{textAlign:"right",padding:"5px 10px",fontWeight:600,fontFamily:FONT.mono,fontSize:11}}>{dayCalcs.reduce((s,dc)=>s+dc[r.k],0)>0?f$(dayCalcs.reduce((s,dc)=>s+dc[r.k],0)):"n/a"}</td></tr>))}
@@ -1672,17 +1621,6 @@ export default function App(){
               <div><div style={{fontWeight:700,fontSize:16}}>SanWD Changelog</div><div style={{fontSize:11,opacity:0.85}}>Versionshistorie und Änderungen</div></div>
             </div>
             {[
-              {v:"v7.0",d:"27.02.2026",c:[
-                "🎉 Major Release: Vollständiges Responsive Design für Smartphone und Tablet",
-                "Bottom-Tab-Bar: Mobile Navigation mit fixierter Leiste am unteren Bildschirmrand",
-                "Header: Kompakte Darstellung auf Mobile (Logo + SanWD + Avatar)",
-                "Formulare: Alle Grids automatisch einspaltig auf Smartphone, zweispaltig auf Tablet",
-                "Vorgangsliste: Kompakte Tabelle auf Mobile (unwichtige Spalten ausgeblendet)",
-                "PDF-Vorschau: Responsive Skalierung für alle Dokumententypen",
-                "Stammdaten/Einstellungen: Optimiertes Layout für alle Bildschirmgrößen",
-                "Safe-Area: iPhone-Notch und Statusbar-Unterstützung",
-                "CSS Media Queries: Breakpoints bei 768px (Mobile) und 1024px (Tablet)",
-              ]},
               {v:"v6.7",d:"27.02.2026",c:[
                 "Toast-Notifications: Native Browser-Alerts durch eigenes Notification-System im BRK-Design ersetzt",
                 "Bestätigungsdialoge: Native confirm() durch modale ConfirmDialogs mit Danger/Default-Variante ersetzt",
@@ -1825,11 +1763,11 @@ export default function App(){
           </div>
         </div>
       )}
-      {tab==="settings"&&(<div><div className="rg2" style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:14}}>
+      {tab==="settings"&&(<div><div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:14}}>
           <div>
             {(user?.rolle==="admin"||user?.rolle==="kbl")&&<Card title="Organisation" accent={C.rot}><Inp label="Kreisverband" value={stammdaten.kvName} onChange={v=>updateStamm("kvName",v)}/><Inp label="Kreisgeschäftsführer" value={stammdaten.kgf} onChange={v=>updateStamm("kgf",v)}/><Inp label="Adresse" value={stammdaten.kvAdresse} onChange={v=>updateStamm("kvAdresse",v)}/><Inp label="PLZ Ort" value={stammdaten.kvPlzOrt} onChange={v=>updateStamm("kvPlzOrt",v)}/></Card>}
             <Card title="Mein Profil" accent={C.rot} sub="Persönliche Kontaktdaten (nur für Sie)">
-              <div className="rg2" style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"0 16px"}}>
+              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"0 16px"}}>
               <Inp label="Titel / Funktion" value={user.titel||""} onChange={v=>setUser(p=>({...p,titel:v}))}/>
               <Inp label="Ort (für Datum-Zeile)" value={user.ort||""} onChange={v=>setUser(p=>({...p,ort:v}))} placeholder="z.B. Schrobenhausen"/>
               <Inp label="Telefon (dienstlich)" value={user.telefon||""} onChange={v=>setUser(p=>({...p,telefon:v}))}/>
@@ -1863,8 +1801,8 @@ export default function App(){
             <Card title="Bereitschaftsleitung" accent={C.mittelblau}><Inp label="Bereitschaftsleiter" value={stammdaten.bereitschaftsleiter} onChange={v=>updateStamm("bereitschaftsleiter",v)}/><Inp label="Telefon" value={stammdaten.telefon} onChange={v=>updateStamm("telefon",v)}/><Inp label="Fax" value={stammdaten.fax} onChange={v=>updateStamm("fax",v)}/><Inp label="Mobil" value={stammdaten.mobil} onChange={v=>updateStamm("mobil",v)}/><Inp label="E-Mail" value={stammdaten.email} onChange={v=>updateStamm("email",v)}/><Inp label="Funkgruppe" value={stammdaten.funkgruppe} onChange={v=>updateStamm("funkgruppe",v)}/></Card>
           </div>
           <div>
-            <Card title="Kostensätze (EUR)" sub={user?.rolle!=="admin"?"Nur Admin kann diese Daten ändern – Ansicht nur lesend":undefined} accent="#d4920a"><div className="rg2" style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"0 10px"}}>{[["Helfer (€/Std)","helfer"],["KTW","ktw"],["RTW","rtw"],["GKTW","gktw"],["EL (€/Std)","einsatzleiter"],["EL-KFZ","einsatzleiterKfz"],["SEG-LKW","segLkw"],["MTW","mtw"],["Zelt","zelt"],["Verpfl. (€/P/8h)","verpflegung"]].map(([l,k])=><Inp key={k} small label={l} type="number" min={0} step={0.5} value={stammdaten.rates[k]} onChange={v=>updateRate(k,v)} disabled={user?.rolle!=="admin"}/>)}</div></Card>
-            <Card title="km-Saetze" accent={C.mittelblau}><div className="rg3" style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:"0 10px"}}>{[["KTW","kmKtw"],["RTW","kmRtw"],["GKTW","kmGktw"],["EL-KFZ","kmElKfz"],["SEG","kmSegLkw"],["MTW","kmMtw"]].map(([l,k])=><Inp key={k} small label={l} type="number" min={0} step={0.1} value={stammdaten.rates[k]} onChange={v=>updateRate(k,v)} disabled={user?.rolle!=="admin"}/>)}</div></Card>
+            <Card title="Kostensätze (EUR)" sub={user?.rolle!=="admin"?"Nur Admin kann diese Daten ändern – Ansicht nur lesend":undefined} accent="#d4920a"><div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"0 10px"}}>{[["Helfer (€/Std)","helfer"],["KTW","ktw"],["RTW","rtw"],["GKTW","gktw"],["EL (€/Std)","einsatzleiter"],["EL-KFZ","einsatzleiterKfz"],["SEG-LKW","segLkw"],["MTW","mtw"],["Zelt","zelt"],["Verpfl. (€/P/8h)","verpflegung"]].map(([l,k])=><Inp key={k} small label={l} type="number" min={0} step={0.5} value={stammdaten.rates[k]} onChange={v=>updateRate(k,v)} disabled={user?.rolle!=="admin"}/>)}</div></Card>
+            <Card title="km-Saetze" accent={C.mittelblau}><div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:"0 10px"}}>{[["KTW","kmKtw"],["RTW","kmRtw"],["GKTW","kmGktw"],["EL-KFZ","kmElKfz"],["SEG","kmSegLkw"],["MTW","kmMtw"]].map(([l,k])=><Inp key={k} small label={l} type="number" min={0} step={0.1} value={stammdaten.rates[k]} onChange={v=>updateRate(k,v)} disabled={user?.rolle!=="admin"}/>)}</div></Card>
           </div>
         </div>
 
@@ -1904,9 +1842,7 @@ export default function App(){
 
         </div>)}
       </main>
-      {/* BOTTOM TAB BAR (mobile) */}
-      <nav className="btm-bar">{TABS.map(t=>(<button key={t.id} className={`btm-item${tab===t.id?" active":""}`} onClick={()=>{if(t.id==="events"){releaseLock();setCurrentEventId(null);setEvent({...EMPTY_EVENT});setDays(Array.from({length:8},(_,j)=>mkDay(j+1)));}setTab(t.id);}}><span className="btm-icon">{t.icon}</span><span className="btm-label">{t.label}</span></button>))}</nav>
-      <footer className="mob-hide" style={{padding:"12px 20px",borderTop:`1px solid ${C.mittelgrau}40`,textAlign:"center",fontSize:10,color:C.dunkelgrau,background:C.weiss}}>BRK Sanitätswachdienst v7.0 · {bereitschaft.name} · {stammdaten.kvName} · {year}</footer>
+      <footer style={{padding:"12px 20px",borderTop:`1px solid ${C.mittelgrau}40`,textAlign:"center",fontSize:10,color:C.dunkelgrau,background:C.weiss}}>BRK Sanitätswachdienst v6.7 · {bereitschaft.name} · {stammdaten.kvName} · {year}</footer>
       <FeedbackButton user={user} currentView={tab} toast={toast}/>
       <ToastContainer toasts={toasts} onDismiss={dismissToast}/>
       <ConfirmDialog open={!!confirmDlg} title={confirmDlg?.title} message={confirmDlg?.message} confirmLabel={confirmDlg?.confirmLabel} cancelLabel={confirmDlg?.cancelLabel} variant={confirmDlg?.variant} onConfirm={handleConfirm} onCancel={handleCancel}/>
