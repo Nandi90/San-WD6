@@ -324,8 +324,6 @@ function ILSPreview({event,days,stammdaten,user,updateEvent,currentEventId,saveE
   const lastDay=activeDays[activeDays.length-1]||firstDay;
   const fields=[
     {section:"Absendende Person",items:[{label:"Organisation",value:`BRK ${bereitschaft.name}`},{label:"Name",value:user?.name||stammdaten.bereitschaftsleiter},{label:"Funktion",value:stammdaten.bereitschaftsleiterTitle||"Bereitschaftsleiter"},{label:"Rückrufnummer",value:stammdaten.mobil}]},
-    {section:"Anmeldung",items:[{label:"Art",value:"☑ Sanitätsdienst"}]},
-    {section:"Zeitraum",items:[{label:"von",value:`${fDate(firstDay.date)}  ${firstDay.startTime||""}`},{label:"bis",value:`${fDate(lastDay.date||firstDay.date)}  ${lastDay.endTime||firstDay.endTime||""}`}]},
     {section:"Örtlichkeit",items:[{label:"Straße",value:event.adresse||""},{label:"Objekt",value:event.ort||""},{label:"PLZ / Ort",value:event.rePlzOrt||event.ort||""}]},
     {section:"Allgemeine Informationen",items:[{label:"Name Veranstaltung",value:event.name||""}]},
   ];
@@ -333,8 +331,11 @@ function ILSPreview({event,days,stammdaten,user,updateEvent,currentEventId,saveE
   const ilsInp={width:"100%",border:"none",background:"transparent",padding:"6px 10px",fontSize:12,fontFamily:FONT.sans,color:C.schwarz,outline:"none",boxSizing:"border-box"};
   return(<div>
     <div style={{padding:"14px 18px",background:C.hellblau,borderRadius:6,marginBottom:14,border:`1px solid ${C.mittelblau}33`}}>
-      <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:8}}><span style={{fontSize:20}}>📄</span><div><div style={{fontSize:14,fontWeight:700,color:C.dunkelblau}}>ILS-Anmeldung Sanitätsdienst</div><div style={{fontSize:11,color:C.dunkelgrau}}>Original-PDF der ILS Region Ingolstadt · Nur Abschnitt 1 wird automatisch befüllt</div></div></div>
-      <div style={{fontSize:11,color:C.dunkelgrau,padding:"6px 10px",background:C.weiss,borderRadius:4}}>✉️ Weiterleiten an: <strong>anmeldung@ils-ingolstadt.de</strong> · Fax: 0841/14254-160<br/>⏰ Mindestens 1 Stunde vor Dienstbeginn einreichen</div>
+      <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:8}}><span style={{fontSize:20}}>📄</span><div style={{fontSize:14,fontWeight:700,color:C.dunkelblau}}>ILS-Anmeldung Sanitätsdienst</div></div>
+      <div style={{padding:"10px 14px",background:C.weiss,borderRadius:6,border:`1px solid ${C.mittelblau}44`}}>
+        <div style={{display:"flex",alignItems:"center",gap:8,fontSize:12,color:C.schwarz,marginBottom:4}}>✉️ Weiterleiten an: <strong style={{color:C.dunkelblau}}>anmeldung@ils-ingolstadt.de</strong> · Fax: <strong>0841/14254-160</strong></div>
+        <div style={{display:"flex",alignItems:"center",gap:8,fontSize:12,color:"#c62828",fontWeight:600}}>⏰ Mindestens 1 Stunde vor Dienstbeginn einreichen</div>
+      </div>
     </div>
     <div style={{fontSize:13,fontWeight:700,color:C.dunkelblau,marginBottom:10}}>Automatisch befüllte Felder:</div>
     {fields.map((sec,si)=>(<div key={si} style={{marginBottom:12}}><div style={{fontSize:11,fontWeight:700,color:C.rot,textTransform:"uppercase",letterSpacing:0.5,marginBottom:4}}>{sec.section}</div><div style={{background:C.weiss,borderRadius:4,border:`1px solid ${C.mittelgrau}40`,overflow:"hidden"}}>{sec.items.map((item,ii)=>(<div key={ii} style={{display:"flex",borderBottom:ii<sec.items.length-1?`1px solid ${C.hellgrau}`:"none"}}><div style={{width:140,padding:"6px 10px",fontSize:11,color:C.dunkelgrau,background:C.hellgrau,fontWeight:600,flexShrink:0}}>{item.label}</div><div style={{flex:1,padding:"6px 10px",fontSize:12,color:item.value?C.schwarz:C.bgrau}}>{item.value||"n/a"}</div></div>))}</div></div>))}
@@ -370,7 +371,6 @@ function ILSPreview({event,days,stammdaten,user,updateEvent,currentEventId,saveE
         </Btn>
       ))}
     </div>
-    <div style={{padding:"10px 14px",background:"#e8f4fd",borderRadius:6,border:"1px solid #b8daef",fontSize:11,color:"#0c5460",marginTop:8}}><strong>Für ILS Auszufüllen:</strong> Einsatz in ELDIS eröffnet! — Aufnahme Datum, Name Personal Disposition, Prüfung Datum, Name Schichtführung <span style={{fontSize:10,fontStyle:"italic"}}>(wird durch die ILS befüllt)</span></div>
   </div>);
 }
 
