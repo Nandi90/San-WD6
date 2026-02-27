@@ -1285,6 +1285,7 @@ export default function App(){
   const [vorgangStatus,setVorgangStatus]=useState(null);
   const [editHistory,setEditHistory]=useState([]);
   const [kompOverride,setKompOverride]=useState({ack:false,kommentar:"",saving:false});
+  const [showKompModal,setShowKompModal]=useState(false);
   const [stammdatenLoaded,setStammdatenLoaded]=useState(false);
   const printRef=useRef(null);
 
@@ -1403,7 +1404,7 @@ export default function App(){
   const newEvent=useCallback(()=>{setCurrentEventId(null);setEvent({...EMPTY_EVENT});setDays(Array.from({length:8},(_,i)=>mkDay(i+1)));setActiveDay(0);setTab("event");},[]);
   const loadEvent=useCallback(async(ev)=>{
     setCurrentEventId(ev.id);setEvent({...EMPTY_EVENT,...(ev.event||{})});setDays(ev.days||Array.from({length:8},(_,i)=>mkDay(i+1)));setTab("event");setActiveDay(0);
-    setKompOverride({ack:false,kommentar:"",saving:false});
+    setKompOverride({ack:false,kommentar:"",saving:false});setShowKompModal(false);
     // Lock prüfen und setzen
     try{
       const status=await API.getLockStatus(ev.id);
@@ -1586,34 +1587,6 @@ export default function App(){
                   <div style={{display:"flex",justifyContent:"space-between",padding:"4px 0",fontSize:12}}><span style={{color:C.dunkelgrau}}>Gesamtkosten</span><span style={{fontWeight:700,color:C.rot,fontFamily:FONT.mono}}>{f$(totalCosts)}</span></div>
                   {event.w3w&&<div style={{display:"flex",justifyContent:"space-between",padding:"4px 0",fontSize:12}}><span style={{color:C.dunkelgrau}}>what3words</span><span style={{fontWeight:600,color:C.rot,fontSize:11}}>{event.w3w}</span></div>}
                 </div>
-                <div style={{borderTop:"1px solid "+C.mittelgrau+"40",marginTop:10,paddingTop:10}}>
-                  <div style={{fontSize:11,fontWeight:700,color:C.dunkelgrau,marginBottom:6}}>4-Augen-Prinzip</div>
-                  {(()=>{const maxTP=Math.max(...dayCalcs.map(d=>d.tp),0);const auth=getSignAuthority(maxTP);const userMax=getUserMaxStufe(user?.rolle);const exceeded=auth.stufe>userMax;return(<div>
-                    <div style={{fontSize:12,lineHeight:1.6}}>
-                      <div style={{display:"flex",justifyContent:"space-between"}}><span style={{color:C.bgrau}}>Max. Stellen:</span><strong>{maxTP}</strong></div>
-                      <div style={{display:"flex",justifyContent:"space-between"}}><span style={{color:C.bgrau}}>Erstellt:</span><strong>{auth.erstellt}</strong></div>
-                      <div style={{display:"flex",justifyContent:"space-between"}}><span style={{color:C.bgrau}}>Kontrolle:</span><strong style={{color:C.rot}}>{auth.kontrolle}</strong></div>
-                    </div>
-                    {exceeded&&<div style={{marginTop:10,padding:"10px 12px",background:"#fff3cd",border:"1px solid #ffc10766",borderRadius:6}}>
-                      <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:6}}><span style={{fontSize:14}}>⚠️</span><strong style={{fontSize:12,color:"#856404"}}>Prüfung durch {auth.kontrolle} notwendig</strong></div>
-                      <div style={{fontSize:11,color:"#856404",lineHeight:1.5,marginBottom:8}}>Dieser Vorgang erfordert <strong>Stufe {auth.stufe}</strong> ({auth.kontrolle}). Deine Rolle <strong>({user?.rolle?.toUpperCase()})</strong> deckt bis Stufe {userMax} ab.</div>
-                      {!kompOverride.ack&&<div>
-                        <textarea placeholder="Begründung warum du trotzdem unterzeichnest (mind. 5 Zeichen)..." value={kompOverride.kommentar} onChange={e=>setKompOverride(p=>({...p,kommentar:e.target.value}))} rows={2} style={{width:"100%",padding:"6px 8px",border:"1px solid #ffc107",borderRadius:4,fontSize:11,fontFamily:FONT.sans,boxSizing:"border-box",resize:"vertical",background:"#fffef8"}}/>
-                        <button disabled={kompOverride.kommentar.trim().length<5||kompOverride.saving} onClick={async()=>{
-                          setKompOverride(p=>({...p,saving:true}));
-                          try{
-                            await API.kompetenzOverride(currentEventId,{kommentar:kompOverride.kommentar.trim(),maxStellen:maxTP,erforderlicheStufe:auth.stufe,benutzerRolle:user?.rolle});
-                            setKompOverride(p=>({...p,ack:true,saving:false}));
-                            toast("Kompetenz-Override bestätigt und im Audit gespeichert","success");
-                          }catch(e){toast(e.message,"error");setKompOverride(p=>({...p,saving:false}));}
-                        }} style={{marginTop:6,width:"100%",padding:"6px 10px",background:kompOverride.kommentar.trim().length<5?"#ccc":"#e65100",color:"#fff",border:"none",borderRadius:4,fontSize:11,fontWeight:600,cursor:kompOverride.kommentar.trim().length<5?"not-allowed":"pointer",fontFamily:FONT.sans}}>
-                          {kompOverride.saving?"Speichert...":"☑ Zur Kenntnis genommen – trotzdem fortfahren"}
-                        </button>
-                      </div>}
-                      {kompOverride.ack&&<div style={{padding:"6px 10px",background:"#e8f5e9",border:"1px solid #a5d6a766",borderRadius:4,fontSize:11,color:"#2e7d32",display:"flex",alignItems:"center",gap:6}}>✅ Override bestätigt und im Audit-Log dokumentiert</div>}
-                    </div>}
-                  </div>);})()}
-                </div>
               </Card>
               {currentEventId&&editHistory.length>0&&<HistoryWidget history={editHistory}/>}
             </div>
@@ -1681,6 +1654,17 @@ export default function App(){
                   </div>)}
                 </Card>
                 <Card><div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}><span style={{color:C.dunkelgrau}}>Kosten Tag {i+1}</span><span style={{fontSize:22,fontWeight:800,color:C.rot,fontFamily:FONT.mono}}>{f$(calc.total)}</span></div></Card>
+                {(()=>{const maxTP=Math.max(...dayCalcs.map(d=>d.tp),0);const auth=getSignAuthority(maxTP);const userMax=getUserMaxStufe(user?.rolle);const exceeded=auth.stufe>userMax;return(
+                  <Card title="4-Augen-Prinzip" accent={exceeded?"#e65100":"#1a7a3a"}>
+                    <div style={{fontSize:12,lineHeight:1.6}}>
+                      <div style={{display:"flex",justifyContent:"space-between"}}><span style={{color:C.bgrau}}>Max. Stellen:</span><strong>{maxTP}</strong></div>
+                      <div style={{display:"flex",justifyContent:"space-between"}}><span style={{color:C.bgrau}}>Erstellt:</span><strong>{auth.erstellt}</strong></div>
+                      <div style={{display:"flex",justifyContent:"space-between"}}><span style={{color:C.bgrau}}>Kontrolle:</span><strong style={{color:exceeded?"#e65100":C.rot}}>{auth.kontrolle}</strong></div>
+                    </div>
+                    {exceeded&&!kompOverride.ack&&<button onClick={()=>setShowKompModal(true)} style={{marginTop:8,width:"100%",padding:"8px 10px",background:"#fff3cd",border:"1px solid #ffc10766",borderRadius:4,fontSize:12,fontWeight:600,color:"#856404",cursor:"pointer",fontFamily:FONT.sans,display:"flex",alignItems:"center",justifyContent:"center",gap:6}}>⚠️ Prüfung durch {auth.kontrolle} notwendig</button>}
+                    {kompOverride.ack&&<div style={{marginTop:8,padding:"6px 10px",background:"#e8f5e9",border:"1px solid #a5d6a766",borderRadius:4,fontSize:11,color:"#2e7d32",display:"flex",alignItems:"center",gap:6}}>✅ Override bestätigt</div>}
+                  </Card>
+                );})()}
               </div>
             </div>);
           })()}
@@ -2006,6 +1990,43 @@ export default function App(){
       <ToastContainer toasts={toasts} onDismiss={dismissToast}/>
       <ConfirmDialog open={!!confirmDlg} title={confirmDlg?.title} message={confirmDlg?.message} confirmLabel={confirmDlg?.confirmLabel} cancelLabel={confirmDlg?.cancelLabel} variant={confirmDlg?.variant} onConfirm={handleConfirm} onCancel={handleCancel}/>
       {showWhatsNew&&<WhatsNewBanner release={LATEST_RELEASE} onDismiss={dismissWhatsNew} onChangelog={()=>setTab("releases")}/>}
+      {/* KOMPETENZ-OVERRIDE POPUP */}
+      {showKompModal&&(()=>{const maxTP=Math.max(...dayCalcs.map(d=>d.tp),0);const auth=getSignAuthority(maxTP);const userMax=getUserMaxStufe(user?.rolle);return(
+        <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.5)",zIndex:10002,display:"flex",alignItems:"center",justifyContent:"center",fontFamily:FONT.sans}} onClick={()=>setShowKompModal(false)}>
+          <div onClick={e=>e.stopPropagation()} style={{background:C.weiss,borderRadius:10,maxWidth:460,width:"92%",boxShadow:"0 8px 32px #0003",overflow:"hidden"}}>
+            <div style={{background:"linear-gradient(135deg, #e65100, #bf360c)",padding:"18px 22px",color:"#fff"}}>
+              <div style={{display:"flex",alignItems:"center",gap:10}}><span style={{fontSize:28}}>⚠️</span><div>
+                <div style={{fontSize:16,fontWeight:800}}>Prüfung durch {auth.kontrolle} notwendig</div>
+                <div style={{fontSize:11,opacity:0.85,marginTop:2}}>4-Augen-Prinzip · Stufe {auth.stufe}</div>
+              </div></div>
+            </div>
+            <div style={{padding:"16px 22px"}}>
+              <div style={{fontSize:13,color:C.dunkelgrau,lineHeight:1.6,marginBottom:12}}>
+                Dieser Vorgang hat <strong>{maxTP} Stellen</strong> und erfordert Kontrolle durch <strong>{auth.kontrolle}</strong> (Stufe {auth.stufe}).
+                Deine Rolle <strong>{user?.rolle?.toUpperCase()}</strong> deckt bis Stufe {userMax} ab.
+              </div>
+              <div style={{padding:"10px 14px",background:C.hellgrau,borderRadius:6,marginBottom:12,fontSize:12}}>
+                <div style={{display:"flex",justifyContent:"space-between",marginBottom:4}}><span>Erstellt durch:</span><strong>{auth.erstellt}</strong></div>
+                <div style={{display:"flex",justifyContent:"space-between"}}><span>Kontrolle durch:</span><strong style={{color:"#e65100"}}>{auth.kontrolle}</strong></div>
+              </div>
+              <div style={{fontSize:12,fontWeight:600,color:C.dunkelgrau,marginBottom:6}}>Begründung (Pflichtfeld):</div>
+              <textarea placeholder="z.B. Rücksprache mit KBL erfolgt, Genehmigung mündlich erteilt..." value={kompOverride.kommentar} onChange={e=>setKompOverride(p=>({...p,kommentar:e.target.value}))} rows={3} style={{width:"100%",padding:"8px 10px",border:"1px solid "+C.mittelgrau,borderRadius:4,fontSize:12,fontFamily:FONT.sans,boxSizing:"border-box",resize:"vertical"}}/>
+            </div>
+            <div style={{padding:"12px 22px 18px",display:"flex",justifyContent:"flex-end",gap:8,borderTop:"1px solid "+C.hellgrau}}>
+              <Btn variant="secondary" onClick={()=>setShowKompModal(false)}>Abbrechen</Btn>
+              <Btn variant="primary" disabled={kompOverride.kommentar.trim().length<5||kompOverride.saving} style={{background:kompOverride.kommentar.trim().length<5?"#ccc":"#e65100"}} onClick={async()=>{
+                setKompOverride(p=>({...p,saving:true}));
+                try{
+                  await API.kompetenzOverride(currentEventId,{kommentar:kompOverride.kommentar.trim(),maxStellen:maxTP,erforderlicheStufe:auth.stufe,benutzerRolle:user?.rolle});
+                  setKompOverride(p=>({...p,ack:true,saving:false}));
+                  setShowKompModal(false);
+                  toast("Kompetenz-Override bestätigt und im Audit gespeichert","success");
+                }catch(e){toast(e.message,"error");setKompOverride(p=>({...p,saving:false}));}
+              }}>{kompOverride.saving?"Speichert...":"☑ Zur Kenntnis genommen"}</Btn>
+            </div>
+          </div>
+        </div>
+      );})()}
     </div>
   );
 }
