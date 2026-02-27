@@ -1210,6 +1210,7 @@ const APP_VERSION="v7.0";
 const LATEST_RELEASE={v:"v7.0",d:"27.02.2026",c:[
   "🎉 Vollständiges Responsive Design für Smartphone und Tablet",
   "☰ Hamburger-Menü: Slide-Drawer Navigation auf Mobile",
+  "⚠️ 4-Augen-Prinzip: Popup-Warnung wenn Prüfung durch höhere Stufe notwendig",
   "🔔 Toast-Notifications statt Browser-Popups",
   "✏️ Personal direkt in der Karte editierbar",
   "📄 ILS-Vorschau bereinigt, Angebot mit Tel/Fax/Mobil",
@@ -1741,6 +1742,10 @@ export default function App(){
                 "PDF-Vorschau: Responsive Skalierung für alle Dokumententypen",
                 "Stammdaten/Einstellungen: Optimiertes Layout für alle Bildschirmgrößen",
                 "What's New Banner: Einmaliger Hinweis auf neue Version nach Login",
+                "4-Augen-Prinzip: Anzeige von Veranstaltung nach Tage & Analyse verschoben",
+                "4-Augen-Prinzip: Popup-Warnung wenn Prüfung durch höhere Stufe notwendig",
+                "4-Augen-Prinzip: Pflicht-Begründung + Audit-Logging bei Übersteuerung",
+                "4-Augen-Prinzip: KFDL → KFDL San in allen Planungsgrößen",
                 "CSS Media Queries: Breakpoints bei 768px (Mobile) und 1024px (Tablet)",
               ]},
               {v:"v6.7",d:"27.02.2026",c:[
