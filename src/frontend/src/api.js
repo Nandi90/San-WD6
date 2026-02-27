@@ -222,6 +222,7 @@ const API = {
   async getLockStatus(id) { return this.json("/api/vorgaenge/"+id+"/lock"); },
   async setVorgangStatus(id,status,reason) { return this.json("/api/vorgaenge/"+id+"/status",{method:"POST",body:JSON.stringify({status,reason})}); },
   async entsperrenVorgang(id, begruendung) { return this.json("/api/vorgaenge/"+id+"/entsperren",{method:"POST",body:JSON.stringify({begruendung})}); },
+  async kompetenzOverride(id, data) { return this.json("/api/vorgaenge/"+id+"/kompetenz-override",{method:"POST",body:JSON.stringify(data)}); },
   async getVorgangHistory(id) { return this.json("/api/vorgaenge/"+id+"/history"); },
   async getStatusLog(id) { return this.json("/api/vorgaenge/"+id+"/status-log"); },
   async getAnfragen() { return this.json("/api/anfragen"); },

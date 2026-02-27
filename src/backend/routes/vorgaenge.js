@@ -38,6 +38,21 @@ router.post("/:id/entsperren", requireWriteAccess, (req, res) => {
   res.json({ ok: true });
 });
 
+// ── Kompetenz-Override (4-Augen-Prinzip Überschreitung → Audit) ─
+router.post("/:id/kompetenz-override", requireWriteAccess, (req, res) => {
+  const { id } = req.params;
+  const { kommentar, maxStellen, erforderlicheStufe, benutzerRolle } = req.body;
+  if (!kommentar || kommentar.trim().length < 5) {
+    return res.status(400).json({ error: "Kommentar erforderlich (mind. 5 Zeichen)" });
+  }
+  const row = getDb().prepare("SELECT data FROM vorgaenge WHERE id = ?").get(id);
+  if (!row) return res.status(404).json({ error: "Nicht gefunden" });
+  const details = `4-Augen-Prinzip Override: ${maxStellen} Stellen (Stufe ${erforderlicheStufe}), Rolle: ${benutzerRolle}. Kommentar: ${kommentar.trim()}`;
+  audit(req.session.user, "kompetenz_override", "vorgang", id, details);
+  console.log(`⚠️ Kompetenz-Override Vorgang ${id} von ${req.session.user.name}: ${details}`);
+  res.json({ ok: true });
+});
+
 // ═════════════════════════════════════════════════════════════════
 // SPEZIFISCHE ROUTEN ZUERST (vor /:year und /:year/:id)
 // ═════════════════════════════════════════════════════════════════

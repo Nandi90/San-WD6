@@ -162,11 +162,17 @@ function WhatsNewBanner({release,onDismiss,onChangelog}){
 }
 // 4-Augen-Prinzip: Planungsgrößen für Unterzeichner
 function getSignAuthority(maxStellen) {
-  if (maxStellen > 15) return { erstellt: "BL unterstützt KFDL und KBL", kontrolle: "KGF", stufe: 4 };
-  if (maxStellen >= 15) return { erstellt: "BL unterstützt KFDL", kontrolle: "KBL", stufe: 3 };
-  if (maxStellen >= 10) return { erstellt: "BL", kontrolle: "KFDL oder vergleichbare Person", stufe: 2 };
+  if (maxStellen > 15) return { erstellt: "BL unterstützt KFDL San und KBL", kontrolle: "KGF", stufe: 4 };
+  if (maxStellen >= 15) return { erstellt: "BL unterstützt KFDL San", kontrolle: "KBL", stufe: 3 };
+  if (maxStellen >= 10) return { erstellt: "BL", kontrolle: "KFDL San oder vergleichbare Person", stufe: 2 };
   if (maxStellen >= 5) return { erstellt: "BL", kontrolle: "stellv. BL oder vergleichbare Person", stufe: 1 };
   return { erstellt: "BL", kontrolle: "—", stufe: 0 };
+}
+function getUserMaxStufe(rolle){
+  if(rolle==="admin"||rolle==="kgf")return 99;
+  if(rolle==="kbl")return 3;
+  if(rolle==="bl")return 1;
+  return 0;
 }
 
 function AddressAutocomplete({label,value,onChange,onResult}){
@@ -473,7 +479,7 @@ function StatusBanner({angebotVersendet,abgeschlossen,onUnlock}){
 // ═══════════════════════════════════════════════════════════════════════════
 function HistoryWidget({history}){
   if(!history||history.length===0)return null;
-  const iconMap={create:"🆕",update:"✏️",edit:"✏️",checklist:"☑️",status:"📊",status_versendet:"📤",status_entsperrt:"🔓",lock:"🔒",unlock:"🔓",entsperrt:"🔓",gesperrt:"🔒",save:"💾",delete:"🗑️"};
+  const iconMap={create:"🆕",update:"✏️",edit:"✏️",checklist:"☑️",status:"📊",status_versendet:"📤",status_entsperrt:"🔓",lock:"🔒",unlock:"🔓",entsperrt:"🔓",gesperrt:"🔒",save:"💾",delete:"🗑️",kompetenz_override:"⚠️"};
   return(<Card title="Änderungsverlauf" accent="#78909c" sub={`${history.length} Einträge`}>
     <div style={{maxHeight:300,overflowY:"auto"}}>
       {history.map((h,i)=>(<div key={i} style={{display:"flex",gap:10,padding:"6px 0",borderBottom:i<history.length-1?`1px solid ${C.hellgrau}`:"none",fontSize:12}}>
@@ -1278,6 +1284,7 @@ export default function App(){
   },[currentEventId]);
   const [vorgangStatus,setVorgangStatus]=useState(null);
   const [editHistory,setEditHistory]=useState([]);
+  const [kompOverride,setKompOverride]=useState({ack:false,kommentar:"",saving:false});
   const [stammdatenLoaded,setStammdatenLoaded]=useState(false);
   const printRef=useRef(null);
 
@@ -1396,6 +1403,7 @@ export default function App(){
   const newEvent=useCallback(()=>{setCurrentEventId(null);setEvent({...EMPTY_EVENT});setDays(Array.from({length:8},(_,i)=>mkDay(i+1)));setActiveDay(0);setTab("event");},[]);
   const loadEvent=useCallback(async(ev)=>{
     setCurrentEventId(ev.id);setEvent({...EMPTY_EVENT,...(ev.event||{})});setDays(ev.days||Array.from({length:8},(_,i)=>mkDay(i+1)));setTab("event");setActiveDay(0);
+    setKompOverride({ack:false,kommentar:"",saving:false});
     // Lock prüfen und setzen
     try{
       const status=await API.getLockStatus(ev.id);
@@ -1580,10 +1588,30 @@ export default function App(){
                 </div>
                 <div style={{borderTop:"1px solid "+C.mittelgrau+"40",marginTop:10,paddingTop:10}}>
                   <div style={{fontSize:11,fontWeight:700,color:C.dunkelgrau,marginBottom:6}}>4-Augen-Prinzip</div>
-                  {(()=>{const maxTP=Math.max(...dayCalcs.map(d=>d.tp),0);const auth=getSignAuthority(maxTP);return(<div style={{fontSize:12,lineHeight:1.6}}>
-                    <div style={{display:"flex",justifyContent:"space-between"}}><span style={{color:C.bgrau}}>Max. Stellen:</span><strong>{maxTP}</strong></div>
-                    <div style={{display:"flex",justifyContent:"space-between"}}><span style={{color:C.bgrau}}>Erstellt:</span><strong>{auth.erstellt}</strong></div>
-                    <div style={{display:"flex",justifyContent:"space-between"}}><span style={{color:C.bgrau}}>Kontrolle:</span><strong style={{color:C.rot}}>{auth.kontrolle}</strong></div>
+                  {(()=>{const maxTP=Math.max(...dayCalcs.map(d=>d.tp),0);const auth=getSignAuthority(maxTP);const userMax=getUserMaxStufe(user?.rolle);const exceeded=auth.stufe>userMax;return(<div>
+                    <div style={{fontSize:12,lineHeight:1.6}}>
+                      <div style={{display:"flex",justifyContent:"space-between"}}><span style={{color:C.bgrau}}>Max. Stellen:</span><strong>{maxTP}</strong></div>
+                      <div style={{display:"flex",justifyContent:"space-between"}}><span style={{color:C.bgrau}}>Erstellt:</span><strong>{auth.erstellt}</strong></div>
+                      <div style={{display:"flex",justifyContent:"space-between"}}><span style={{color:C.bgrau}}>Kontrolle:</span><strong style={{color:C.rot}}>{auth.kontrolle}</strong></div>
+                    </div>
+                    {exceeded&&<div style={{marginTop:10,padding:"10px 12px",background:"#fff3cd",border:"1px solid #ffc10766",borderRadius:6}}>
+                      <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:6}}><span style={{fontSize:14}}>⚠️</span><strong style={{fontSize:12,color:"#856404"}}>Prüfung durch {auth.kontrolle} notwendig</strong></div>
+                      <div style={{fontSize:11,color:"#856404",lineHeight:1.5,marginBottom:8}}>Dieser Vorgang erfordert <strong>Stufe {auth.stufe}</strong> ({auth.kontrolle}). Deine Rolle <strong>({user?.rolle?.toUpperCase()})</strong> deckt bis Stufe {userMax} ab.</div>
+                      {!kompOverride.ack&&<div>
+                        <textarea placeholder="Begründung warum du trotzdem unterzeichnest (mind. 5 Zeichen)..." value={kompOverride.kommentar} onChange={e=>setKompOverride(p=>({...p,kommentar:e.target.value}))} rows={2} style={{width:"100%",padding:"6px 8px",border:"1px solid #ffc107",borderRadius:4,fontSize:11,fontFamily:FONT.sans,boxSizing:"border-box",resize:"vertical",background:"#fffef8"}}/>
+                        <button disabled={kompOverride.kommentar.trim().length<5||kompOverride.saving} onClick={async()=>{
+                          setKompOverride(p=>({...p,saving:true}));
+                          try{
+                            await API.kompetenzOverride(currentEventId,{kommentar:kompOverride.kommentar.trim(),maxStellen:maxTP,erforderlicheStufe:auth.stufe,benutzerRolle:user?.rolle});
+                            setKompOverride(p=>({...p,ack:true,saving:false}));
+                            toast("Kompetenz-Override bestätigt und im Audit gespeichert","success");
+                          }catch(e){toast(e.message,"error");setKompOverride(p=>({...p,saving:false}));}
+                        }} style={{marginTop:6,width:"100%",padding:"6px 10px",background:kompOverride.kommentar.trim().length<5?"#ccc":"#e65100",color:"#fff",border:"none",borderRadius:4,fontSize:11,fontWeight:600,cursor:kompOverride.kommentar.trim().length<5?"not-allowed":"pointer",fontFamily:FONT.sans}}>
+                          {kompOverride.saving?"Speichert...":"☑ Zur Kenntnis genommen – trotzdem fortfahren"}
+                        </button>
+                      </div>}
+                      {kompOverride.ack&&<div style={{padding:"6px 10px",background:"#e8f5e9",border:"1px solid #a5d6a766",borderRadius:4,fontSize:11,color:"#2e7d32",display:"flex",alignItems:"center",gap:6}}>✅ Override bestätigt und im Audit-Log dokumentiert</div>}
+                    </div>}
                   </div>);})()}
                 </div>
               </Card>
