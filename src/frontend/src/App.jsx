@@ -57,13 +57,11 @@ const buildAddrStr=(addr)=>{
   if(!addr)return"";
   const road=addr.road||addr.pedestrian||addr.path||addr.footway||"";
   const hnr=addr.house_number||"";
-  const sub=addr.suburb||addr.quarter||addr.neighbourhood||"";
   const city=addr.city||addr.town||addr.village||addr.hamlet||"";
   const plz=addr.postcode||"";
   const parts=[];
   if(road&&hnr)parts.push(road+" "+hnr);else if(road)parts.push(road);
-  if(sub)parts.push(sub);if(city)parts.push(city);if(plz)parts.push(plz);
-  parts.push("Deutschland");
+  if(plz&&city)parts.push(plz+" "+city);else if(city)parts.push(city);
   return parts.join(", ");
 };
 const fTS=(ts)=>{if(!ts)return"";const d=typeof ts==="number"?new Date(ts):new Date(String(ts).includes("T")||String(ts).endsWith("Z")?ts:String(ts).replace(" ","T")+"Z");if(isNaN(d))return"";return d.toLocaleDateString("de-DE",{day:"2-digit",month:"2-digit",year:"numeric",hour:"2-digit",minute:"2-digit"})};
@@ -215,22 +213,7 @@ function AddressAutocomplete({label,value,onChange,onResult}){
   const selectAddr=async(s)=>{
     onChange(s.address);setSuggestions([]);
     if(s.hnr && s.road){
-      // 1. Versuch: Nominatim strukturiert
-      try{
-        const params=new URLSearchParams({street:s.hnr+" "+s.road,format:"json",addressdetails:"1",limit:"1",countrycodes:"de","accept-language":"de"});
-        if(s.city)params.set("city",s.city);
-        if(s.plz)params.set("postalcode",s.plz);
-        const rr=await fetch(`https://nominatim.openstreetmap.org/search?${params}`,{headers:{"User-Agent":"BRK-SanWD/6.0"}});
-        const rd=await rr.json();
-        if(rd[0] && rd[0].address && rd[0].address.house_number){
-          const rlat=parseFloat(rd[0].lat),rlng=parseFloat(rd[0].lon);
-          let rw3w=null;
-          try{const wr=await fetch(`/api/w3w?lat=${rlat}&lng=${rlng}`,{credentials:"include"});const wd=await wr.json();rw3w=wd.w3w||null;}catch{}
-          if(onResult)onResult({...s,lat:rlat,lng:rlng,w3w:rw3w||s.w3w,imprecise:false});
-          return;
-        }
-      }catch{}
-      // 2. Fallback: HERE Geocoding (praezise Hausnummer-Aufloesung)
+      // 1. Versuch: HERE Geocoding (praeziseste Hausnummer-Aufloesung)
       try{
         const hq=s.road+" "+s.hnr+(s.plz?" "+s.plz:"")+(s.city?" "+s.city:"");
         const hr=await fetch(`/api/geocode?q=${encodeURIComponent(hq)}`,{credentials:"include"});
@@ -242,7 +225,35 @@ function AddressAutocomplete({label,value,onChange,onResult}){
           return;
         }
       }catch{}
-      // Beide Geocoder gescheitert
+      // 2. Fallback: Nominatim Freitext
+      try{
+        const fq=`${s.road} ${s.hnr}${s.plz?", "+s.plz:""}${s.city?(" "+s.city):""}`;
+        const rr=await fetch(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(fq)}&format=json&addressdetails=1&limit=1&countrycodes=de&accept-language=de`,{headers:{"User-Agent":"BRK-SanWD/7.0"}});
+        const rd=await rr.json();
+        if(rd[0] && rd[0].address && rd[0].address.house_number){
+          const rlat=parseFloat(rd[0].lat),rlng=parseFloat(rd[0].lon);
+          let rw3w=null;
+          try{const wr=await fetch(`/api/w3w?lat=${rlat}&lng=${rlng}`,{credentials:"include"});const wd=await wr.json();rw3w=wd.w3w||null;}catch{}
+          if(onResult)onResult({...s,lat:rlat,lng:rlng,w3w:rw3w||s.w3w,imprecise:false});
+          return;
+        }
+      }catch{}
+      // 3. Fallback: Nominatim strukturiert
+      try{
+        const params=new URLSearchParams({street:`${s.hnr} ${s.road}`,format:"json",addressdetails:"1",limit:"1",countrycodes:"de","accept-language":"de"});
+        if(s.city)params.set("city",s.city);
+        if(s.plz)params.set("postalcode",s.plz);
+        const rr=await fetch(`https://nominatim.openstreetmap.org/search?${params}`,{headers:{"User-Agent":"BRK-SanWD/7.0"}});
+        const rd=await rr.json();
+        if(rd[0]){
+          const rlat=parseFloat(rd[0].lat),rlng=parseFloat(rd[0].lon);
+          let rw3w=null;
+          try{const wr=await fetch(`/api/w3w?lat=${rlat}&lng=${rlng}`,{credentials:"include"});const wd=await wr.json();rw3w=wd.w3w||null;}catch{}
+          if(onResult)onResult({...s,lat:rlat,lng:rlng,w3w:rw3w||s.w3w,imprecise:!(rd[0].address&&rd[0].address.house_number)});
+          return;
+        }
+      }catch{}
+      // Alle Geocoder gescheitert
       if(onResult)onResult({...s,imprecise:true});
       return;
     }
@@ -258,8 +269,16 @@ function AddressAutocomplete({label,value,onChange,onResult}){
 // MINI MAP
 // ═══════════════════════════════════════════════════════════════════════════
 function LeafletMap({coords,w3w,onChange,onW3W}){
-  const mapRef=useRef(null);const mapInst=useRef(null);const markerRef=useRef(null);
+  const mapRef=useRef(null);const mapInst=useRef(null);const markerRef=useRef(null);const layersRef=useRef({});
   const [search,setSearch]=useState("");
+  const [activeLayer,setActiveLayer]=useState("karte");
+  const reverseGeocode=async(lat,lng)=>{
+    try{const r=await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json&addressdetails=1&accept-language=de`,{headers:{"User-Agent":"BRK-SanWD/7.0"}});const d=await r.json();if(d.address){const a=buildAddrStr(d.address);onChange({lat,lng,address:a||d.display_name});}}catch{}
+    try{const wr=await fetch(`/api/w3w?lat=${lat}&lng=${lng}`,{credentials:"include"});const wd=await wr.json();if(wd.w3w)onW3W(wd.w3w);}catch{}
+  };
+  const setupDrag=(marker)=>{
+    marker.on("dragend",async(e)=>{const p=e.target.getLatLng();onChange({lat:p.lat,lng:p.lng});reverseGeocode(p.lat,p.lng);});
+  };
   useEffect(()=>{
     if(!mapRef.current||mapInst.current)return;
     const loadLeaflet=()=>{
@@ -273,61 +292,68 @@ function LeafletMap({coords,w3w,onChange,onW3W}){
     };
     const initMap=()=>{
     const L=window.L;if(!L)return;
-    const lat=coords?.lat||48.75;const lng=coords?.lng||11.4;
-    const map=L.map(mapRef.current,{scrollWheelZoom:true}).setView([lat,lng],coords?.lat?15:10);
-    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",{attribution:"© OSM"}).addTo(map);
+    const lat=coords?.lat||48.63;const lng=coords?.lng||11.25;
+    const map=L.map(mapRef.current,{scrollWheelZoom:true}).setView([lat,lng],coords?.lat?17:10);
+    // BKG TopPlusOpen WMTS (OpenData, weltweit, amtliche Daten für DE)
+    const BKG="© BKG 2025 dl-de/by-2-0";
+    const TPO="https://sgx.geodatenzentrum.de/wmts_topplus_open/tile/1.0.0";
+    const BA="© Bayer. Vermessungsverwaltung";
+    layersRef.current={
+      karte:L.tileLayer(TPO+"/web/default/WEBMERCATOR/{z}/{y}/{x}.png",{attribution:BKG,maxZoom:18,tileSize:256}),
+      luftbild:L.tileLayer.wms("https://geoservices.bayern.de/od/wms/dop/v1/dop20?",{layers:"by_dop20c",format:"image/png",transparent:false,attribution:BA,maxZoom:20,version:"1.3.0"}),
+      osm:L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",{attribution:"© OSM",maxZoom:19})
+    };
+    layersRef.current.karte.addTo(map);
     if(coords?.lat){
       markerRef.current=L.marker([lat,lng],{draggable:true}).addTo(map);
-      markerRef.current.on("dragend",async(e)=>{
-        const p=e.target.getLatLng();
-        onChange({lat:p.lat,lng:p.lng});
-        try{const r=await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${p.lat}&lon=${p.lng}&format=json&addressdetails=1&accept-language=de`,{headers:{"User-Agent":"BRK-SanWD/6.5"}});const d=await r.json();if(d.address){const a=buildAddrStr(d.address);onChange({lat:p.lat,lng:p.lng,address:a||d.display_name});}}catch{}
-        try{const wr=await fetch(`/api/w3w?lat=${p.lat}&lng=${p.lng}`,{credentials:"include"});const wd=await wr.json();if(wd.w3w)onW3W(wd.w3w);}catch{}
-      });
+      setupDrag(markerRef.current);
     }
     map.on("click",async(e)=>{
       const{lat:la,lng:ln}=e.latlng;
       if(markerRef.current)markerRef.current.setLatLng([la,ln]);
-      else{markerRef.current=L.marker([la,ln],{draggable:true}).addTo(map);
-        markerRef.current.on("dragend",async(ev)=>{
-          const p=ev.target.getLatLng();onChange({lat:p.lat,lng:p.lng});
-          try{const r=await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${p.lat}&lon=${p.lng}&format=json&addressdetails=1&accept-language=de`,{headers:{"User-Agent":"BRK-SanWD/6.5"}});const d=await r.json();if(d.address){const a=buildAddrStr(d.address);onChange({lat:p.lat,lng:p.lng,address:a||d.display_name});}}catch{}
-          try{const wr=await fetch(`/api/w3w?lat=${p.lat}&lng=${p.lng}`,{credentials:"include"});const wd=await wr.json();if(wd.w3w)onW3W(wd.w3w);}catch{}
-        });
-      }
+      else{markerRef.current=L.marker([la,ln],{draggable:true}).addTo(map);setupDrag(markerRef.current);}
       onChange({lat:la,lng:ln});
-      try{const r=await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${la}&lon=${ln}&format=json&addressdetails=1&accept-language=de`,{headers:{"User-Agent":"BRK-SanWD/6.5"}});const d=await r.json();if(d.address){const a=buildAddrStr(d.address);onChange({lat:la,lng:ln,address:a||d.display_name});}}catch{}
-      try{const wr=await fetch(`/api/w3w?lat=${la}&lng=${ln}`,{credentials:"include"});const wd=await wr.json();if(wd.w3w)onW3W(wd.w3w);}catch{}
+      reverseGeocode(la,ln);
     });
     mapInst.current=map;
     };
     loadLeaflet();
     return()=>{if(mapInst.current){mapInst.current.remove();mapInst.current=null;}};
   },[]);
+  // Layer switch
+  useEffect(()=>{
+    if(!mapInst.current||!layersRef.current[activeLayer])return;
+    Object.values(layersRef.current).forEach(l=>{if(mapInst.current.hasLayer(l))mapInst.current.removeLayer(l);});
+    layersRef.current[activeLayer].addTo(mapInst.current);
+  },[activeLayer]);
   useEffect(()=>{
     if(!mapInst.current||!coords?.lat)return;
     const L=window.L;if(!L)return;
     if(markerRef.current)markerRef.current.setLatLng([coords.lat,coords.lng]);
-    else{markerRef.current=L.marker([coords.lat,coords.lng],{draggable:true}).addTo(mapInst.current);}
-    mapInst.current.flyTo([coords.lat,coords.lng],15);
+    else{markerRef.current=L.marker([coords.lat,coords.lng],{draggable:true}).addTo(mapInst.current);setupDrag(markerRef.current);}
+    mapInst.current.flyTo([coords.lat,coords.lng],17);
   },[coords?.lat,coords?.lng]);
   const flyToSearch=async()=>{
     if(!search||search.length<3)return;
-    try{const r=await fetch(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(search)}&format=json&limit=1&countrycodes=de&accept-language=de`,{headers:{"User-Agent":"BRK-SanWD/6.5"}});const d=await r.json();
+    try{const r=await fetch(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(search)}&format=json&limit=1&countrycodes=de&accept-language=de`,{headers:{"User-Agent":"BRK-SanWD/7.0"}});const d=await r.json();
       if(d[0]){const lat=parseFloat(d[0].lat),lng=parseFloat(d[0].lon);
         onChange({lat,lng,address:d[0].display_name});
-        if(mapInst.current){mapInst.current.flyTo([lat,lng],15);const L=window.L;
+        if(mapInst.current){mapInst.current.flyTo([lat,lng],17);const L=window.L;
           if(markerRef.current)markerRef.current.setLatLng([lat,lng]);
-          else{markerRef.current=L.marker([lat,lng],{draggable:true}).addTo(mapInst.current);}
+          else{markerRef.current=L.marker([lat,lng],{draggable:true}).addTo(mapInst.current);setupDrag(markerRef.current);}
         }
         try{const wr=await fetch(`/api/w3w?lat=${lat}&lng=${lng}`,{credentials:"include"});const wd=await wr.json();if(wd.w3w)onW3W(wd.w3w);}catch{}
       }
     }catch{}
   };
+  const layerBtns=[{id:"karte",label:"Karte"},{id:"luftbild",label:"Luftbild"},{id:"osm",label:"OSM"}];
   return(<div style={{borderRadius:6,overflow:"hidden",border:`1px solid ${C.mittelgrau}40`,marginTop:8}}>
-    <div style={{display:"flex",gap:4,padding:"6px 8px",background:C.hellgrau}}>
-      <input type="text" value={search} onChange={e=>setSearch(e.target.value)} onKeyDown={e=>e.key==="Enter"&&flyToSearch()} placeholder="Adresse suchen..." style={{flex:1,padding:"4px 8px",border:`1px solid ${C.mittelgrau}`,borderRadius:3,fontSize:11,fontFamily:FONT.sans}}/>
+    <div style={{display:"flex",gap:4,padding:"6px 8px",background:C.hellgrau,flexWrap:"wrap"}}>
+      <input type="text" value={search} onChange={e=>setSearch(e.target.value)} onKeyDown={e=>e.key==="Enter"&&flyToSearch()} placeholder="Adresse suchen..." style={{flex:1,padding:"4px 8px",border:`1px solid ${C.mittelgrau}`,borderRadius:3,fontSize:11,fontFamily:FONT.sans,minWidth:120}}/>
       <button onClick={flyToSearch} style={{padding:"4px 10px",background:C.mittelblau,color:"#fff",border:"none",borderRadius:3,fontSize:11,cursor:"pointer"}}>🔍</button>
+      <div style={{display:"flex",gap:2,marginLeft:4}}>
+        {layerBtns.map(b=><button key={b.id} onClick={()=>setActiveLayer(b.id)} style={{padding:"3px 7px",fontSize:9,fontWeight:activeLayer===b.id?700:400,border:`1px solid ${activeLayer===b.id?C.rot:C.mittelgrau}`,borderRadius:3,background:activeLayer===b.id?`${C.rot}15`:"#fff",color:activeLayer===b.id?C.rot:C.dunkelgrau,cursor:"pointer",fontFamily:FONT.sans}}>{b.label}</button>)}
+      </div>
     </div>
     <div ref={mapRef} style={{height:280,width:"100%"}}/>
     <div style={{padding:"6px 10px",background:C.hellgrau,display:"flex",gap:12,fontSize:11,flexWrap:"wrap"}}>
@@ -1514,7 +1540,7 @@ export default function App(){
               {(isLocked||isEditLocked)&&<div style={{position:"absolute",top:0,left:0,right:0,bottom:0,background:"rgba(255,255,255,0.55)",zIndex:10,borderRadius:8,pointerEvents:"all"}}/>}
               <Card title="Auftrag" accent={C.rot} sub={event.auftragsnr?`Nr. ${event.auftragsnr}`:"Noch keine Nummer"} action={<div style={{display:"flex",gap:6}}><Btn small onClick={generateNr} icon="🔢">Nr. generieren</Btn><Btn small variant="success" onClick={saveEvent} icon="💾" disabled={isLocked}>Speichern</Btn></div>}>
                 <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:"0 16px",className:"rg3"}}>
-                  <Sel label="Bereitschaft" value={stammdaten.bereitschaftIdx} onChange={v=>updateStamm("bereitschaftIdx",v)} options={BEREITSCHAFTEN.map((b,i)=>({value:i,label:`${b.code} — ${b.name}`}))}/>
+                  <Sel label="Bereitschaft" value={stammdaten.bereitschaftIdx} onChange={v=>updateStamm("bereitschaftIdx",v)} disabled={user?.rolle!=="admin"&&user?.rolle!=="kbl"} options={(user?.rolle==="admin"||user?.rolle==="kbl")?BEREITSCHAFTEN.map((b,i)=>({value:i,label:`${b.code} — ${b.name}`})):BEREITSCHAFTEN.map((b,i)=>({value:i,label:`${b.code} — ${b.name}`})).filter(o=>BEREITSCHAFTEN[o.value]?.code===user?.bereitschaftCode)}/>
                   <Inp label="Auftragsnummer" value={event.auftragsnr} onChange={v=>updateEvent("auftragsnr",v)} placeholder="Auto-generiert"/>
                   <Inp label="Rechnungsnummer" value={event.rechnungsnr} onChange={v=>updateEvent("rechnungsnr",v)}/>
                 </div>
