@@ -1621,42 +1621,41 @@ export default function App(){
               <div><div style={{fontWeight:700,fontSize:16}}>SanWD Changelog</div><div style={{fontSize:11,opacity:0.85}}>Versionshistorie und Änderungen</div></div>
             </div>
             {[
+              {v:"v6.7",d:"27.02.2026",c:[
+                "Toast-Notifications: Native Browser-Alerts durch eigenes Notification-System im BRK-Design ersetzt",
+                "Bestätigungsdialoge: Native confirm() durch modale ConfirmDialogs mit Danger/Default-Variante ersetzt",
+                "Personal Inline-Editing: Direkte Bearbeitung in der Personal-Card statt separatem Override-Bereich",
+                "Personal Anzeige: Überschriebene Werte gelb markiert mit (empf. X) Hinweis",
+                "Ergebnis-Card: Zeigt tatsächliche statt nur empfohlene Werte, mit manuell-angepasst Markierung",
+                "Zurücksetzen-Button: Alle Personal-Overrides eines Tages mit einem Klick auf Empfehlung zurücksetzen",
+                "Auto-Save Lock-Fix: Kein Speichern-Fehlgeschlagen mehr bei gesperrten Vorgängen",
+                "Tage-Tabs Readonly: Tag-Auswahl bei gesperrten Vorgängen wieder anklickbar",
+                "ILS-Vorschau: Überflüssige Felder (Anmeldung Art, Zeitraum) entfernt",
+                "ILS-Vorschau: Info-Zeile (ILS auszufüllen) entfernt, E-Mail/Fax/1h-Hinweis prominenter",
+                "Angebot-Preview: Tel./Fax/Mobil Kürzel vor Rufnummern ergänzt",
+                "Seitenränder: Alle Dokumente einheitlich 12mm links/rechts (Frontend + Backend)",
+              ]},
               {v:"v6.6",d:"26.02.2026",c:[
                 "Papierkorb: Soft-Delete statt Hard-Delete – gelöschte Vorgänge 60 Tage wiederherstellbar",
-                "Papierkorb: Modal in Vorgangsliste (unten rechts), Anzeige mit Auftragsnr + Restlaufzeit",
-                "Papierkorb: Wiederherstellen für alle Nutzer, Endgültig löschen nur Admin",
+                "Papierkorb: Modal in Vorgangsliste, Wiederherstellen für alle, Endgültig löschen nur Admin",
                 "Papierkorb: Auto-Cleanup täglich + beim Serverstart (>60 Tage endgültig gelöscht)",
                 "ILS-Anmeldung: Download mit Dateiname Auftragsnr_ILS-Anmeldung_Tag1.pdf",
-                "Einsatzprotokoll: Download mit Dateiname Auftragsnr_Einsatzprotokoll_Tag1.pdf",
-                "Checkliste: +3 neue Items (Angebot signiert, ILS-Anmeldung, Einsatzprotokoll gedruckt)",
-                "Infrastruktur: Einheitliches deploy.sh (Build + Deploy in einem Schritt)",
-                "Infrastruktur: Test-Namespace (sanwd-test/30099) entfernt, nginx auf Port 30092 korrigiert",
-                "Papierkorb: Soft-Delete statt Hard-Delete – gelöschte Vorgänge 60 Tage wiederherstellbar",
-                "Papierkorb: Modal in Vorgangsliste (unten rechts), Anzeige mit Restlaufzeit",
-                "Papierkorb: Endgültig löschen nur für Admins, Wiederherstellen für alle",
-                "Papierkorb: Auto-Cleanup täglich + beim Serverstart (>60 Tage endgültig gelöscht)",
-                "Infrastruktur: Einheitliches deploy.sh (Build + Deploy in einem Schritt)",
-                "Infrastruktur: Test-Namespace (sanwd-test/30099) entfernt, nginx auf Port 30092",
                 "Einsatzprotokoll: Serverseitige PDF-Generierung pro Tag",
                 "Checkliste: +3 neue Items (Angebot signiert, ILS-Anmeldung, Einsatzprotokoll gedruckt)",
                 "Gefahrenanalyse: Serverseitige PDF-Generierung statt Browser-Druck",
-                "Adress-Autocomplete: Hausnummer wird korrekt übernommen und angezeigt",
-                "HERE Geocoding Fallback: Präzise Hausnummer-Koordinaten + korrekter w3w-Code",
+                "Adress-Autocomplete: Hausnummer korrekt übernommen, HERE Geocoding Fallback",
                 "Warnung bei ungenauer Adressauflösung: Pin manuell verschieben",
                 "Berechnung: 15-Minuten-Takt statt volle Stunden (Viertelstunden-Aufrundung)",
                 "AAB: Abrechnungstext an Viertelstunden-Takt angepasst",
                 "Feedback-System: Direktes Ticket an Zammad (Bug/Feature-Request)",
                 "4-Augen-Prinzip: Planungsgrößen-Vorschlag in Zusammenfassung",
                 "Dateisperre: Gleichzeitige Bearbeitung verhindert (Lock + Heartbeat)",
-                "Lock-Banner und Overlay auf Veranstaltung, Tage & Analyse und Kosten",
                 "Checkliste: Angebot-Status nur über Entsperren-Dialog deaktivierbar",
                 "Schreibschutz: Formularfelder ausgegraut bei versendetem Angebot",
-                "Änderungsverlauf in rechte Spalte verschoben",
                 "Emergency-Login für Admin-Zugang bei Keycloak-Ausfall",
                 "Persistenter Session-Store (SQLite) gegen Login-Verlust bei Restart",
                 "ILS Rückrufnummer: Mobilnummer des Users statt Bereitschafts-Telefon",
-                "Signatur nur noch im Profil (nicht mehr pro Veranstaltung)",
-                "PDF-Buttons: Ladeanzeige während Generierung",
+                "Infrastruktur: Einheitliches deploy.sh (Build + Deploy in einem Schritt)",
                 "Beginn erweiterter Testbetrieb in den Bereitschaften",
               ]},
               {v:"v6.5",d:"25.02.2026",c:[
@@ -1843,7 +1842,7 @@ export default function App(){
 
         </div>)}
       </main>
-      <footer style={{padding:"12px 20px",borderTop:`1px solid ${C.mittelgrau}40`,textAlign:"center",fontSize:10,color:C.dunkelgrau,background:C.weiss}}>BRK Sanitätswachdienst v6.6 · {bereitschaft.name} · {stammdaten.kvName} · {year}</footer>
+      <footer style={{padding:"12px 20px",borderTop:`1px solid ${C.mittelgrau}40`,textAlign:"center",fontSize:10,color:C.dunkelgrau,background:C.weiss}}>BRK Sanitätswachdienst v6.7 · {bereitschaft.name} · {stammdaten.kvName} · {year}</footer>
       <FeedbackButton user={user} currentView={tab} toast={toast}/>
       <ToastContainer toasts={toasts} onDismiss={dismissToast}/>
       <ConfirmDialog open={!!confirmDlg} title={confirmDlg?.title} message={confirmDlg?.message} confirmLabel={confirmDlg?.confirmLabel} cancelLabel={confirmDlg?.cancelLabel} variant={confirmDlg?.variant} onConfirm={handleConfirm} onCancel={handleCancel}/>
