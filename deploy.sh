@@ -11,7 +11,7 @@ NS="sanwd"
 DEPLOY="sanwd-app"
 
 echo "🔨 Build: $IMAGE"
-$NERDCTL build -t $IMAGE .
+$NERDCTL build --no-cache -t $IMAGE .
 
 echo "🚀 Deploy: $DEPLOY in $NS"
 kubectl -n $NS set image deployment/$DEPLOY sanwd=$IMAGE
