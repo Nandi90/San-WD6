@@ -657,9 +657,9 @@ function AngebotPDF({event,dayCalcs,totalCosts,stammdaten,activeDays,bereitschaf
           {stammdaten.customLogo&&<img src={stammdaten.customLogo} alt="Logo" style={{height:60,width:"auto",display:"block",marginBottom:6}}/>}
           <div style={{fontWeight:"bold",fontSize:"11pt"}}>{unterzeichner}</div>
           <div style={{fontWeight:"bold"}}>{unterTitel}</div>
-          <div>{unterTelefon}</div>
-          {stammdaten.fax&&<div>{stammdaten.fax}</div>}
-          {unterMobil&&<div>{unterMobil}</div>}
+          <div>Tel.: {unterTelefon}</div>
+          {stammdaten.fax&&<div>Fax: {stammdaten.fax}</div>}
+          {unterMobil&&<div>Mobil: {unterMobil}</div>}
           <div>E-Mail: {unterEmail}</div>
           <div style={{marginTop:6}}>Unser Zeichen:&nbsp;&nbsp;<strong>{unterZeichen}</strong></div>
           <div>{ortName},&nbsp;{new Date().toLocaleDateString("de-DE")}</div>
