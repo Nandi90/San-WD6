@@ -1203,7 +1203,7 @@ const TABS=[{id:"events",label:"Vorgänge",icon:"📁"},{id:"event",label:"Veran
 const APP_VERSION="v7.0";
 const LATEST_RELEASE={v:"v7.0",d:"27.02.2026",c:[
   "🎉 Vollständiges Responsive Design für Smartphone und Tablet",
-  "📱 Bottom-Tab-Bar: Mobile Navigation am unteren Bildschirmrand",
+  "☰ Hamburger-Menü: Slide-Drawer Navigation auf Mobile",
   "🔔 Toast-Notifications statt Browser-Popups",
   "✏️ Personal direkt in der Karte editierbar",
   "📄 ILS-Vorschau bereinigt, Angebot mit Tel/Fax/Mobil",
@@ -1246,6 +1246,7 @@ export default function App(){
   const [vertragPending,setVertragPending]=useState(false);
   const [pdfView,setPdfView]=useState("gefahren");
   const {mob,tab:isTablet}=useResponsive();
+  const [menuOpen,setMenuOpen]=useState(false);
   const [saving,setSaving]=useState(false);
   const [kunden,setKunden]=useState([]);
   // Toast notification system
@@ -1434,7 +1435,7 @@ export default function App(){
           .rg3s{grid-template-columns:1fr 1fr!important}
           .mob-hide{display:none!important}
           .top-nav{display:none!important}
-          .r-main{padding-bottom:72px!important;padding-left:8px!important;padding-right:8px!important}
+          .r-main{padding-left:8px!important;padding-right:8px!important}
           .r-header{padding:8px 12px!important}
           .r-header-right .r-user-name,.r-header-right .r-abmelden{display:none!important}
           .r-header-right .r-event-badge{display:none!important}
@@ -1456,18 +1457,22 @@ export default function App(){
         }
         @media(min-width:769px){
           .mob-show{display:none!important}
-          .btm-bar{display:none!important}
+          .hamburger-btn{display:none!important}
         }
-        /* Bottom Tab Bar */
-        .btm-bar{position:fixed;bottom:0;left:0;right:0;z-index:200;background:#fff;border-top:1px solid #ddd;box-shadow:0 -2px 8px rgba(0,0,0,0.08);display:flex;justify-content:space-around;padding:4px 0 env(safe-area-inset-bottom,4px) 0}
-        .btm-item{display:flex;flex-direction:column;align-items:center;gap:1px;padding:4px 2px;border:none;background:none;cursor:pointer;font-size:9px;color:#554F4A;font-family:'Open Sans',sans-serif;min-width:0;flex:1}
-        .btm-item.active{color:#E60005}
-        .btm-item .btm-icon{font-size:18px;line-height:1}
-        .btm-item .btm-label{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:64px;font-weight:600}
+        /* Hamburger Drawer */
+        .drawer-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.4);z-index:300;opacity:0;transition:opacity 0.25s ease}
+        .drawer-overlay.open{opacity:1}
+        .drawer{position:fixed;top:0;left:-280px;width:280px;height:100%;background:#fff;z-index:301;transition:left 0.25s ease;box-shadow:4px 0 20px rgba(0,0,0,0.15);display:flex;flex-direction:column}
+        .drawer.open{left:0}
+        .drawer-item{display:flex;align-items:center;gap:10px;padding:14px 20px;border:none;background:none;cursor:pointer;font-size:14px;color:#554F4A;font-family:'Open Sans',sans-serif;border-bottom:1px solid #f0f0f0;text-align:left;width:100%}
+        .drawer-item:hover{background:#f5f5f5}
+        .drawer-item.active{color:#E60005;background:#E6000508;font-weight:700}
+        .drawer-item .drawer-icon{font-size:18px;width:24px;text-align:center}
       `}</style>
       <div style={{height:4,background:C.rot}}/>
       <header className="r-header" style={{background:C.weiss,borderBottom:`1px solid ${C.mittelgrau}40`,padding:"10px 20px",display:"flex",alignItems:"center",justifyContent:"space-between",position:"sticky",top:0,zIndex:100,boxShadow:"0 1px 4px #0001"}}>
         <div style={{display:"flex",alignItems:"center",gap:mob?8:12}}>
+          <button className="hamburger-btn" onClick={()=>setMenuOpen(true)} style={{background:"none",border:"none",cursor:"pointer",fontSize:22,color:C.schwarz,padding:"2px 6px",lineHeight:1}}>☰</button>
           <BRKLogo size={mob?28:36} full customLogo={stammdaten.customLogo}/>
           {!mob&&<div><div style={{fontSize:15,fontWeight:700,color:C.schwarz}}>Bayerisches Rotes Kreuz</div><div style={{fontSize:11,color:C.dunkelgrau}}>{bereitschaft.name} · Sanitätswachdienst</div></div>}
           {mob&&<div style={{fontSize:13,fontWeight:700,color:C.schwarz}}>SanWD</div>}
@@ -1717,13 +1722,13 @@ export default function App(){
             {[
               {v:"v7.0",d:"27.02.2026",c:[
                 "🎉 Major Release: Vollständiges Responsive Design für Smartphone und Tablet",
-                "Bottom-Tab-Bar: Mobile Navigation mit fixierter Leiste am unteren Bildschirmrand",
+                "Hamburger-Menü: Slide-Drawer Navigation auf Mobile mit allen Tabs",
                 "Header: Kompakte Darstellung auf Mobile (Logo + SanWD + Avatar)",
                 "Formulare: Alle Grids automatisch einspaltig auf Smartphone, zweispaltig auf Tablet",
                 "Vorgangsliste: Kompakte Tabelle auf Mobile (unwichtige Spalten ausgeblendet)",
                 "PDF-Vorschau: Responsive Skalierung für alle Dokumententypen",
                 "Stammdaten/Einstellungen: Optimiertes Layout für alle Bildschirmgrößen",
-                "Safe-Area: iPhone-Notch und Statusbar-Unterstützung",
+                "What's New Banner: Einmaliger Hinweis auf neue Version nach Login",
                 "CSS Media Queries: Breakpoints bei 768px (Mobile) und 1024px (Tablet)",
               ]},
               {v:"v6.7",d:"27.02.2026",c:[
@@ -1947,8 +1952,27 @@ export default function App(){
 
         </div>)}
       </main>
-      {/* BOTTOM TAB BAR (mobile) */}
-      <nav className="btm-bar">{TABS.map(t=>(<button key={t.id} className={`btm-item${tab===t.id?" active":""}`} onClick={()=>{if(t.id==="events"){releaseLock();setCurrentEventId(null);setEvent({...EMPTY_EVENT});setDays(Array.from({length:8},(_,j)=>mkDay(j+1)));}setTab(t.id);}}><span className="btm-icon">{t.icon}</span><span className="btm-label">{t.label}</span></button>))}</nav>
+      {/* HAMBURGER DRAWER (mobile) */}
+      {menuOpen&&<div className="drawer-overlay open" onClick={()=>setMenuOpen(false)}/>}
+      <div className={`drawer${menuOpen?" open":""}`}>
+        <div style={{padding:"16px 20px",borderBottom:`3px solid ${C.rot}`,display:"flex",alignItems:"center",justifyContent:"space-between"}}>
+          <div style={{display:"flex",alignItems:"center",gap:10}}>
+            <BRKLogo size={28} customLogo={stammdaten.customLogo}/>
+            <div><div style={{fontSize:14,fontWeight:700,color:C.schwarz}}>SanWD</div><div style={{fontSize:10,color:C.dunkelgrau}}>{bereitschaft.name}</div></div>
+          </div>
+          <button onClick={()=>setMenuOpen(false)} style={{background:"none",border:"none",fontSize:20,cursor:"pointer",color:C.dunkelgrau,lineHeight:1}}>✕</button>
+        </div>
+        <div style={{flex:1,overflowY:"auto",paddingTop:4}}>
+          {TABS.map(t=>(<button key={t.id} className={`drawer-item${tab===t.id?" active":""}`} onClick={()=>{if(t.id==="events"){releaseLock();setCurrentEventId(null);setEvent({...EMPTY_EVENT});setDays(Array.from({length:8},(_,j)=>mkDay(j+1)));}setTab(t.id);setMenuOpen(false);}}><span className="drawer-icon">{t.icon}</span>{t.label}</button>))}
+        </div>
+        <div style={{padding:"12px 20px",borderTop:`1px solid ${C.hellgrau}`}}>
+          <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:10}}>
+            <div style={{width:30,height:30,borderRadius:15,background:C.rot,display:"flex",alignItems:"center",justifyContent:"center",fontSize:13,fontWeight:700,color:"#fff"}}>{user.name.charAt(0)}</div>
+            <div><div style={{fontSize:12,fontWeight:600}}>{user.name}</div><div style={{fontSize:10,color:C.dunkelgrau}}>{user.bereitschaft}{user.rolle==="admin"?" (Admin)":user.rolle==="bl"?" (BL)":""}</div></div>
+          </div>
+          <button onClick={()=>window.location.href="/auth/logout"} style={{width:"100%",padding:"8px 12px",background:C.hellgrau,border:"none",borderRadius:4,fontSize:12,cursor:"pointer",fontFamily:FONT.sans,color:C.dunkelgrau}}>⏻ Abmelden</button>
+        </div>
+      </div>
       <footer className="mob-hide" style={{padding:"12px 20px",borderTop:`1px solid ${C.mittelgrau}40`,textAlign:"center",fontSize:10,color:C.dunkelgrau,background:C.weiss}}>BRK Sanitätswachdienst v7.0 · {bereitschaft.name} · {stammdaten.kvName} · {year}</footer>
       <FeedbackButton user={user} currentView={tab} toast={toast}/>
       <ToastContainer toasts={toasts} onDismiss={dismissToast}/>
