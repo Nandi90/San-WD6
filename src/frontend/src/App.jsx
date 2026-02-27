@@ -129,6 +129,37 @@ function ConfirmDialog({open,title,message,confirmLabel,cancelLabel,variant,onCo
     </div>
   </div>);
 }
+
+// ═══════════════════════════════════════════════════════════════════════════
+// WHAT'S NEW BANNER (einmalig pro Version)
+// ═══════════════════════════════════════════════════════════════════════════
+function WhatsNewBanner({release,onDismiss,onChangelog}){
+  if(!release)return null;
+  return(<div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.45)",zIndex:10001,display:"flex",alignItems:"center",justifyContent:"center",fontFamily:FONT.sans}} onClick={onDismiss}>
+    <div onClick={e=>e.stopPropagation()} style={{background:C.weiss,borderRadius:12,maxWidth:480,width:"92%",boxShadow:"0 12px 40px #0003",overflow:"hidden",animation:"slideIn 0.3s ease"}}>
+      <div style={{background:`linear-gradient(135deg, ${C.rot}, ${C.dunkelrot})`,padding:"20px 24px",color:"#fff"}}>
+        <div style={{display:"flex",alignItems:"center",justifyContent:"space-between"}}>
+          <div>
+            <div style={{fontSize:11,opacity:0.85,textTransform:"uppercase",letterSpacing:1,marginBottom:4}}>Neu in SanWD</div>
+            <div style={{fontSize:22,fontWeight:800}}>{release.v}</div>
+          </div>
+          <div style={{fontSize:36}}>🚀</div>
+        </div>
+        <div style={{fontSize:11,opacity:0.7,marginTop:4}}>{release.d}</div>
+      </div>
+      <div style={{padding:"16px 24px",maxHeight:"40vh",overflowY:"auto"}}>
+        {release.c.map((item,i)=>(<div key={i} style={{display:"flex",alignItems:"flex-start",gap:8,padding:"6px 0",borderBottom:i<release.c.length-1?`1px solid ${C.hellgrau}`:"none"}}>
+          <span style={{color:C.rot,fontWeight:700,fontSize:12,flexShrink:0,marginTop:1}}>•</span>
+          <span style={{fontSize:13,color:C.dunkelgrau,lineHeight:1.4}}>{item}</span>
+        </div>))}
+      </div>
+      <div style={{padding:"12px 24px 20px",display:"flex",justifyContent:"space-between",alignItems:"center",borderTop:`1px solid ${C.hellgrau}`}}>
+        <button onClick={()=>{onDismiss();onChangelog();}} style={{background:"none",border:"none",color:C.mittelblau,fontSize:12,cursor:"pointer",fontFamily:FONT.sans,textDecoration:"underline"}}>Vollständiges Changelog →</button>
+        <Btn variant="primary" onClick={onDismiss}>Verstanden</Btn>
+      </div>
+    </div>
+  </div>);
+}
 // 4-Augen-Prinzip: Planungsgrößen für Unterzeichner
 function getSignAuthority(maxStellen) {
   if (maxStellen > 15) return { erstellt: "BL unterstützt KFDL und KBL", kontrolle: "KGF", stufe: 4 };
@@ -1169,6 +1200,15 @@ function FeedbackButton({user,currentView,toast}){
 // MAIN APP
 // ═══════════════════════════════════════════════════════════════════════════
 const TABS=[{id:"events",label:"Vorgänge",icon:"📁"},{id:"event",label:"Veranstaltung",icon:"📋"},{id:"days",label:"Tage & Analyse",icon:"📊"},{id:"costs",label:"Kosten",icon:"💰"},{id:"pdf",label:"Dokumente",icon:"🖨️"},{id:"kunden",label:"Kunden",icon:"👥"},{id:"settings",label:"Stammdaten",icon:"⚙️"},{id:"releases",label:"Changelog",icon:"🆕"}];
+const APP_VERSION="v7.0";
+const LATEST_RELEASE={v:"v7.0",d:"27.02.2026",c:[
+  "🎉 Vollständiges Responsive Design für Smartphone und Tablet",
+  "📱 Bottom-Tab-Bar: Mobile Navigation am unteren Bildschirmrand",
+  "🔔 Toast-Notifications statt Browser-Popups",
+  "✏️ Personal direkt in der Karte editierbar",
+  "📄 ILS-Vorschau bereinigt, Angebot mit Tel/Fax/Mobil",
+  "📐 Einheitliche 12mm Seitenränder bei allen Dokumenten",
+]};
 
 export default function App(){
   const [user,setUser]=useState(null);
@@ -1219,6 +1259,9 @@ export default function App(){
   const showConfirm=useCallback((opts)=>new Promise(resolve=>{confirmRef.current=resolve;setConfirmDlg({title:opts.title||"Bestätigung",message:opts.message,confirmLabel:opts.confirmLabel,cancelLabel:opts.cancelLabel,variant:opts.variant||"default"});}),[]);
   const handleConfirm=useCallback(()=>{if(confirmRef.current)confirmRef.current(true);confirmRef.current=null;setConfirmDlg(null);},[]);
   const handleCancel=useCallback(()=>{if(confirmRef.current)confirmRef.current(false);confirmRef.current=null;setConfirmDlg(null);},[]);
+  // What's New banner (einmalig pro Version)
+  const [showWhatsNew,setShowWhatsNew]=useState(()=>{try{return localStorage.getItem("sanwd-seen-version")!==APP_VERSION;}catch{return false;}});
+  const dismissWhatsNew=useCallback(()=>{setShowWhatsNew(false);try{localStorage.setItem("sanwd-seen-version",APP_VERSION);}catch{}},[]);
   const [lockInfo,setLockInfo]=useState(null);
   // Lock-Heartbeat: alle 30s verlängern
   useEffect(()=>{
@@ -1910,6 +1953,7 @@ export default function App(){
       <FeedbackButton user={user} currentView={tab} toast={toast}/>
       <ToastContainer toasts={toasts} onDismiss={dismissToast}/>
       <ConfirmDialog open={!!confirmDlg} title={confirmDlg?.title} message={confirmDlg?.message} confirmLabel={confirmDlg?.confirmLabel} cancelLabel={confirmDlg?.cancelLabel} variant={confirmDlg?.variant} onConfirm={handleConfirm} onCancel={handleCancel}/>
+      {showWhatsNew&&<WhatsNewBanner release={LATEST_RELEASE} onDismiss={dismissWhatsNew} onChangelog={()=>setTab("releases")}/>}
     </div>
   );
 }
