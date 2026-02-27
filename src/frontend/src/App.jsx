@@ -85,8 +85,41 @@ const Gauge=({value})=>{const pct=Math.min(value/120*100,100);const c=pct<20?"#1
 const Stat=({label,value,color=C.rot})=>(<div style={{textAlign:"center",padding:"12px 8px"}}><div style={{fontSize:10,color:C.dunkelgrau,textTransform:"uppercase",letterSpacing:1,marginBottom:4,fontFamily:FONT.sans}}>{label}</div><div style={{fontSize:22,fontWeight:800,color,fontFamily:FONT.mono}}>{value}</div></div>);
 
 // ═══════════════════════════════════════════════════════════════════════════
-// ADDRESS AUTOCOMPLETE + what3words
+// TOAST NOTIFICATION SYSTEM
 // ═══════════════════════════════════════════════════════════════════════════
+const TOAST_ICONS={success:"✅",error:"❌",warning:"⚠️",info:"ℹ️"};
+const TOAST_COLORS={success:{bg:"#e8f5e9",border:"#2e7d32",text:"#1b5e20"},error:{bg:"#ffebee",border:"#c62828",text:"#b71c1c"},warning:{bg:"#fff3e0",border:"#e65100",text:"#bf360c"},info:{bg:"#e3f2fd",border:"#1565c0",text:"#0d47a1"}};
+function ToastContainer({toasts,onDismiss}){
+  if(!toasts.length)return null;
+  return(<div style={{position:"fixed",top:60,right:16,zIndex:9999,display:"flex",flexDirection:"column",gap:8,maxWidth:400,minWidth:300}}>
+    {toasts.map(t=>{const c=TOAST_COLORS[t.type]||TOAST_COLORS.info;return(
+      <div key={t.id} style={{background:c.bg,border:`1px solid ${c.border}40`,borderLeft:`4px solid ${c.border}`,borderRadius:6,padding:"12px 16px",boxShadow:"0 4px 12px #0002",display:"flex",alignItems:"flex-start",gap:10,animation:"slideIn 0.3s ease",fontFamily:FONT.sans}}>
+        <span style={{fontSize:16,flexShrink:0,marginTop:1}}>{TOAST_ICONS[t.type]}</span>
+        <div style={{flex:1,fontSize:13,color:c.text,lineHeight:1.4}}>{t.message}</div>
+        <button onClick={()=>onDismiss(t.id)} style={{background:"none",border:"none",cursor:"pointer",color:c.text,fontSize:16,padding:0,lineHeight:1,opacity:0.6}}>×</button>
+      </div>
+    );})}
+    <style>{`@keyframes slideIn{from{transform:translateX(100%);opacity:0}to{transform:translateX(0);opacity:1}}`}</style>
+  </div>);
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// CONFIRM DIALOG
+// ═══════════════════════════════════════════════════════════════════════════
+function ConfirmDialog({open,title,message,confirmLabel,cancelLabel,variant,onConfirm,onCancel}){
+  if(!open)return null;
+  const isDanger=variant==="danger";
+  return(<div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.4)",zIndex:10000,display:"flex",alignItems:"center",justifyContent:"center",fontFamily:FONT.sans}} onClick={onCancel}>
+    <div onClick={e=>e.stopPropagation()} style={{background:C.weiss,borderRadius:10,padding:"24px 28px",maxWidth:420,width:"90%",boxShadow:"0 8px 32px #0003",borderTop:`3px solid ${isDanger?C.rot:C.mittelblau}`}}>
+      <div style={{fontSize:16,fontWeight:700,color:C.schwarz,marginBottom:8}}>{title||"Bestätigung"}</div>
+      <div style={{fontSize:13,color:C.dunkelgrau,lineHeight:1.5,marginBottom:20}}>{message}</div>
+      <div style={{display:"flex",justifyContent:"flex-end",gap:8}}>
+        <Btn variant="secondary" onClick={onCancel}>{cancelLabel||"Abbrechen"}</Btn>
+        <Btn variant={isDanger?"primary":"success"} onClick={onConfirm}>{confirmLabel||"Bestätigen"}</Btn>
+      </div>
+    </div>
+  </div>);
+}
 // 4-Augen-Prinzip: Planungsgrößen für Unterzeichner
 function getSignAuthority(maxStellen) {
   if (maxStellen > 15) return { erstellt: "BL unterstützt KFDL und KBL", kontrolle: "KGF", stufe: 4 };
@@ -284,7 +317,7 @@ function VorgangChecklist({checklist={},onChange,eventDate}){
 // ═══════════════════════════════════════════════════════════════════════════
 // ILS PREVIEW (with w3w in Sonstiges)
 // ═══════════════════════════════════════════════════════════════════════════
-function ILSPreview({event,days,stammdaten,user,updateEvent,currentEventId,saveEvent}){
+function ILSPreview({event,days,stammdaten,user,updateEvent,currentEventId,saveEvent,toast}){
   const bereitschaft=BEREITSCHAFTEN[stammdaten.bereitschaftIdx];
   const activeDays=days.filter(d=>d.active);
   const firstDay=activeDays[0]||{};
@@ -321,7 +354,7 @@ function ILSPreview({event,days,stammdaten,user,updateEvent,currentEventId,saveE
     <div style={{marginTop:14,display:"flex",flexWrap:"wrap",gap:8}}>
       {days.filter(d=>d.active).map((d,i)=>(
         <Btn key={i} small variant="primary" onClick={async()=>{
-          if(!currentEventId){alert("Bitte zuerst Vorgang speichern.");return;}
+          if(!currentEventId){toast("Bitte zuerst Vorgang speichern","warning");return;}
           try{
             await saveEvent();
             const blob=await API.getILSPDF(currentEventId,i);
@@ -331,7 +364,7 @@ function ILSPreview({event,days,stammdaten,user,updateEvent,currentEventId,saveE
             const nr=(event.auftragsnr||"ILS").replace(/[^a-zA-Z0-9_-]/g,"_");
             a.download=nr+"_ILS-Anmeldung_Tag"+(i+1)+".pdf";
             a.click();
-          }catch(e){alert("Fehler: "+e.message);}
+          }catch(e){toast(e.message,"error");}
         }}>
           ILS-Anmeldung Tag {i+1}{d.date?" ("+new Date(d.date).toLocaleDateString("de-DE")+")":""}
         </Btn>
@@ -418,14 +451,14 @@ function HistoryWidget({history}){
 // ═══════════════════════════════════════════════════════════════════════════
 // KUNDEN MANAGER TAB (v6.5 #4-6)
 // ═══════════════════════════════════════════════════════════════════════════
-function KundenManager({kunden,setKunden,user}){
+function KundenManager({kunden,setKunden,user,toast,showConfirm}){
   const [edit,setEdit]=useState(null);
   const [csvMsg,setCsvMsg]=useState("");
   const [search,setSearch]=useState("");
   const empty={name:"",kundennummer:"",ansprechpartner:"",telefon:"",email:"",rechnungsempfaenger:"",reStrasse:"",rePlzOrt:"",anrede:"Sehr geehrte Damen und Herren,",bemerkung:""};
   const filtered=kunden.filter(k=>{const s=search.toLowerCase();return !s||k.name?.toLowerCase().includes(s)||k.kundennummer?.toLowerCase().includes(s)||k.ansprechpartner?.toLowerCase().includes(s);});
-  const save=async()=>{if(!edit?.name)return;try{await API.saveKunde(edit);const k=await API.getKunden();setKunden(k);setEdit(null);}catch(e){alert("Fehler: "+e.message);}};
-  const del=async(name)=>{if(!confirm(`Kunde "${name}" löschen?`))return;try{await API.deleteKunde(name);const k=await API.getKunden();setKunden(k);}catch(e){alert("Fehler: "+e.message);}};
+  const save=async()=>{if(!edit?.name)return;try{await API.saveKunde(edit);const k=await API.getKunden();setKunden(k);setEdit(null);}catch(e){toast(e.message,"error");}};
+  const del=async(name)=>{if(!await showConfirm({title:"Kunde löschen",message:`"${name}" wirklich löschen?`,confirmLabel:"Löschen",variant:"danger"}))return;try{await API.deleteKunde(name);const k=await API.getKunden();setKunden(k);}catch(e){toast(e.message,"error");}};
   const handleCSV=async(e)=>{
     const file=e.target.files[0];if(!file)return;setCsvMsg("Importiere...");
     const text=await file.text();const lines=text.split("\n").filter(l=>l.trim());
@@ -913,7 +946,7 @@ function AABPDF({stammdaten,bereitschaft}){
 // ═══════════════════════════════════════════════════════════════════════════
 // VORGÄNGE LIST with ARCHIVE + ÜBERSICHT
 // ═══════════════════════════════════════════════════════════════════════════
-function PapierkorbTab({user,bereitschaft,allBereitschaften,stammdaten,onRestore}){
+function PapierkorbTab({user,bereitschaft,allBereitschaften,stammdaten,onRestore,toast,showConfirm}){
   const [items,setItems]=React.useState([]);
   const [loading,setLoading]=React.useState(true);
   const [error,setError]=React.useState(null);
@@ -926,14 +959,14 @@ function PapierkorbTab({user,bereitschaft,allBereitschaften,stammdaten,onRestore
   };
   useEffect(()=>{load();},[]);
   const restore=async(id,name)=>{
-    if(!confirm(`"${name}" wiederherstellen?`))return;
+    if(!await showConfirm({title:"Wiederherstellen",message:`"${name}" wiederherstellen?`,confirmLabel:"Wiederherstellen",variant:"default"}))return;
     try{await restoreVorgang(id);if(onRestore)onRestore();else load();}
-    catch(e){alert("Fehler: "+e.message);}
+    catch(e){toast(e.message,"error");}
   };
   const purge=async(id,name)=>{
-    if(!confirm(`"${name}" ENDGÜLTIG löschen? Dies kann nicht rückgängig gemacht werden!`))return;
+    if(!await showConfirm({title:"Endgültig löschen",message:`"${name}" ENDGÜLTIG löschen? Dies kann nicht rückgängig gemacht werden!`,confirmLabel:"Endgültig löschen",variant:"danger"}))return;
     try{await purgeVorgang(id);load();}
-    catch(e){alert("Fehler: "+e.message);}
+    catch(e){toast(e.message,"error");}
   };
   const daysLeft=(deletedAt)=>{
     const d=new Date(deletedAt);
@@ -983,7 +1016,7 @@ function PapierkorbTab({user,bereitschaft,allBereitschaften,stammdaten,onRestore
   );
 }
 
-function VorgaengeListe({bereitschaftCode,user,onLoad,onNew,onCopy,bereitschaft,allBereitschaften,onFilterChange}){
+function VorgaengeListe({bereitschaftCode,user,onLoad,onNew,onCopy,bereitschaft,allBereitschaften,onFilterChange,toast,showConfirm}){
   const [showPapierkorb,setShowPapierkorb]=useState(false);
   const [papierkorbKey,setPapierkorbKey]=useState(0);
   const thisYear=new Date().getFullYear();
@@ -996,7 +1029,7 @@ function VorgaengeListe({bereitschaftCode,user,onLoad,onNew,onCopy,bereitschaft,
   const prefix=`sanwd:${bereitschaftCode}:${viewYear}`;
   useEffect(()=>{loadEvents();},[prefix]);
   const loadEvents=async(bcFilter)=>{setLoading(true);try{const bc=bcFilter!==undefined?bcFilter:filterBereitschaft;const data=await API.getVorgaenge(viewYear,bc);setEvents(data.map(v=>({...v,id:v.id})));}catch{setEvents([]);}setLoading(false);};
-  const del=async(id)=>{if(!confirm("Vorgang in den Papierkorb verschieben? Er kann innerhalb von 60 Tagen wiederhergestellt werden."))return;try{await API.deleteVorgang(id);loadEvents();}catch(e){alert("Fehler beim Löschen: "+e.message);}};
+  const del=async(id)=>{if(!await showConfirm({title:"In Papierkorb verschieben",message:"Vorgang in den Papierkorb verschieben? Er kann innerhalb von 60 Tagen wiederhergestellt werden.",confirmLabel:"In Papierkorb",variant:"danger"}))return;try{await API.deleteVorgang(id);loadEvents();}catch(e){toast("Fehler beim Löschen: "+e.message,"error");}};
   const years=[];for(let y=thisYear;y>=2025;y--)years.push(y);
   const isArchive=viewYear<thisYear;
   const totalBetrag=events.reduce((s,ev)=>{const e=ev.event;if(!e)return s;const dc=(ev.days||[]).filter(d=>d.active);let t=0;try{dc.forEach(d=>{const c=calcDay(d,DEFAULT_STAMMDATEN.rates,e.verpflegung);t+=c.total;});}catch{}return s+t;},0);
@@ -1061,7 +1094,7 @@ function VorgaengeListe({bereitschaftCode,user,onLoad,onNew,onCopy,bereitschaft,
               <button onClick={()=>setShowPapierkorb(false)} style={{background:"none",border:"none",fontSize:20,cursor:"pointer",color:C.dunkelgrau,lineHeight:1}}>✕</button>
             </div>
           </div>
-          <PapierkorbTab key={papierkorbKey} user={user} bereitschaft={bereitschaftCode} allBereitschaften={allBereitschaften} stammdaten={{}} onRestore={()=>{setShowPapierkorb(false);loadEvents();}}/>
+          <PapierkorbTab key={papierkorbKey} user={user} bereitschaft={bereitschaftCode} allBereitschaften={allBereitschaften} stammdaten={{}} onRestore={()=>{setShowPapierkorb(false);loadEvents();}} toast={toast} showConfirm={showConfirm}/>
         </div>
       </div>
     )}
@@ -1072,7 +1105,7 @@ function VorgaengeListe({bereitschaftCode,user,onLoad,onNew,onCopy,bereitschaft,
 // ═══════════════════════════════════════════════════════════════════════════
 // FEEDBACK BUTTON + MODAL
 // ═══════════════════════════════════════════════════════════════════════════
-function FeedbackButton({user,currentView}){
+function FeedbackButton({user,currentView,toast}){
   const [open,setOpen]=useState(false);
   const [kat,setKat]=useState("bug");
   const [betreff,setBetreff]=useState("");
@@ -1081,12 +1114,12 @@ function FeedbackButton({user,currentView}){
   const [done,setDone]=useState(null);
   const reset=()=>{setBetreff("");setBeschreibung("");setKat("bug");setDone(null);};
   const send=async()=>{
-    if(!betreff.trim()||!beschreibung.trim()){alert("Bitte Betreff und Beschreibung ausfüllen");return;}
+    if(!betreff.trim()||!beschreibung.trim()){toast("Bitte Betreff und Beschreibung ausfüllen","warning");return;}
     setSending(true);
     try{
       const r=await API.submitFeedback({kategorie:kat,betreff,beschreibung,ansicht:currentView,browser:navigator.userAgent});
       setDone(r.ticket);
-    }catch(e){alert("Fehler: "+e.message);}
+    }catch(e){toast(e.message,"error");}
     finally{setSending(false);}
   };
   if(!user)return null;
@@ -1165,6 +1198,17 @@ export default function App(){
   const [pdfView,setPdfView]=useState("gefahren");
   const [saving,setSaving]=useState(false);
   const [kunden,setKunden]=useState([]);
+  // Toast notification system
+  const [toasts,setToasts]=useState([]);
+  const toastIdRef=useRef(0);
+  const toast=useCallback((message,type="info",duration=4000)=>{const id=++toastIdRef.current;setToasts(p=>[...p,{id,message,type}]);if(duration>0)setTimeout(()=>setToasts(p=>p.filter(t=>t.id!==id)),duration);},[]);
+  const dismissToast=useCallback((id)=>setToasts(p=>p.filter(t=>t.id!==id)),[]);
+  // Confirm dialog system
+  const [confirmDlg,setConfirmDlg]=useState(null);
+  const confirmRef=useRef(null);
+  const showConfirm=useCallback((opts)=>new Promise(resolve=>{confirmRef.current=resolve;setConfirmDlg({title:opts.title||"Bestätigung",message:opts.message,confirmLabel:opts.confirmLabel,cancelLabel:opts.cancelLabel,variant:opts.variant||"default"});}),[]);
+  const handleConfirm=useCallback(()=>{if(confirmRef.current)confirmRef.current(true);confirmRef.current=null;setConfirmDlg(null);},[]);
+  const handleCancel=useCallback(()=>{if(confirmRef.current)confirmRef.current(false);confirmRef.current=null;setConfirmDlg(null);},[]);
   const [lockInfo,setLockInfo]=useState(null);
   // Lock-Heartbeat: alle 30s verlängern
   useEffect(()=>{
@@ -1220,7 +1264,7 @@ export default function App(){
         console.warn("⏭️ Speichern übersprungen (gesperrt):",e.message);
       }else{
         console.error("❌ Speichern fehlgeschlagen:",e.message,e);
-        alert("Speichern fehlgeschlagen: "+e.message);
+        toast("Speichern fehlgeschlagen: "+e.message,"error");
       }
     }setSaving(false);},[user,currentEventId,event,days,stammdaten.bereitschaftIdx,upsertKunde,year]);
 
@@ -1265,7 +1309,7 @@ export default function App(){
     setPdfView("angebot");
     await new Promise(res=>setTimeout(res,600));
     const pc=printRef.current;
-    if(!pc){alert("Druckbereich nicht gefunden");return;}
+    if(!pc){toast("Druckbereich nicht gefunden","error");return;}
     const angebotEl=pc.querySelector("[data-print='angebot']");
     const angebotHTML=angebotEl?angebotEl.innerHTML:"";
     setPdfView("aab");
@@ -1290,8 +1334,8 @@ export default function App(){
         await API.saveKlausel(id,inhalt);
       }
       const k=await API.getKlauseln();setKlauseln(k);
-      alert("Textvorlagen gespeichert");
-    }catch(e){alert("Fehler: "+e.message);}finally{setKlauselnSaving(false);}
+      toast("Textvorlagen gespeichert","success");
+    }catch(e){toast(e.message,"error");}finally{setKlauselnSaving(false);}
   };
   // Lock freigeben beim Vorgang-Wechsel
   const releaseLock=useCallback(async()=>{if(currentEventId){try{await API.unlockVorgang(currentEventId);}catch{}setLockInfo(null);}},[currentEventId]);
@@ -1350,7 +1394,7 @@ export default function App(){
       <main style={{maxWidth:1100,margin:"0 auto",padding:"16px 14px"}}>
 
         {/* VORGÄNGE + ARCHIV */}
-        {tab==="events"&&<VorgaengeListe bereitschaftCode={BEREITSCHAFTEN[stammdaten.bereitschaftIdx].code} user={user} onLoad={loadEvent} onNew={newEvent} onCopy={copyEvent} bereitschaft={bereitschaft} allBereitschaften={BEREITSCHAFTEN}/>}
+        {tab==="events"&&<VorgaengeListe bereitschaftCode={BEREITSCHAFTEN[stammdaten.bereitschaftIdx].code} user={user} onLoad={loadEvent} onNew={newEvent} onCopy={copyEvent} bereitschaft={bereitschaft} allBereitschaften={BEREITSCHAFTEN} toast={toast} showConfirm={showConfirm}/>}
 
         {/* VERANSTALTUNG */}
         {tab==="event"&&(<div>
@@ -1482,17 +1526,32 @@ export default function App(){
                 </Card>
                 <Card title="Ergebnis der Berechnung" accent="#1a7a3a">
                   <div style={{marginBottom:6,fontSize:12}}>Gesamtrisiko: <strong style={{color:C.rot}}>{calc.risk.total.toFixed(1)} Punkte</strong></div>
-                  <div style={{fontSize:11,color:C.dunkelgrau,marginBottom:6}}>Empfohlene Kräfte:</div>
+                  <div style={{fontSize:11,color:C.dunkelgrau,marginBottom:6}}>Eingesetzte Kräfte{(d.oHelfer!=null||d.oKtw!=null||d.oRtw!=null||d.oAerzte!=null||d.oGktw!=null)?" (manuell angepasst)":""}:</div>
                   <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:4}}>
-                    {[[`${calc.rec.helfer} Helfer`,"🧑‍⚕️"],[`${calc.rec.ktw} KTW`,"🚑"],[`${calc.rec.rtw} RTW`,"🚒"],[`${calc.rec.nef} Notarzt`,"👨‍⚕️"],[`${calc.rec.gktw} GKTW`,"🚐"],[calc.rec.el==="im Team"?"keine stabsm. EL":calc.rec.el,"📋"]].map(([v,ic],idx)=>(<div key={idx} style={{display:"flex",alignItems:"center",gap:6,padding:"4px 8px",background:C.hellgrau,borderRadius:4,fontSize:11}}><span>{ic}</span><span style={{fontWeight:600}}>{v}</span></div>))}
+                    {[[calc.hc,"Helfer",d.oHelfer,calc.rec.helfer,"🧑‍⚕️"],[calc.kc,"KTW",d.oKtw,calc.rec.ktw,"🚑"],[calc.rc,"RTW",d.oRtw,calc.rec.rtw,"🚒"],[calc.ac,"Notarzt",d.oAerzte,0,"👨‍⚕️"],[calc.gc,"GKTW",d.oGktw,calc.rec.gktw,"🚐"],[null,calc.el==="im Team"?"keine stabsm. EL":calc.el,null,null,"📋"]].map(([val,label,ov,rec,icon],idx)=>{const isOv=ov!=null;return(<div key={idx} style={{display:"flex",alignItems:"center",gap:6,padding:"4px 8px",background:isOv?"#fff3cd":C.hellgrau,borderRadius:4,fontSize:11}}><span>{icon}</span><span style={{fontWeight:600,color:isOv?"#e65100":undefined}}>{val!=null?`${val} ${label}`:label}</span>{isOv&&<span style={{fontSize:9,color:C.bgrau,marginLeft:"auto"}}>(empf. {rec})</span>}</div>);})}
                   </div>
                   <div style={{fontSize:10,color:"#c00",marginTop:6,fontWeight:600}}>Fahrzeugbesatzungen gelten grundsätzlich zuzüglich zum angegebenen Personalbedarf!</div>
                   <div style={{fontSize:9,color:C.bgrau,marginTop:8,lineHeight:1.3,fontStyle:"italic"}}>Diese Berechnung basiert auf dem "Maurer-Algorithmus" (nach Dipl.Ing. Klaus Maurer, Stand 2010). Die hier angegebenen Richtwerte haben lediglich empfehlenden Charakter und müssen an die örtlichen Verhältnisse unter Berücksichtigung der Erfahrungswerte früherer, vergleichbarer Veranstaltungen angepasst werden.</div>
                 </Card>
                 <Card title="Personal" accent="#1a7a3a">
-                  <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:6}}>{[["Helfer",calc.rec.helfer],["KTW",calc.rec.ktw],["RTW",calc.rec.rtw],["NEF",calc.rec.nef],["GKTW",calc.rec.gktw],["EL",calc.rec.el]].map(([l,v])=>(<div key={l} style={{display:"flex",justifyContent:"space-between",padding:"4px 8px",background:C.hellgrau,borderRadius:4,fontSize:12}}><span style={{color:C.dunkelgrau}}>{l}</span><span style={{fontWeight:700,color:"#1a7a3a",fontFamily:FONT.mono}}>{v}</span></div>))}</div>
-                  <Btn small variant="secondary" onClick={()=>setShowOverrides(!showOverrides)} style={{marginTop:10}}>{showOverrides?"▾ Ausblenden":"▸ Anpassen"}</Btn>
-                  {showOverrides&&<div style={{marginTop:8,padding:10,background:C.hellgrau,borderRadius:6}}><div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:"0 6px"}}>{[["Helfer","oHelfer"],["KTW","oKtw"],["RTW","oRtw"],["Ärzte","oAerzte"],["GKTW","oGktw"],["EL-KFZ","oElKfz"],["SEG","oSeg"],["MTW","oMtw"],["Zelt","oZelt"]].map(([l,k])=><Inp key={k} small label={l} type="number" min={0} value={d[k]??""} onChange={v=>updateDay(i,k,v===""?null:v)}/>)}</div></div>}
+                  {showOverrides?(<div>
+                    <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:"0 6px"}}>
+                      {[["Helfer","oHelfer",calc.rec.helfer],["KTW","oKtw",calc.rec.ktw],["RTW","oRtw",calc.rec.rtw],["Ärzte","oAerzte",0],["GKTW","oGktw",calc.rec.gktw],["EL-KFZ","oElKfz",calc.rec.elKfz],["SEG","oSeg",0],["MTW","oMtw",0],["Zelt","oZelt",0]].map(([l,k,rec])=><Inp key={k} small label={`${l} (empf. ${rec})`} type="number" min={0} value={d[k]!=null?d[k]:rec} onChange={v=>updateDay(i,k,v===""?null:v)}/>)}
+                    </div>
+                    <div style={{display:"flex",gap:6,marginTop:10}}>
+                      <Btn small variant="success" onClick={()=>setShowOverrides(false)}>✓ Fertig</Btn>
+                      <Btn small onClick={()=>{setDays(p=>p.map((dd,j)=>j===i?{...dd,oHelfer:null,oKtw:null,oRtw:null,oAerzte:null,oGktw:null,oElKfz:null,oSeg:null,oMtw:null,oZelt:null}:dd));setShowOverrides(false);}}>↺ Zurücksetzen</Btn>
+                    </div>
+                  </div>):(<div>
+                    <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:6}}>
+                      {[["Helfer",calc.hc,"oHelfer"],["KTW",calc.kc,"oKtw"],["RTW",calc.rc,"oRtw"],["NEF",calc.ac,"oAerzte"],["GKTW",calc.gc,"oGktw"],["EL",calc.el,null]].map(([l,v,k])=>{const isOv=k&&d[k]!=null;return(<div key={l} style={{display:"flex",justifyContent:"space-between",padding:"4px 8px",background:isOv?"#fff3cd":C.hellgrau,borderRadius:4,fontSize:12}}><span style={{color:C.dunkelgrau}}>{l}</span><span style={{fontWeight:700,color:isOv?"#e65100":"#1a7a3a",fontFamily:FONT.mono}}>{v}</span></div>);})}
+                      {calc.ec>0&&<div style={{display:"flex",justifyContent:"space-between",padding:"4px 8px",background:"#fff3cd",borderRadius:4,fontSize:12}}><span style={{color:C.dunkelgrau}}>EL-KFZ</span><span style={{fontWeight:700,color:"#e65100",fontFamily:FONT.mono}}>{calc.ec}</span></div>}
+                      {calc.sc>0&&<div style={{display:"flex",justifyContent:"space-between",padding:"4px 8px",background:"#fff3cd",borderRadius:4,fontSize:12}}><span style={{color:C.dunkelgrau}}>SEG</span><span style={{fontWeight:700,color:"#e65100",fontFamily:FONT.mono}}>{calc.sc}</span></div>}
+                      {calc.mc>0&&<div style={{display:"flex",justifyContent:"space-between",padding:"4px 8px",background:"#fff3cd",borderRadius:4,fontSize:12}}><span style={{color:C.dunkelgrau}}>MTW</span><span style={{fontWeight:700,color:"#e65100",fontFamily:FONT.mono}}>{calc.mc}</span></div>}
+                      {calc.zc>0&&<div style={{display:"flex",justifyContent:"space-between",padding:"4px 8px",background:"#fff3cd",borderRadius:4,fontSize:12}}><span style={{color:C.dunkelgrau}}>Zelt</span><span style={{fontWeight:700,color:"#e65100",fontFamily:FONT.mono}}>{calc.zc}</span></div>}
+                    </div>
+                    <Btn small variant="secondary" onClick={()=>setShowOverrides(true)} style={{marginTop:10}}>✎ Anpassen</Btn>
+                  </div>)}
                 </Card>
                 <Card><div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}><span style={{color:C.dunkelgrau}}>Kosten Tag {i+1}</span><span style={{fontSize:22,fontWeight:800,color:C.rot,fontFamily:FONT.mono}}>{f$(calc.total)}</span></div></Card>
               </div>
@@ -1519,19 +1578,19 @@ export default function App(){
                 {["gefahren","angebot","vertrag","aab","ils","einsatzprotokoll"].map(v=>(<Btn key={v} variant={pdfView===v?"primary":"secondary"} small onClick={()=>setPdfView(v)}>{{gefahren:"Gefahrenanalyse",angebot:"Angebot",vertrag:"Vertrag",aab:"AAB",ils:"ILS Anmeldung",einsatzprotokoll:"Einsatzprotokoll"}[v]}</Btn>))}
               </div>
               <div style={{display:"flex",gap:6,flexWrap:"wrap",alignItems:"center"}}>
-                {(pdfView==="gefahren")&&<Btn onClick={async()=>{if(!currentEventId){alert("Bitte zuerst speichern");return;}setGefahrenPending(true);try{const blob=await API.generateGefahrenPDF(currentEventId,dayCalcs,activeDays);const url=URL.createObjectURL(blob);const a=document.createElement("a");a.href=url;a.download=(event.auftragsnr||"Gefahren").replace(/[^a-zA-Z0-9_-]/g,"_")+"_Gefahrenanalyse.pdf";a.click();}catch(e){alert("Fehler: "+e.message);}finally{setGefahrenPending(false);}}} icon="⬇️" variant="blue" disabled={gefahrenPending}>{gefahrenPending?"Erstelle PDF...":"PDF herunterladen"}</Btn>}
-                {(pdfView==="angebot")&&<Btn onClick={async()=>{if(!currentEventId){alert("Bitte zuerst speichern");return;}setAngebotPending(true);try{const blob=await API.generateAngebotPDF(currentEventId,dayCalcs,totalCosts,activeDays);const url=URL.createObjectURL(blob);const a=document.createElement("a");a.href=url;a.download=(event.auftragsnr||"Angebot").replace(/[^a-zA-Z0-9_-]/g,"_")+"_Angebot.pdf";a.click();}catch(e){alert("Fehler: "+e.message);}finally{setAngebotPending(false);}}} icon="⬇️" variant="blue" disabled={angebotPending}>{angebotPending?"Erstelle PDF...":"PDF herunterladen"}</Btn>}
-                {(pdfView==="aab")&&<Btn onClick={async()=>{if(!currentEventId){alert("Bitte zuerst speichern");return;}setAabPending(true);try{const blob=await API.generateAABPDF(currentEventId);const url=URL.createObjectURL(blob);const a=document.createElement("a");a.href=url;a.download=(event.auftragsnr||"AAB").replace(/[^a-zA-Z0-9_-]/g,"_")+"_AAB.pdf";a.click();}catch(e){alert("Fehler: "+e.message);}finally{setAabPending(false);}}} icon="⬇️" variant="blue" disabled={aabPending}>{aabPending?"Erstelle PDF...":"AAB herunterladen"}</Btn>}
-                <Btn onClick={async()=>{if(!currentEventId){alert("Bitte zuerst Vorgang speichern");return;}setMappePending(true);await saveEvent();try{const blob=await API.generateMappePDF(currentEventId,dayCalcs,totalCosts,activeDays);const url=URL.createObjectURL(blob);const a=document.createElement("a");const nr=(event.auftragsnr||"").replace(/[^a-zA-Z0-9_-]/g,"_");const name=(event.name||"Veranstaltung").substring(0,30).replace(/ /g,"_");a.href=url;a.download=nr+"_"+name+"_Angebotsmappe.pdf";a.click();}catch(e){alert("Fehler bei Angebotsmappe: "+e.message);}finally{setMappePending(false);}}} icon="📦" variant="success" disabled={mappePending}>{mappePending?"Erstelle PDF...":"Angebotsmappe (PDF)"}</Btn>
+                {(pdfView==="gefahren")&&<Btn onClick={async()=>{if(!currentEventId){toast("Bitte zuerst speichern","warning");return;}setGefahrenPending(true);try{const blob=await API.generateGefahrenPDF(currentEventId,dayCalcs,activeDays);const url=URL.createObjectURL(blob);const a=document.createElement("a");a.href=url;a.download=(event.auftragsnr||"Gefahren").replace(/[^a-zA-Z0-9_-]/g,"_")+"_Gefahrenanalyse.pdf";a.click();}catch(e){toast(e.message,"error");}finally{setGefahrenPending(false);}}} icon="⬇️" variant="blue" disabled={gefahrenPending}>{gefahrenPending?"Erstelle PDF...":"PDF herunterladen"}</Btn>}
+                {(pdfView==="angebot")&&<Btn onClick={async()=>{if(!currentEventId){toast("Bitte zuerst speichern","warning");return;}setAngebotPending(true);try{const blob=await API.generateAngebotPDF(currentEventId,dayCalcs,totalCosts,activeDays);const url=URL.createObjectURL(blob);const a=document.createElement("a");a.href=url;a.download=(event.auftragsnr||"Angebot").replace(/[^a-zA-Z0-9_-]/g,"_")+"_Angebot.pdf";a.click();}catch(e){toast(e.message,"error");}finally{setAngebotPending(false);}}} icon="⬇️" variant="blue" disabled={angebotPending}>{angebotPending?"Erstelle PDF...":"PDF herunterladen"}</Btn>}
+                {(pdfView==="aab")&&<Btn onClick={async()=>{if(!currentEventId){toast("Bitte zuerst speichern","warning");return;}setAabPending(true);try{const blob=await API.generateAABPDF(currentEventId);const url=URL.createObjectURL(blob);const a=document.createElement("a");a.href=url;a.download=(event.auftragsnr||"AAB").replace(/[^a-zA-Z0-9_-]/g,"_")+"_AAB.pdf";a.click();}catch(e){toast(e.message,"error");}finally{setAabPending(false);}}} icon="⬇️" variant="blue" disabled={aabPending}>{aabPending?"Erstelle PDF...":"AAB herunterladen"}</Btn>}
+                <Btn onClick={async()=>{if(!currentEventId){toast("Bitte zuerst Vorgang speichern","warning");return;}setMappePending(true);await saveEvent();try{const blob=await API.generateMappePDF(currentEventId,dayCalcs,totalCosts,activeDays);const url=URL.createObjectURL(blob);const a=document.createElement("a");const nr=(event.auftragsnr||"").replace(/[^a-zA-Z0-9_-]/g,"_");const name=(event.name||"Veranstaltung").substring(0,30).replace(/ /g,"_");a.href=url;a.download=nr+"_"+name+"_Angebotsmappe.pdf";a.click();}catch(e){toast("Fehler bei Angebotsmappe: "+e.message,"error");}finally{setMappePending(false);}}} icon="📦" variant="success" disabled={mappePending}>{mappePending?"Erstelle PDF...":"Angebotsmappe (PDF)"}</Btn>
               </div>
             </div>
           </Card>
           <div ref={printRef} style={{background:"#fff",borderRadius:8,overflow:"hidden"}}>
             {pdfView==="gefahren"&&activeDays.map((d,i)=><GefahrenPDF key={i} day={d} calc={dayCalcs[i]} eventData={event} stammdaten={stammdaten} dayNum={i+1}/>)}
             {pdfView==="angebot"&&<div data-print="angebot"><AngebotPDF event={event} dayCalcs={dayCalcs} totalCosts={totalCosts} stammdaten={stammdaten} activeDays={activeDays} bereitschaft={bereitschaft} user={user}/></div>}
-            {pdfView==="vertrag"&&<Card accent={C.dunkelblau}><div style={{display:"flex",alignItems:"center",gap:10,marginBottom:12}}><span style={{fontSize:20}}>📄</span><div><div style={{fontSize:14,fontWeight:700,color:C.dunkelblau}}>Vereinbarung</div><div style={{fontSize:11,color:C.dunkelgrau}}>Serverseitig generiertes PDF mit Seitenzahlen</div></div></div><Btn variant="primary" onClick={async()=>{if(!currentEventId){alert("Bitte zuerst Vorgang speichern");return;}setVertragPending(true);await saveEvent();try{const r=await fetch("/api/pdf/vertrag/"+currentEventId,{method:"POST",credentials:"include"});if(!r.ok){const e=await r.json();alert(e.error||"Fehler");return;}const blob=await r.blob();const url=URL.createObjectURL(blob);window.open(url,"_blank");}catch(e){alert("Fehler: "+e.message);}finally{setVertragPending(false);}}} disabled={vertragPending}>{vertragPending?"Erstelle PDF...":"Vertrag-PDF generieren und öffnen"}</Btn></Card>}
+            {pdfView==="vertrag"&&<Card accent={C.dunkelblau}><div style={{display:"flex",alignItems:"center",gap:10,marginBottom:12}}><span style={{fontSize:20}}>📄</span><div><div style={{fontSize:14,fontWeight:700,color:C.dunkelblau}}>Vereinbarung</div><div style={{fontSize:11,color:C.dunkelgrau}}>Serverseitig generiertes PDF mit Seitenzahlen</div></div></div><Btn variant="primary" onClick={async()=>{if(!currentEventId){toast("Bitte zuerst Vorgang speichern","warning");return;}setVertragPending(true);await saveEvent();try{const r=await fetch("/api/pdf/vertrag/"+currentEventId,{method:"POST",credentials:"include"});if(!r.ok){const e=await r.json();toast(e.error||"Fehler","error");return;}const blob=await r.blob();const url=URL.createObjectURL(blob);window.open(url,"_blank");}catch(e){toast(e.message,"error");}finally{setVertragPending(false);}}} disabled={vertragPending}>{vertragPending?"Erstelle PDF...":"Vertrag-PDF generieren und öffnen"}</Btn></Card>}
             {pdfView==="aab"&&<div data-print="aab"><AABPDF stammdaten={stammdaten} bereitschaft={bereitschaft}/></div>}
-            {pdfView==="ils"&&<ILSPreview event={event} days={days} stammdaten={stammdaten} user={user} updateEvent={updateEvent} currentEventId={currentEventId} saveEvent={saveEvent}/>}
+            {pdfView==="ils"&&<ILSPreview event={event} days={days} stammdaten={stammdaten} user={user} updateEvent={updateEvent} currentEventId={currentEventId} saveEvent={saveEvent} toast={toast}/>}
             {pdfView==="einsatzprotokoll"&&<Card accent={C.dunkelblau}>
               <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:12}}>
                 <span style={{fontSize:20}}>🖨️</span>
@@ -1540,7 +1599,7 @@ export default function App(){
               </div>
               <div style={{display:"flex",flexWrap:"wrap",gap:8}}>
                 {(days||[]).filter(d=>d.active!==false).map((d,i)=>(
-                  <Btn key={i} variant="primary" onClick={async()=>{if(!currentEventId){alert("Bitte zuerst Vorgang speichern");return;}await saveEvent();try{const blob=await API.getEinsatzprotokollPDF(currentEventId,i);const url=URL.createObjectURL(blob);const a=document.createElement("a");a.href=url;const nr=(event.auftragsnr||"EP").replace(/[^a-zA-Z0-9_-]/g,"_");a.download=nr+"_Einsatzprotokoll_Tag"+(i+1)+".pdf";a.click();}catch(e){alert("Fehler: "+e.message);}}} icon="🖨️">
+                  <Btn key={i} variant="primary" onClick={async()=>{if(!currentEventId){toast("Bitte zuerst Vorgang speichern","warning");return;}await saveEvent();try{const blob=await API.getEinsatzprotokollPDF(currentEventId,i);const url=URL.createObjectURL(blob);const a=document.createElement("a");a.href=url;const nr=(event.auftragsnr||"EP").replace(/[^a-zA-Z0-9_-]/g,"_");a.download=nr+"_Einsatzprotokoll_Tag"+(i+1)+".pdf";a.click();}catch(e){toast(e.message,"error");}}} icon="🖨️">
                     Einsatzprotokoll Tag {d.id||i+1}{d.date?" ("+new Date(d.date).toLocaleDateString("de-DE")+")":""}
                   </Btn>
                 ))}
@@ -1551,7 +1610,7 @@ export default function App(){
         </div>)}
 
         {/* KUNDEN */}
-        {tab==="kunden"&&<KundenManager kunden={kunden} setKunden={setKunden} user={user}/>}
+        {tab==="kunden"&&<KundenManager kunden={kunden} setKunden={setKunden} user={user} toast={toast} showConfirm={showConfirm}/>}
 
         {/* STAMMDATEN */}
         {tab==="releases"&&(
@@ -1724,7 +1783,7 @@ export default function App(){
                   <label htmlFor="sigUpload" style={{display:"inline-block",padding:"4px 12px",background:C.hellgrau,border:`1px solid ${C.mittelgrau}`,borderRadius:3,fontSize:11,cursor:"pointer"}}>📁 Bild hochladen</label>
                 </div>
               </Card>
-              <Btn small variant="success" onClick={async()=>{try{const r=await API.saveProfile({telefon:user.telefon||"",mobil:user.mobil||"",titel:user.titel||"",email:user.email||"",ort:user.ort||"",signatur:user.signatur||""});if(r&&r.success){alert("Profil gespeichert!");}else{alert("Fehler: "+JSON.stringify(r));}}catch(e){alert("Fehler: "+e.message);}}}>Profil speichern</Btn>
+              <Btn small variant="success" onClick={async()=>{try{const r=await API.saveProfile({telefon:user.telefon||"",mobil:user.mobil||"",titel:user.titel||"",email:user.email||"",ort:user.ort||"",signatur:user.signatur||""});if(r&&r.success){toast("Profil gespeichert","success");}else{toast("Fehler beim Speichern","error");}}catch(e){toast(e.message,"error");}}}>Profil speichern</Btn>
               <div style={{fontSize:10,color:C.bgrau,marginTop:4}}>Diese Daten erscheinen als Unterzeichner im Angebot</div>
             </Card>
             {(user?.rolle==="admin"||user?.rolle==="kbl")&&<Card title="Logo für Drucksachen" accent={C.dunkelblau} sub="Wird auf allen Dokumenten und der Website angezeigt (außer ILS)">
@@ -1785,7 +1844,9 @@ export default function App(){
         </div>)}
       </main>
       <footer style={{padding:"12px 20px",borderTop:`1px solid ${C.mittelgrau}40`,textAlign:"center",fontSize:10,color:C.dunkelgrau,background:C.weiss}}>BRK Sanitätswachdienst v6.6 · {bereitschaft.name} · {stammdaten.kvName} · {year}</footer>
-      <FeedbackButton user={user} currentView={tab}/>
+      <FeedbackButton user={user} currentView={tab} toast={toast}/>
+      <ToastContainer toasts={toasts} onDismiss={dismissToast}/>
+      <ConfirmDialog open={!!confirmDlg} title={confirmDlg?.title} message={confirmDlg?.message} confirmLabel={confirmDlg?.confirmLabel} cancelLabel={confirmDlg?.cancelLabel} variant={confirmDlg?.variant} onConfirm={handleConfirm} onCancel={handleCancel}/>
     </div>
   );
 }
