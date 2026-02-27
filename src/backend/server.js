@@ -412,7 +412,7 @@ app.post("/api/pdf/vertrag/:id", requireAuth, async (req, res) => {
     await page.setContent(html, { waitUntil: "domcontentloaded" });
     const pdf = await page.pdf({
       format: "A4",
-      margin: { top: "15mm", right: "10mm", bottom: "20mm", left: "10mm" },
+      margin: { top: "15mm", right: "12mm", bottom: "20mm", left: "12mm" },
       displayHeaderFooter: true,
       headerTemplate: "<span></span>",
       footerTemplate: `<div style="width:100%;text-align:center;font-size:8pt;color:#aaa;font-family:Arial,sans-serif">Seite <span class="pageNumber"></span> von <span class="totalPages"></span></div>`,
@@ -653,7 +653,7 @@ app.post("/api/pdf/gefahren/:id", requireAuth, async (req, res) => {
     const browser = await puppeteer.launch({ executablePath: process.env.CHROMIUM_PATH || "/usr/bin/chromium-browser", args: ["--no-sandbox","--disable-setuid-sandbox","--disable-dev-shm-usage","--disable-gpu"], headless: true });
     const page = await browser.newPage();
     await page.setContent(html, { waitUntil: "domcontentloaded" });
-    const pdf = await page.pdf({ format: "A4", margin: { top: "15mm", right: "10mm", bottom: "20mm", left: "10mm" }, displayHeaderFooter: true, headerTemplate: "<span></span>", footerTemplate: '<div style="width:100%;text-align:center;font-size:8pt;color:#aaa;font-family:Arial,sans-serif">Seite <span class="pageNumber"></span> von <span class="totalPages"></span></div>', printBackground: true });
+    const pdf = await page.pdf({ format: "A4", margin: { top: "15mm", right: "12mm", bottom: "20mm", left: "12mm" }, displayHeaderFooter: true, headerTemplate: "<span></span>", footerTemplate: '<div style="width:100%;text-align:center;font-size:8pt;color:#aaa;font-family:Arial,sans-serif">Seite <span class="pageNumber"></span> von <span class="totalPages"></span></div>', printBackground: true });
     await browser.close();
     const nr = (vorgang.event?.auftragsnr || req.params.id).replace(/[^a-zA-Z0-9_-]/g,"_");
     res.set({ "Content-Type": "application/pdf", "Content-Disposition": `attachment; filename="${nr}_Gefahrenanalyse.pdf"` });
@@ -679,7 +679,7 @@ app.post("/api/pdf/angebot/:id", requireAuth, async (req, res) => {
     const browser = await puppeteer.launch({ executablePath: process.env.CHROMIUM_PATH || "/usr/bin/chromium-browser", args: ["--no-sandbox","--disable-setuid-sandbox","--disable-dev-shm-usage","--disable-gpu"], headless: true });
     const page = await browser.newPage();
     await page.setContent(html, { waitUntil: "domcontentloaded" });
-    const pdf = await page.pdf({ format: "A4", margin: { top: "15mm", right: "10mm", bottom: "20mm", left: "10mm" }, displayHeaderFooter: true, headerTemplate: "<span></span>", footerTemplate: `<div style="width:100%;text-align:center;font-size:8pt;color:#aaa;font-family:Arial,sans-serif">Seite <span class="pageNumber"></span> von <span class="totalPages"></span></div>`, printBackground: true });
+    const pdf = await page.pdf({ format: "A4", margin: { top: "15mm", right: "12mm", bottom: "20mm", left: "12mm" }, displayHeaderFooter: true, headerTemplate: "<span></span>", footerTemplate: `<div style="width:100%;text-align:center;font-size:8pt;color:#aaa;font-family:Arial,sans-serif">Seite <span class="pageNumber"></span> von <span class="totalPages"></span></div>`, printBackground: true });
     await browser.close();
     const nr = (vorgang.event?.auftragsnr || req.params.id).replace(/[^a-zA-Z0-9_-]/g,"_");
     res.set({ "Content-Type": "application/pdf", "Content-Disposition": `attachment; filename="${nr}_Angebot.pdf"` });
@@ -702,7 +702,7 @@ app.post("/api/pdf/aab/:id", requireAuth, async (req, res) => {
     const browser = await puppeteer.launch({ executablePath: process.env.CHROMIUM_PATH || "/usr/bin/chromium-browser", args: ["--no-sandbox","--disable-setuid-sandbox","--disable-dev-shm-usage","--disable-gpu"], headless: true });
     const page = await browser.newPage();
     await page.setContent(html, { waitUntil: "domcontentloaded" });
-    const pdf = await page.pdf({ format: "A4", margin: { top: "15mm", right: "10mm", bottom: "20mm", left: "10mm" }, displayHeaderFooter: true, headerTemplate: "<span></span>", footerTemplate: `<div style="width:100%;text-align:center;font-size:8pt;color:#aaa;font-family:Arial,sans-serif">Seite <span class="pageNumber"></span> von <span class="totalPages"></span></div>`, printBackground: true });
+    const pdf = await page.pdf({ format: "A4", margin: { top: "15mm", right: "12mm", bottom: "20mm", left: "12mm" }, displayHeaderFooter: true, headerTemplate: "<span></span>", footerTemplate: `<div style="width:100%;text-align:center;font-size:8pt;color:#aaa;font-family:Arial,sans-serif">Seite <span class="pageNumber"></span> von <span class="totalPages"></span></div>`, printBackground: true });
     await browser.close();
     const nr = (vorgang.event?.auftragsnr || "AAB").replace(/[^a-zA-Z0-9_-]/g,"_");
     res.set({ "Content-Type": "application/pdf", "Content-Disposition": `attachment; filename="${nr}_AAB.pdf"` });
@@ -728,7 +728,7 @@ app.post("/api/pdf/mappe/:id", requireAuth, async (req, res) => {
 
     const browser = await puppeteer.launch({ executablePath: process.env.CHROMIUM_PATH || "/usr/bin/chromium-browser", args: ["--no-sandbox","--disable-setuid-sandbox","--disable-dev-shm-usage","--disable-gpu"], headless: true });
     const footerTpl = `<div style="width:100%;text-align:center;font-size:8pt;color:#aaa;font-family:Arial,sans-serif">Seite <span class="pageNumber"></span> von <span class="totalPages"></span></div>`;
-    const pdfOpts = (marginLeft="10mm") => ({ format: "A4", margin: { top: "15mm", right: "20mm", bottom: "20mm", left: marginLeft }, displayHeaderFooter: true, headerTemplate: "<span></span>", footerTemplate: footerTpl, printBackground: true });
+    const pdfOpts = (marginLeft="12mm") => ({ format: "A4", margin: { top: "15mm", right: "12mm", bottom: "20mm", left: marginLeft }, displayHeaderFooter: true, headerTemplate: "<span></span>", footerTemplate: footerTpl, printBackground: true });
 
     const renderHTML = async (html, ml="12mm") => {
       const page = await browser.newPage();
@@ -819,7 +819,7 @@ function buildEinsatzprotokollHTML(vorgang, stamm, dayIdx) {
   .freitext-box { border: 1px solid #000; padding: 10px; margin-top: 4px; min-height: 50px; }
   .bemerkung-box { background: #d3d3d3; border: 1px solid #000; padding: 10px; margin-top: 4px; min-height: 120px; }
   strong { font-weight: bold; }
-  @media print { body { margin: 0; padding: 10mm; } }
+  @media print { body { margin: 0; padding: 12mm; } }
 </style>
 </head>
 <body>
@@ -902,7 +902,7 @@ app.post("/api/pdf/einsatzprotokoll/:id", requireAuth, async (req, res) => {
     await page.setContent(html, { waitUntil: "domcontentloaded" });
     const pdf = await page.pdf({
       format: "A4",
-      margin: { top: "10mm", right: "10mm", bottom: "15mm", left: "10mm" },
+      margin: { top: "10mm", right: "12mm", bottom: "15mm", left: "12mm" },
       printBackground: true
     });
     await browser.close();
@@ -936,7 +936,7 @@ app.post("/api/pdf/angebot/:id", requireAuth, async (req, res) => {
     const browser = await puppeteer.launch({ executablePath: process.env.CHROMIUM_PATH || "/usr/bin/chromium-browser", args: ["--no-sandbox","--disable-setuid-sandbox","--disable-dev-shm-usage","--disable-gpu"], headless: true });
     const page = await browser.newPage();
     await page.setContent(html, { waitUntil: "domcontentloaded" });
-    const pdf = await page.pdf({ format: "A4", margin: { top: "15mm", right: "10mm", bottom: "20mm", left: "10mm" }, displayHeaderFooter: true, headerTemplate: "<span></span>", footerTemplate: `<div style="width:100%;text-align:center;font-size:8pt;color:#aaa;font-family:Arial,sans-serif">Seite <span class="pageNumber"></span> von <span class="totalPages"></span></div>`, printBackground: true });
+    const pdf = await page.pdf({ format: "A4", margin: { top: "15mm", right: "12mm", bottom: "20mm", left: "12mm" }, displayHeaderFooter: true, headerTemplate: "<span></span>", footerTemplate: `<div style="width:100%;text-align:center;font-size:8pt;color:#aaa;font-family:Arial,sans-serif">Seite <span class="pageNumber"></span> von <span class="totalPages"></span></div>`, printBackground: true });
     await browser.close();
     const nr = (vorgang.event?.auftragsnr || req.params.id).replace(/[^a-zA-Z0-9_-]/g,"_");
     res.set({ "Content-Type": "application/pdf", "Content-Disposition": `attachment; filename="${nr}_Angebot.pdf"` });
@@ -959,7 +959,7 @@ app.post("/api/pdf/aab/:id", requireAuth, async (req, res) => {
     const browser = await puppeteer.launch({ executablePath: process.env.CHROMIUM_PATH || "/usr/bin/chromium-browser", args: ["--no-sandbox","--disable-setuid-sandbox","--disable-dev-shm-usage","--disable-gpu"], headless: true });
     const page = await browser.newPage();
     await page.setContent(html, { waitUntil: "domcontentloaded" });
-    const pdf = await page.pdf({ format: "A4", margin: { top: "15mm", right: "10mm", bottom: "20mm", left: "10mm" }, displayHeaderFooter: true, headerTemplate: "<span></span>", footerTemplate: `<div style="width:100%;text-align:center;font-size:8pt;color:#aaa;font-family:Arial,sans-serif">Seite <span class="pageNumber"></span> von <span class="totalPages"></span></div>`, printBackground: true });
+    const pdf = await page.pdf({ format: "A4", margin: { top: "15mm", right: "12mm", bottom: "20mm", left: "12mm" }, displayHeaderFooter: true, headerTemplate: "<span></span>", footerTemplate: `<div style="width:100%;text-align:center;font-size:8pt;color:#aaa;font-family:Arial,sans-serif">Seite <span class="pageNumber"></span> von <span class="totalPages"></span></div>`, printBackground: true });
     await browser.close();
     const nr = (vorgang.event?.auftragsnr || "AAB").replace(/[^a-zA-Z0-9_-]/g,"_");
     res.set({ "Content-Type": "application/pdf", "Content-Disposition": `attachment; filename="${nr}_AAB.pdf"` });
@@ -985,7 +985,7 @@ app.post("/api/pdf/mappe/:id", requireAuth, async (req, res) => {
 
     const browser = await puppeteer.launch({ executablePath: process.env.CHROMIUM_PATH || "/usr/bin/chromium-browser", args: ["--no-sandbox","--disable-setuid-sandbox","--disable-dev-shm-usage","--disable-gpu"], headless: true });
     const footerTpl = `<div style="width:100%;text-align:center;font-size:8pt;color:#aaa;font-family:Arial,sans-serif">Seite <span class="pageNumber"></span> von <span class="totalPages"></span></div>`;
-    const pdfOpts = (marginLeft="10mm") => ({ format: "A4", margin: { top: "15mm", right: "20mm", bottom: "20mm", left: marginLeft }, displayHeaderFooter: true, headerTemplate: "<span></span>", footerTemplate: footerTpl, printBackground: true });
+    const pdfOpts = (marginLeft="12mm") => ({ format: "A4", margin: { top: "15mm", right: "12mm", bottom: "20mm", left: marginLeft }, displayHeaderFooter: true, headerTemplate: "<span></span>", footerTemplate: footerTpl, printBackground: true });
 
     const renderHTML = async (html, ml="12mm") => {
       const page = await browser.newPage();

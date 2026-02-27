@@ -538,7 +538,7 @@ function KundenManager({kunden,setKunden,user,toast,showConfirm}){
 // ═══════════════════════════════════════════════════════════════════════════
 function GefahrenPDF({day,calc,eventData,stammdaten,dayNum}){
   const r=calc.risk,b=BEREITSCHAFTEN[stammdaten.bereitschaftIdx],ev=EVENT_TYPES.find(e=>e.id===day.eventTypeId);
-  return(<div className="pdf-page" style={{fontFamily:"Arial,sans-serif",fontSize:"10pt",color:"#000",background:"#fff",padding:"15mm 18mm",lineHeight:1.35,pageBreakAfter:"always"}}>
+  return(<div className="pdf-page" style={{fontFamily:"Arial,sans-serif",fontSize:"10pt",color:"#000",background:"#fff",padding:"15mm 12mm",lineHeight:1.35,pageBreakAfter:"always"}}>
     <div style={{display:"flex",justifyContent:"space-between",borderBottom:`2pt solid ${C.rot}`,paddingBottom:8,marginBottom:12}}><div>{stammdaten.customLogo&&<img src={stammdaten.customLogo} alt="Logo" style={{height:28,width:"auto",marginBottom:4,display:"block"}}/>}<div style={{fontSize:"8pt",color:"#666"}}>{stammdaten.kvName}</div><div style={{fontSize:"13pt",fontWeight:"bold"}}>Gefahrenanalyse {dayNum}. Tag</div></div><div style={{textAlign:"right",fontSize:"9pt",fontWeight:"bold",color:C.rot}}>Sanitätswachdienst</div></div>
     <table style={{width:"100%",marginBottom:10,borderCollapse:"collapse"}}><tbody><tr><td style={{fontWeight:"bold"}}>{eventData.name}</td><td style={{textAlign:"right"}}>{fDate(day.date)} {day.startTime}—{day.endTime}</td></tr><tr><td colSpan={2} style={{textAlign:"right",fontSize:"9pt",color:"#666"}}>Einsatzdauer: <strong>{calc.h.toFixed(2).replace('.',',')} Std.</strong></td></tr></tbody></table>
     <table style={{width:"100%",borderCollapse:"collapse",fontSize:"9pt",marginBottom:14}}><thead><tr style={{background:"#eee",fontWeight:"bold"}}><th style={{border:"1px solid #999",padding:"4px 6px",textAlign:"left",width:30}}>Nr.</th><th style={{border:"1px solid #999",padding:"4px 6px",textAlign:"left"}}>Kriterium</th><th style={{border:"1px solid #999",padding:"4px 6px",textAlign:"right",width:80}}>Wert</th><th style={{border:"1px solid #999",padding:"4px 6px",textAlign:"right",width:60}}>Punkte</th></tr></thead>
@@ -638,7 +638,7 @@ function AngebotPDF({event,dayCalcs,totalCosts,stammdaten,activeDays,bereitschaf
   const TDR={...TD,textAlign:"right"};
   const TDC={...TD,textAlign:"center"};
   return(
-    <div className="pdf-page" style={{fontFamily:"Arial,Helvetica,sans-serif",fontSize:"10pt",color:"#000",background:"#fff",width:"210mm",minHeight:"297mm",boxSizing:"border-box",padding:"12mm 15mm 10mm 20mm",position:"relative"}}>
+    <div className="pdf-page" style={{fontFamily:"Arial,Helvetica,sans-serif",fontSize:"10pt",color:"#000",background:"#fff",width:"210mm",minHeight:"297mm",boxSizing:"border-box",padding:"12mm 12mm 10mm 12mm",position:"relative"}}>
 
       {/* KOPFZEILE + ZWEISPALTIG */}
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:12}}>
@@ -796,7 +796,7 @@ function VertragPDF({event,dayCalcs,totalCosts,stammdaten,activeDays,bereitschaf
   const vOrt=user?.ort||bereitschaft.name.replace(/^Bereitschaft\s*/i,"").trim()||"Schrobenhausen";
   const vUnterzeichner=user?.name||stammdaten.bereitschaftsleiter;
   const vTitel=user?.titel||stammdaten.bereitschaftsleiterTitle||"Bereitschaftsleiter";
-  return(<div className="pdf-page" style={{fontFamily:"Arial,sans-serif",fontSize:"9.5pt",color:"#000",background:"#fff",padding:"12mm 18mm",lineHeight:1.5}}>
+  return(<div className="pdf-page" style={{fontFamily:"Arial,sans-serif",fontSize:"9.5pt",color:"#000",background:"#fff",padding:"12mm 12mm",lineHeight:1.5}}>
     <div style={{display:"flex",justifyContent:"space-between",marginBottom:6}}>
       <div style={{fontSize:"8pt",color:"#666"}}>{stammdaten.customLogo?<img src={stammdaten.customLogo} alt="Logo" style={{height:32,width:"auto"}}/>:<span style={{color:C.rot,fontWeight:"bold",fontSize:"10pt"}}>✚</span>} {stammdaten.kvName}</div>
       <div style={{textAlign:"right",fontSize:"8pt",color:"#666"}}>Auftragsnr: <strong>{event.auftragsnr}</strong></div>
@@ -898,7 +898,7 @@ function VertragPDF({event,dayCalcs,totalCosts,stammdaten,activeDays,bereitschaf
 // AAB PDF (Allgemeine Auftragsbedingungen - Original aus Excel)
 // ═══════════════════════════════════════════════════════════════════════════
 function AABPDF({stammdaten,bereitschaft}){
-  return(<div className="pdf-page" style={{fontFamily:"Arial,sans-serif",fontSize:"8.5pt",color:"#000",background:"#fff",padding:"12mm 18mm",lineHeight:1.55}}>
+  return(<div className="pdf-page" style={{fontFamily:"Arial,sans-serif",fontSize:"8.5pt",color:"#000",background:"#fff",padding:"12mm 12mm",lineHeight:1.55}}>
     <div style={{display:"flex",justifyContent:"space-between",marginBottom:4}}>
       <div style={{fontSize:"8pt",color:"#666"}}>{stammdaten.kvName}</div>
       <div style={{fontSize:"8pt",color:C.rot,fontWeight:"bold"}}>Sanitätswachdienst</div>
@@ -1294,7 +1294,7 @@ export default function App(){
   const f$=(v)=>new Intl.NumberFormat("de-DE",{style:"currency",currency:"EUR"}).format(v);
   const bereitschaft=BEREITSCHAFTEN[stammdaten.bereitschaftIdx];
 
-  const handlePrint=()=>{const pc=printRef.current;if(!pc)return;const w=window.open("","_blank");w.document.write(`<!DOCTYPE html><html><head><title>SanWD ${event.name}</title><style>@page{size:A4;margin:15mm 10mm 20mm 10mm}body{margin:0;font-family:Arial,sans-serif;font-size:9.5pt}.pdf-page{page-break-after:always}.brk-absatz{page-break-inside:avoid}.brk-break{page-break-before:always}@media print{body{-webkit-print-color-adjust:exact;print-color-adjust:exact}}</style></head><body>${pc.innerHTML}</body></html>`);w.document.close();setTimeout(()=>{const allPages=w.document.querySelectorAll('.pdf-page');const total=allPages.length;if(total>0){allPages.forEach((pg,i)=>{const f=w.document.createElement('div');f.style.cssText='text-align:center;font-size:8pt;color:#999;padding-top:6px;';f.textContent='Seite '+(i+1)+' von '+total;pg.appendChild(f);});}w.print();},400);};
+  const handlePrint=()=>{const pc=printRef.current;if(!pc)return;const w=window.open("","_blank");w.document.write(`<!DOCTYPE html><html><head><title>SanWD ${event.name}</title><style>@page{size:A4;margin:15mm 12mm 20mm 12mm}body{margin:0;font-family:Arial,sans-serif;font-size:9.5pt}.pdf-page{page-break-after:always}.brk-absatz{page-break-inside:avoid}.brk-break{page-break-before:always}@media print{body{-webkit-print-color-adjust:exact;print-color-adjust:exact}}</style></head><body>${pc.innerHTML}</body></html>`);w.document.close();setTimeout(()=>{const allPages=w.document.querySelectorAll('.pdf-page');const total=allPages.length;if(total>0){allPages.forEach((pg,i)=>{const f=w.document.createElement('div');f.style.cssText='text-align:center;font-size:8pt;color:#999;padding-top:6px;';f.textContent='Seite '+(i+1)+' von '+total;pg.appendChild(f);});}w.print();},400);};
 
   const handlePrintAll=async()=>{
     const nr=(event.auftragsnr||"unbekannt").replace(/[^a-zA-Z0-9_-]/g,"_");
