@@ -31,8 +31,9 @@ router.post("/:id/entsperren", requireWriteAccess, (req, res) => {
   const d = JSON.parse(row.data);
   const cl = d.event?.checklist || d.checklist || {};
   cl["angebotVersendet"] = false;
+  cl["abgeschlossen"] = false;
   if (d.event?.checklist) d.event.checklist = cl; else d.checklist = cl;
-  getDb().prepare("UPDATE vorgaenge SET data = ?, updated_at = datetime('now') WHERE id = ?").run(JSON.stringify(d), id);
+  getDb().prepare("UPDATE vorgaenge SET data = ?, status = 'entwurf', updated_at = datetime('now') WHERE id = ?").run(JSON.stringify(d), id);
   audit(req.session.user, "entsperrt", "vorgang", id, "Begründung: " + begruendung.trim());
   console.log(`Vorgang ${id} entsperrt von ${req.session.user.name}: ${begruendung}`);
   res.json({ ok: true });
@@ -195,7 +196,16 @@ router.put("/:id", requireWriteAccess, (req, res) => {
   const bc = (isAdmin && req.body.bereitschaftCode) ? req.body.bereitschaftCode : getBereitschaftCode(req);
   const { id } = req.params;
   const lock = getActiveLock(id, req.session.user.sub);
-  if (isVersendet(id)) return res.status(423).json({ error: "Vorgang ist versendet und kann nicht mehr bearbeitet werden.", reason: "versendet" });
+  if (isVersendet(id)) {
+    const newData = typeof req.body === "string" ? JSON.parse(req.body) : req.body;
+    const newCL = newData.event?.checklist || newData.checklist || {};
+    const oldRow = getDb().prepare("SELECT data FROM vorgaenge WHERE id = ?").get(id);
+    const oldData = oldRow ? JSON.parse(oldRow.data) : {};
+    const oldCL = oldData.event?.checklist || oldData.checklist || {};
+    const isInitialLock = (!!newCL.angebotVersendet && !oldCL.angebotVersendet) || (!!newCL.abgeschlossen && !oldCL.abgeschlossen);
+    if (!isInitialLock) return res.status(423).json({ error: "Vorgang ist versendet - erst entsperren", reason: "versendet" });
+    console.log("Initial-Lock Save erlaubt:", id);
+  }
   if (lock) return res.status(423).json({ error: "Gesperrt durch " + lock.user_name, lockedBy: lock.user_name });
   const year = req.body.year || new Date().getFullYear();
   const json = JSON.stringify(req.body);

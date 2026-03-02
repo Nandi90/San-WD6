@@ -185,7 +185,7 @@ function AddressAutocomplete({label,value,onChange,onResult}){
       const mapped=await Promise.all(data.map(async r=>{
         const lat=parseFloat(r.lat),lng=parseFloat(r.lon);
         let w3w=null;
-        try{const wr=await fetch(`/api/w3w?lat=${lat}&lng=${lng}`,{credentials:"include"});const wd=await wr.json();w3w=wd.w3w||null;}catch{}
+        try{const wr=await fetch(`/api/w3w?lat=${lat}&lng=${lng}`,{credentials:"include"});const wd=await wr.json();w3w=wd.w3w||null;}catch(e){console.error("Fehler:",e);}
         // Strukturierte Adresse mit Hausnummer aufbauen
         const addr = r.address || {};
         const road = addr.road || addr.pedestrian || addr.path || addr.footway || "";
@@ -220,11 +220,11 @@ function AddressAutocomplete({label,value,onChange,onResult}){
         const hd=await hr.json();
         if(hd.lat && hd.houseNumber){
           let rw3w=null;
-          try{const wr=await fetch(`/api/w3w?lat=${hd.lat}&lng=${hd.lng}`,{credentials:"include"});const wd=await wr.json();rw3w=wd.w3w||null;}catch{}
+          try{const wr=await fetch(`/api/w3w?lat=${hd.lat}&lng=${hd.lng}`,{credentials:"include"});const wd=await wr.json();rw3w=wd.w3w||null;}catch(e){console.error("Fehler:",e);}
           if(onResult)onResult({...s,lat:hd.lat,lng:hd.lng,w3w:rw3w||s.w3w,imprecise:false});
           return;
         }
-      }catch{}
+      }catch(e){console.error("Fehler:",e);}
       // 2. Fallback: Nominatim Freitext
       try{
         const fq=`${s.road} ${s.hnr}${s.plz?", "+s.plz:""}${s.city?(" "+s.city):""}`;
@@ -233,11 +233,11 @@ function AddressAutocomplete({label,value,onChange,onResult}){
         if(rd[0] && rd[0].address && rd[0].address.house_number){
           const rlat=parseFloat(rd[0].lat),rlng=parseFloat(rd[0].lon);
           let rw3w=null;
-          try{const wr=await fetch(`/api/w3w?lat=${rlat}&lng=${rlng}`,{credentials:"include"});const wd=await wr.json();rw3w=wd.w3w||null;}catch{}
+          try{const wr=await fetch(`/api/w3w?lat=${rlat}&lng=${rlng}`,{credentials:"include"});const wd=await wr.json();rw3w=wd.w3w||null;}catch(e){console.error("Fehler:",e);}
           if(onResult)onResult({...s,lat:rlat,lng:rlng,w3w:rw3w||s.w3w,imprecise:false});
           return;
         }
-      }catch{}
+      }catch(e){console.error("Fehler:",e);}
       // 3. Fallback: Nominatim strukturiert
       try{
         const params=new URLSearchParams({street:`${s.hnr} ${s.road}`,format:"json",addressdetails:"1",limit:"1",countrycodes:"de","accept-language":"de"});
@@ -248,11 +248,11 @@ function AddressAutocomplete({label,value,onChange,onResult}){
         if(rd[0]){
           const rlat=parseFloat(rd[0].lat),rlng=parseFloat(rd[0].lon);
           let rw3w=null;
-          try{const wr=await fetch(`/api/w3w?lat=${rlat}&lng=${rlng}`,{credentials:"include"});const wd=await wr.json();rw3w=wd.w3w||null;}catch{}
+          try{const wr=await fetch(`/api/w3w?lat=${rlat}&lng=${rlng}`,{credentials:"include"});const wd=await wr.json();rw3w=wd.w3w||null;}catch(e){console.error("Fehler:",e);}
           if(onResult)onResult({...s,lat:rlat,lng:rlng,w3w:rw3w||s.w3w,imprecise:!(rd[0].address&&rd[0].address.house_number)});
           return;
         }
-      }catch{}
+      }catch(e){console.error("Fehler:",e);}
       // Alle Geocoder gescheitert
       if(onResult)onResult({...s,imprecise:true});
       return;
@@ -273,8 +273,8 @@ function LeafletMap({coords,w3w,onChange,onW3W}){
   const [search,setSearch]=useState("");
   const [activeLayer,setActiveLayer]=useState("karte");
   const reverseGeocode=async(lat,lng)=>{
-    try{const r=await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json&addressdetails=1&accept-language=de`,{headers:{"User-Agent":"BRK-SanWD/7.0"}});const d=await r.json();if(d.address){const a=buildAddrStr(d.address);onChange({lat,lng,address:a||d.display_name});}}catch{}
-    try{const wr=await fetch(`/api/w3w?lat=${lat}&lng=${lng}`,{credentials:"include"});const wd=await wr.json();if(wd.w3w)onW3W(wd.w3w);}catch{}
+    try{const r=await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json&addressdetails=1&accept-language=de`,{headers:{"User-Agent":"BRK-SanWD/7.0"}});const d=await r.json();if(d.address){const a=buildAddrStr(d.address);onChange({lat,lng,address:a||d.display_name});}}catch(e){console.error("Fehler:",e);}
+    try{const wr=await fetch(`/api/w3w?lat=${lat}&lng=${lng}`,{credentials:"include"});const wd=await wr.json();if(wd.w3w)onW3W(wd.w3w);}catch(e){console.error("Fehler:",e);}
   };
   const setupDrag=(marker)=>{
     marker.on("dragend",async(e)=>{const p=e.target.getLatLng();onChange({lat:p.lat,lng:p.lng});reverseGeocode(p.lat,p.lng);});
@@ -342,9 +342,9 @@ function LeafletMap({coords,w3w,onChange,onW3W}){
           if(markerRef.current)markerRef.current.setLatLng([lat,lng]);
           else{markerRef.current=L.marker([lat,lng],{draggable:true}).addTo(mapInst.current);setupDrag(markerRef.current);}
         }
-        try{const wr=await fetch(`/api/w3w?lat=${lat}&lng=${lng}`,{credentials:"include"});const wd=await wr.json();if(wd.w3w)onW3W(wd.w3w);}catch{}
+        try{const wr=await fetch(`/api/w3w?lat=${lat}&lng=${lng}`,{credentials:"include"});const wd=await wr.json();if(wd.w3w)onW3W(wd.w3w);}catch(e){console.error("Fehler:",e);}
       }
-    }catch{}
+    }catch(e){console.error("Fehler:",e);}
   };
   const layerBtns=[{id:"karte",label:"Karte"},{id:"luftbild",label:"Luftbild"},{id:"osm",label:"OSM"}];
   return(<div style={{borderRadius:6,overflow:"hidden",border:`1px solid ${C.mittelgrau}40`,marginTop:8}}>
@@ -367,12 +367,55 @@ function LeafletMap({coords,w3w,onChange,onW3W}){
 // ═══════════════════════════════════════════════════════════════════════════
 // CHECKLIST COMPONENT
 // ═══════════════════════════════════════════════════════════════════════════
-function VorgangChecklist({checklist={},onChange,eventDate}){
-  const toggle=(key)=>{if((key==="angebotVersendet"||key==="abgeschlossen")&&checklist[key])return;const now=Date.now();const cur=checklist[key];onChange({...checklist,[key]:cur?null:now});};
+
+// ═══════════════════════════════════════════════════════════════
+// CONFIRM MODAL (BRK Design)
+// ═══════════════════════════════════════════════════════════════
+function ConfirmModal({open,title,message,icon,onConfirm,onCancel,confirmText="Bestätigen",cancelText="Abbrechen",accent="#c1272d"}){
+  if(!open)return null;
+  return(<div style={{position:"fixed",top:0,left:0,right:0,bottom:0,background:"rgba(0,0,0,0.5)",zIndex:9999,display:"flex",alignItems:"center",justifyContent:"center",backdropFilter:"blur(2px)"}} onClick={onCancel}>
+    <div onClick={e=>e.stopPropagation()} style={{background:"#fff",borderRadius:12,padding:0,width:420,maxWidth:"90vw",boxShadow:"0 20px 60px rgba(0,0,0,0.3)",overflow:"hidden",animation:"fadeIn 0.15s ease"}}>
+      <div style={{padding:"20px 24px 16px",borderBottom:"1px solid #f0f0f0"}}>
+        <div style={{display:"flex",alignItems:"center",gap:12}}>
+          {icon&&<span style={{fontSize:28}}>{icon}</span>}
+          <div style={{fontSize:16,fontWeight:700,color:"#1a1a2e"}}>{title}</div>
+        </div>
+      </div>
+      <div style={{padding:"16px 24px",fontSize:13,color:"#555",lineHeight:1.6}}>{message}</div>
+      <div style={{padding:"12px 24px 20px",display:"flex",justifyContent:"flex-end",gap:10}}>
+        <button onClick={onCancel} style={{padding:"9px 20px",background:"#fff",border:"1px solid #d0d0d0",borderRadius:6,fontSize:13,fontWeight:600,cursor:"pointer",color:"#555"}}>
+          {cancelText}
+        </button>
+        <button onClick={onConfirm} style={{padding:"9px 20px",background:accent,border:"none",borderRadius:6,fontSize:13,fontWeight:600,cursor:"pointer",color:"#fff"}}>
+          {confirmText}
+        </button>
+      </div>
+    </div>
+  </div>);
+}
+function VorgangChecklist({checklist={},onChange,onSave,eventDate}){
+  const [confirmKey,setConfirmKey]=useState(null);
+  const toggle=(key)=>{
+    if((key==="angebotVersendet"||key==="abgeschlossen")&&checklist[key])return;
+    if((key==="angebotVersendet"||key==="abgeschlossen")&&!checklist[key]){
+      setConfirmKey(key);return;
+    }
+    const now=Date.now();const cur=checklist[key];
+    onChange({...checklist,[key]:cur?null:now});
+  };
+  const confirmLock=()=>{
+    if(!confirmKey)return;
+    const now=Date.now();
+    const newCL={...checklist,[confirmKey]:now};
+    onChange(newCL);
+    setConfirmKey(null);
+    if(onSave)setTimeout(()=>onSave(),150);
+  };
   // Wiedervorlage: 4 Wochen nach Event
   const wvDate=eventDate?new Date(new Date(eventDate).getTime()+28*24*60*60*1000):null;
   const wvPast=wvDate&&new Date()>=wvDate;
   const allDone=CHECKLIST_ITEMS.every(i=>checklist[i.key]);
+  const confirmLabels={angebotVersendet:{title:"Angebot versendet markieren?",msg:"Der Vorgang wird anschließend gesperrt. Alle Eingabefelder werden schreibgeschützt. Änderungen sind nur nach Entsperren mit Begründung möglich.",icon:"📨",accent:"#1a7a3a"},abgeschlossen:{title:"Vorgang abschließen?",msg:"Der Vorgang wird dauerhaft gesperrt. Dies markiert den Auftrag als final abgeschlossen. Änderungen sind nur nach Entsperren mit Begründung möglich.",icon:"✅",accent:"#1a237e"}};
   return(<div>
     {CHECKLIST_ITEMS.map(item=>{const done=!!checklist[item.key];return(<div key={item.key} onClick={()=>toggle(item.key)} style={{display:"flex",alignItems:"center",gap:10,padding:"8px 12px",marginBottom:4,background:done?`${C.rot}08`:C.weiss,borderRadius:6,cursor:"pointer",border:`1px solid ${done?C.rot+"30":C.mittelgrau+"40"}`,transition:"all 0.2s"}}>
       <div style={{width:22,height:22,borderRadius:4,border:`2px solid ${done?"#1a7a3a":C.mittelgrau}`,background:done?"#1a7a3a":"transparent",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>{done&&<svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M2 6l3 3 5-5" stroke="#fff" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/></svg>}</div>
@@ -383,6 +426,7 @@ function VorgangChecklist({checklist={},onChange,eventDate}){
       </div>
     </div>);})}
     {allDone&&<div style={{textAlign:"center",padding:"10px",background:"#d4edda",borderRadius:6,marginTop:8,fontSize:13,color:"#155724",fontWeight:600}}>✅ Vorgang vollständig abgeschlossen</div>}
+    <ConfirmModal open={!!confirmKey} title={confirmLabels[confirmKey]?.title||""} message={confirmLabels[confirmKey]?.msg||""} icon={confirmLabels[confirmKey]?.icon} accent={confirmLabels[confirmKey]?.accent} confirmText="Ja, sperren" cancelText="Abbrechen" onConfirm={confirmLock} onCancel={()=>setConfirmKey(null)}/>
   </div>);
 }
 
@@ -549,7 +593,7 @@ function KundenManager({kunden,setKunden,user,toast,showConfirm}){
       const cols=lines[i].split(";").map(c=>c.trim().replace(/^"|"$/g,""));
       const name=cols[nameIdx];if(!name)continue;
       const kunde={name,kundennummer:nrIdx>=0?cols[nrIdx]||"":"",ansprechpartner:apIdx>=0?cols[apIdx]||"":"",telefon:telIdx>=0?cols[telIdx]||"":"",email:mailIdx>=0?cols[mailIdx]||"":"",rechnungsempfaenger:name,reStrasse:strIdx>=0?cols[strIdx]||"":"",rePlzOrt:plzIdx>=0?cols[plzIdx]||"":"",anrede:"Sehr geehrte Damen und Herren,",bemerkung:""};
-      try{await API.saveKunde(kunde);count++;}catch{}
+      try{await API.saveKunde(kunde);count++;}catch(e){console.error("Fehler:",e);}
     }
     const k=await API.getKunden();setKunden(k);
     setCsvMsg(`${count} Kunden importiert`);setTimeout(()=>setCsvMsg(""),5000);
@@ -1104,7 +1148,7 @@ function VorgaengeListe({bereitschaftCode,user,onLoad,onNew,onCopy,bereitschaft,
   const del=async(id)=>{if(!await showConfirm({title:"In Papierkorb verschieben",message:"Vorgang in den Papierkorb verschieben? Er kann innerhalb von 60 Tagen wiederhergestellt werden.",confirmLabel:"In Papierkorb",variant:"danger"}))return;try{await API.deleteVorgang(id);loadEvents();}catch(e){toast("Fehler beim Löschen: "+e.message,"error");}};
   const years=[];for(let y=thisYear;y>=2025;y--)years.push(y);
   const isArchive=viewYear<thisYear;
-  const totalBetrag=events.reduce((s,ev)=>{const e=ev.event;if(!e)return s;const dc=(ev.days||[]).filter(d=>d.active);let t=0;try{dc.forEach(d=>{const c=calcDay(d,DEFAULT_STAMMDATEN.rates,e.verpflegung);t+=c.total;});}catch{}return s+t;},0);
+  const totalBetrag=events.reduce((s,ev)=>{const e=ev.event;if(!e)return s;const dc=(ev.days||[]).filter(d=>d.active);let t=0;try{dc.forEach(d=>{const c=calcDay(d,DEFAULT_STAMMDATEN.rates,e.verpflegung);t+=c.total;});}catch(e){console.error("Fehler:",e);}return s+t;},0);
 
   return(<div>
     {/* Year tabs */}
@@ -1130,7 +1174,7 @@ function VorgaengeListe({bereitschaftCode,user,onLoad,onNew,onCopy,bereitschaft,
     {(<Card title={`Angebote/Rechnungen ${viewYear}`} accent={C.mittelblau} sub={`Gesamt: ${f2(totalBetrag)} €`}>
       <div style={{overflowX:"auto"}}><table style={{width:"100%",borderCollapse:"collapse",fontSize:11}}>
         <thead><tr style={{background:C.hellgrau}}>{[{l:"Lfd.Nr."},{l:"Datum"},{l:"Ansprechpartner",hide:true},{l:"Veranstaltung"},{l:"Kunde",hide:true},{l:"AG",hide:true},{l:"RG",hide:true},{l:"Betrag",right:true},{l:"Status"},{l:""}].map((h,hi)=><th key={hi} className={h.hide?"mob-hide":""} style={{padding:"6px 8px",textAlign:h.right?"right":"left",borderBottom:`2px solid ${C.mittelgrau}40`,fontSize:10,color:C.dunkelgrau,whiteSpace:"nowrap"}}>{h.l}</th>)}</tr></thead>
-        <tbody>{events.filter(ev=>{if(!searchQ)return true;const q=searchQ.toLowerCase();const e=ev.event||{};return(e.name||"").toLowerCase().includes(q)||(e.auftragsnr||"").toLowerCase().includes(q)||(e.veranstalter||"").toLowerCase().includes(q)||(e.rechnungsempfaenger||"").toLowerCase().includes(q)||(e.ansprechpartner||"").toLowerCase().includes(q)||(e.ort||"").toLowerCase().includes(q);}).sort((a,b)=>{const na=a.event?.auftragsnr||"";const nb=b.event?.auftragsnr||"";return nb.localeCompare(na,undefined,{numeric:true});}).map((ev,i)=>{const e=ev.event||{};const cl=e.checklist||{};const dc=(ev.days||[]).filter(d=>d.active);const firstDate=dc[0]?.date;let betrag=0;try{dc.forEach(d=>{betrag+=calcDay(d,DEFAULT_STAMMDATEN.rates,e.verpflegung).total;});}catch{}
+        <tbody>{events.filter(ev=>{if(!searchQ)return true;const q=searchQ.toLowerCase();const e=ev.event||{};return(e.name||"").toLowerCase().includes(q)||(e.auftragsnr||"").toLowerCase().includes(q)||(e.veranstalter||"").toLowerCase().includes(q)||(e.rechnungsempfaenger||"").toLowerCase().includes(q)||(e.ansprechpartner||"").toLowerCase().includes(q)||(e.ort||"").toLowerCase().includes(q);}).sort((a,b)=>{const na=a.event?.auftragsnr||"";const nb=b.event?.auftragsnr||"";return nb.localeCompare(na,undefined,{numeric:true});}).map((ev,i)=>{const e=ev.event||{};const cl=e.checklist||{};const dc=(ev.days||[]).filter(d=>d.active);const firstDate=dc[0]?.date;let betrag=0;try{dc.forEach(d=>{betrag+=calcDay(d,DEFAULT_STAMMDATEN.rates,e.verpflegung).total;});}catch(e){console.error("Fehler:",e);}
           return(<tr key={i} style={{borderBottom:`1px solid ${C.hellgrau}`,cursor:"pointer"}} onClick={()=>isArchive?onCopy(ev):onLoad(ev)}>
             <td style={{padding:"5px 8px",fontWeight:600,color:C.rot,fontFamily:FONT.mono,whiteSpace:"nowrap"}}>{e.auftragsnr||"n/a"}</td>
             <td style={{padding:"5px 8px",whiteSpace:"nowrap"}}>{firstDate?fDate(firstDate):""}</td>
@@ -1295,7 +1339,7 @@ export default function App(){
   const handleCancel=useCallback(()=>{if(confirmRef.current)confirmRef.current(false);confirmRef.current=null;setConfirmDlg(null);},[]);
   // What's New banner (einmalig pro Version)
   const [showWhatsNew,setShowWhatsNew]=useState(()=>{try{return localStorage.getItem("sanwd-seen-version")!==APP_VERSION;}catch{return false;}});
-  const dismissWhatsNew=useCallback(()=>{setShowWhatsNew(false);try{localStorage.setItem("sanwd-seen-version",APP_VERSION);}catch{}},[]);
+  const dismissWhatsNew=useCallback(()=>{setShowWhatsNew(false);try{localStorage.setItem("sanwd-seen-version",APP_VERSION);}catch(e){console.error("Fehler:",e);}},[]);
   const [lockInfo,setLockInfo]=useState(null);
   // Lock-Heartbeat: alle 30s verlängern
   useEffect(()=>{
@@ -1320,18 +1364,18 @@ export default function App(){
   const storagePrefix=useMemo(()=>`sanwd:${user?.bereitschaftCode||BEREITSCHAFTEN[stammdaten.bereitschaftIdx]?.code||"BSOB"}:${year}`,[stammdaten.bereitschaftIdx,year]);
   const kundenKey=useMemo(()=>`sanwd:${BEREITSCHAFTEN[stammdaten.bereitschaftIdx].code}:kunden`,[stammdaten.bereitschaftIdx]);
 
-  useEffect(()=>{if(!user)return;(async()=>{try{const k=await API.getKunden();setKunden(k);}catch{setKunden([]);}try{const kl=await API.getKlauseln();setKlauseln(kl);const ed={};kl.forEach(k=>ed[k.id]=k.inhalt);setKlauselnEdit(ed);}catch{}})();},[user,kundenKey]);
+  useEffect(()=>{if(!user)return;(async()=>{try{const k=await API.getKunden();setKunden(k);}catch{setKunden([]);}try{const kl=await API.getKlauseln();setKlauseln(kl);const ed={};kl.forEach(k=>ed[k.id]=k.inhalt);setKlauselnEdit(ed);}catch(e){console.error("Fehler:",e);}})();},[user,kundenKey]);
 
-  const saveKunden=useCallback(async(k)=>{try{for(const kunde of k){await API.saveKunde(kunde);}}catch{}},[]);
+  const saveKunden=useCallback(async(k)=>{try{for(const kunde of k){await API.saveKunde(kunde);}}catch(e){console.error("Fehler:",e);}},[]);
 
   const upsertKunde=useCallback((ev)=>{if(!ev.veranstalter&&!ev.rechnungsempfaenger)return;const name=ev.veranstalter||ev.rechnungsempfaenger;const entry={name,ansprechpartner:ev.ansprechpartner||"",telefon:ev.telefon||"",email:ev.email||"",rechnungsempfaenger:ev.rechnungsempfaenger||"",reStrasse:ev.reStrasse||"",rePlzOrt:ev.rePlzOrt||"",anrede:ev.anrede||"Sehr geehrte Damen und Herren,"};API.saveKunde(entry).catch(()=>{});setKunden(prev=>{const idx=prev.findIndex(k=>k.name===name);return idx>=0?prev.map((k,i)=>i===idx?entry:k):[...prev,entry];});},[]);
 
-  useEffect(()=>{if(!user)return;(async()=>{try{const c=await API.getCounter(year);setLaufendeNr(c.nextNr||1);}catch{}})();},[user,storagePrefix]);
+  useEffect(()=>{if(!user)return;(async()=>{try{const c=await API.getCounter(year);setLaufendeNr(c.nextNr||1);}catch(e){console.error("Fehler:",e);}})();},[user,storagePrefix]);
 
-  const generateNr=useCallback(()=>{const b=BEREITSCHAFTEN[stammdaten.bereitschaftIdx];const yr=String(year).slice(-2);const nr=String(laufendeNr).padStart(3,"0");setEvent(p=>({...p,auftragsnr:`${b.code} ${yr}/${nr}`}));const next=laufendeNr+1;setLaufendeNr(next);if(user)try{API.incrementCounter(year).catch(()=>{});}catch{}},[stammdaten.bereitschaftIdx,laufendeNr,year,user,storagePrefix]);
+  const generateNr=useCallback(()=>{const b=BEREITSCHAFTEN[stammdaten.bereitschaftIdx];const yr=String(year).slice(-2);const nr=String(laufendeNr).padStart(3,"0");setEvent(p=>({...p,auftragsnr:`${b.code} ${yr}/${nr}`}));const next=laufendeNr+1;setLaufendeNr(next);if(user)try{API.incrementCounter(year).catch(()=>{});}catch(e){console.error("Fehler:",e);}},[stammdaten.bereitschaftIdx,laufendeNr,year,user,storagePrefix]);
 
   const saveEvent=useCallback(async()=>{
-  if(event?.checklist?.angebotVersendet||event?.checklist?.abgeschlossen){console.log("⏭️ Speichern übersprungen: Vorgang gesperrt");return;}
+  /* Lock-Check entfernt - Backend prueft serverseitig, initialer Save muss durchgehen */
     // Auto-Nummer wenn noch keine gesetzt
     if(!event.auftragsnr){
       const b=BEREITSCHAFTEN[stammdaten.bereitschaftIdx];
@@ -1342,7 +1386,7 @@ export default function App(){
         const autoNr=`${b.code} ${yr}/${nr}`;
         setEvent(p=>({...p,auftragsnr:autoNr}));
         setLaufendeNr(prev=>prev+1);
-      }catch{}
+      }catch(e){console.error("Fehler:",e);}
     }if(!user)return;setSaving(true);const id=currentEventId||`evt-${Date.now()}`;if(!currentEventId)setCurrentEventId(id);try{
       const bc=BEREITSCHAFTEN[stammdaten.bereitschaftIdx]?.code;
       await API.saveVorgang(id,{id,event,days,year,updatedAt:Date.now(),activeDays:days.filter(d=>d.active).length,createdBy:user.name,bereitschaftCode:bc});
@@ -1406,7 +1450,7 @@ export default function App(){
     const aabEl=pc.querySelector("[data-print='aab']");
     const aabHTML=aabEl?aabEl.innerHTML:"";
     setPdfView("angebot");
-    const getStyles=()=>{let s="";for(const ss of document.styleSheets){try{for(const rule of ss.cssRules)s+=rule.cssText+" ";}catch{}}return s;};
+    const getStyles=()=>{let s="";for(const ss of document.styleSheets){try{for(const rule of ss.cssRules)s+=rule.cssText+" ";}catch(e){console.error("Fehler:",e);}}return s;};
     const w2=window.open("","_blank");
     w2.document.write("<!DOCTYPE html><html><head><title>"+nr+"_"+evName+"_Angebotsmappe</title><style>"+getStyles()+"@page{size:A4;margin:15mm 12mm}@media print{.pagebreak{page-break-before:always}}</style></head><body>");
     if(angebotHTML)w2.document.write("<div>"+angebotHTML+"</div>");
@@ -1427,7 +1471,7 @@ export default function App(){
     }catch(e){toast(e.message,"error");}finally{setKlauselnSaving(false);}
   };
   // Lock freigeben beim Vorgang-Wechsel
-  const releaseLock=useCallback(async()=>{if(currentEventId){try{await API.unlockVorgang(currentEventId);}catch{}setLockInfo(null);}},[currentEventId]);
+  const releaseLock=useCallback(async()=>{if(currentEventId){try{await API.unlockVorgang(currentEventId);}catch(e){console.error("Fehler:",e);}setLockInfo(null);}},[currentEventId]);
   const newEvent=useCallback(()=>{setCurrentEventId(null);setEvent({...EMPTY_EVENT});setDays(Array.from({length:8},(_,i)=>mkDay(i+1)));setActiveDay(0);setTab("event");},[]);
   const loadEvent=useCallback(async(ev)=>{
     setCurrentEventId(ev.id);setEvent({...EMPTY_EVENT,...(ev.event||{})});setDays(ev.days||Array.from({length:8},(_,i)=>mkDay(i+1)));setTab("event");setActiveDay(0);
@@ -1533,7 +1577,7 @@ export default function App(){
 
         {/* VERANSTALTUNG */}
         {tab==="event"&&(<div>
-          <LockBanner lockInfo={lockInfo} isOwner={lockInfo?.lockedBy===user?.name} onUnlock={async()=>{try{await API.unlockVorgang(currentEventId);setLockInfo(null);}catch{}}}/>
+          <LockBanner lockInfo={lockInfo} isOwner={lockInfo?.lockedBy===user?.name} onUnlock={async()=>{try{await API.unlockVorgang(currentEventId);setLockInfo(null);}catch(e){console.error("Fehler:",e);}}}/>
           <StatusBanner angebotVersendet={event?.checklist?.angebotVersendet} abgeschlossen={event?.checklist?.abgeschlossen} onUnlock={async(begruendung)=>{await API.entsperrenVorgang(currentEventId,begruendung);updateEvent("checklist",{...event.checklist,angebotVersendet:false,abgeschlossen:false});}}/>
           <div className="rg21" style={{display:"grid",gridTemplateColumns:"2fr 1fr",gap:14}}>
             <div style={{position:"relative"}}>
@@ -1606,7 +1650,7 @@ export default function App(){
             {/* RIGHT COLUMN: Checkliste */}
             <div>
               <Card title="Checkliste" accent="#d4920a" sub="Vorgangs-Status">
-                <VorgangChecklist checklist={event.checklist||{}} onChange={updateChecklist} eventDate={activeDays[activeDays.length-1]?.date||activeDays[0]?.date}/>
+                <VorgangChecklist checklist={event.checklist||{}} onChange={updateChecklist} onSave={saveEvent} eventDate={activeDays[activeDays.length-1]?.date||activeDays[0]?.date}/>
               </Card>
               <Card title="Zusammenfassung">
                 <div style={{display:"grid",gap:6}}>
@@ -1622,7 +1666,7 @@ export default function App(){
 
         {/* TAGE & ANALYSE */}
         {tab==="days"&&(<div>
-          <LockBanner lockInfo={lockInfo} isOwner={lockInfo?.lockedBy===user?.name} onUnlock={async()=>{try{await API.unlockVorgang(currentEventId);setLockInfo(null);}catch{}}}/>
+          <LockBanner lockInfo={lockInfo} isOwner={lockInfo?.lockedBy===user?.name} onUnlock={async()=>{try{await API.unlockVorgang(currentEventId);setLockInfo(null);}catch(e){console.error("Fehler:",e);}}}/>
           <StatusBanner angebotVersendet={event?.checklist?.angebotVersendet} abgeschlossen={event?.checklist?.abgeschlossen} onUnlock={async(begruendung)=>{await API.entsperrenVorgang(currentEventId,begruendung);updateEvent("checklist",{...event.checklist,angebotVersendet:false,abgeschlossen:false});}}/>
           <div style={{display:"flex",gap:4,marginBottom:12,flexWrap:"wrap"}}>{days.map((d,i)=>(<div key={i} style={{display:"inline-flex",alignItems:"center",gap:0}}>
               <button onClick={()=>{if(!(isLocked||isEditLocked)&&!d.active)updateDay(i,"active",true);if(d.active)setActiveDay(i);}} style={{padding:"6px 14px",borderRadius:d.active&&i>0?"4px 0 0 4px":4,border:`1px solid ${d.active?(activeDay===i?C.rot:C.mittelgrau):"#e0e0e0"}`,background:activeDay===i?`${C.rot}11`:d.active?C.weiss:C.hellgrau,color:d.active?C.schwarz:C.bgrau,cursor:d.active?"pointer":"default",fontSize:12,fontWeight:activeDay===i?700:500,fontFamily:FONT.sans,borderRight:d.active&&i>0?"none":undefined,opacity:!d.active&&(isLocked||isEditLocked)?0.4:1}}>Tag {i+1}{d.active&&d.date&&<span style={{marginLeft:4,fontSize:10,opacity:0.6}}>{fDate(d.date)}</span>}</button>
@@ -1698,7 +1742,7 @@ export default function App(){
         </div></div>)}
 
         {/* KOSTEN */}
-        {tab==="costs"&&(<div><LockBanner lockInfo={lockInfo} isOwner={lockInfo?.lockedBy===user?.name} onUnlock={async()=>{try{await API.unlockVorgang(currentEventId);setLockInfo(null);}catch{}}}/>
+        {tab==="costs"&&(<div><LockBanner lockInfo={lockInfo} isOwner={lockInfo?.lockedBy===user?.name} onUnlock={async()=>{try{await API.unlockVorgang(currentEventId);setLockInfo(null);}catch(e){console.error("Fehler:",e);}}}/>
           <div className="r-stat-grid" style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:12,marginBottom:14}}><Card><Stat label="Personal" value={dayCalcs.reduce((s,d)=>s+d.tp,0)}/></Card><Card><Stat label="Stunden" value={dayCalcs.reduce((s,d)=>s+d.h,0)} color="#1a7a3a"/></Card><Card><Stat label="Gesamtkosten" value={f$(totalCosts)} color={C.rot}/></Card></div>
           <Card title="Kostenübersicht" accent={C.mittelblau}>
             <div style={{overflowX:"auto"}}><table style={{width:"100%",borderCollapse:"collapse",fontSize:12}}><thead><tr style={{borderBottom:`2px solid ${C.mittelgrau}40`}}><th style={{textAlign:"left",padding:"6px 10px",color:C.dunkelgrau}}>Position</th>{activeDays.map((d,i)=><th key={i} style={{textAlign:"right",padding:"6px 10px",color:C.dunkelgrau}}>Tag {d.id}</th>)}<th style={{textAlign:"right",padding:"6px 10px",color:C.rot,fontWeight:700}}>Gesamt</th></tr></thead>
@@ -1946,7 +1990,7 @@ export default function App(){
                 <div style={{flex:1}}>
                   <input type="file" accept="image/*" id="logoUpload" style={{display:"none"}} onChange={async e=>{const f=e.target.files[0];if(!f)return;const fd=new FormData();fd.append("logo",f);try{const r=await fetch("/api/stammdaten/logo",{method:"POST",body:fd,credentials:"include"});const d=await r.json();if(d.logo){updateStamm("customLogo",d.logo+"?t="+Date.now());}}catch(err){console.error("Logo-Upload fehlgeschlagen:",err);}}}/>
                   <label htmlFor="logoUpload" style={{display:"inline-block",padding:"6px 14px",background:C.mittelblau,color:"#fff",borderRadius:4,fontSize:12,fontWeight:600,cursor:"pointer",fontFamily:FONT.sans}}>📁 Logo hochladen</label>
-                  {stammdaten.customLogo&&<button onClick={async()=>{try{await fetch("/api/stammdaten/logo",{method:"DELETE",credentials:"include"});}catch{}updateStamm("customLogo",null);}} style={{marginLeft:8,padding:"6px 12px",background:"transparent",border:`1px solid ${C.rot}`,borderRadius:4,fontSize:11,color:C.rot,cursor:"pointer",fontFamily:FONT.sans}}>✕ Entfernen</button>}
+                  {stammdaten.customLogo&&<button onClick={async()=>{try{await fetch("/api/stammdaten/logo",{method:"DELETE",credentials:"include"});}catch(e){console.error("Fehler:",e);}updateStamm("customLogo",null);}} style={{marginLeft:8,padding:"6px 12px",background:"transparent",border:`1px solid ${C.rot}`,borderRadius:4,fontSize:11,color:C.rot,cursor:"pointer",fontFamily:FONT.sans}}>✕ Entfernen</button>}
                   <div style={{fontSize:10,color:C.bgrau,marginTop:4}}>Empfohlen: PNG/JPG, ca. 300×150px</div>
                 </div>
               </div>
