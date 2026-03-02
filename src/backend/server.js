@@ -679,7 +679,7 @@ app.post("/api/pdf/angebot/:id", requireAuth, async (req, res) => {
     const browser = await puppeteer.launch({ executablePath: process.env.CHROMIUM_PATH || "/usr/bin/chromium-browser", args: ["--no-sandbox","--disable-setuid-sandbox","--disable-dev-shm-usage","--disable-gpu"], headless: true });
     const page = await browser.newPage();
     await page.setContent(html, { waitUntil: "domcontentloaded" });
-    const pdf = await page.pdf({ format: "A4", margin: { top: "15mm", right: "12mm", bottom: "20mm", left: "12mm" }, displayHeaderFooter: true, headerTemplate: "<span></span>", footerTemplate: `<div style="width:100%;text-align:center;font-size:8pt;color:#aaa;font-family:Arial,sans-serif">Seite <span class="pageNumber"></span> von <span class="totalPages"></span></div>`, printBackground: true });
+    const pdf = await page.pdf({ format: "A4", margin: { top: "20mm", right: "12mm", bottom: "20mm", left: "12mm" }, displayHeaderFooter: true, headerTemplate: `<div style="width:100%;padding:3mm 12mm 0;font-family:Arial,sans-serif;font-size:7.5pt;color:#999;text-align:right">${(vorgang.event?.auftragsnr||"")}</div>`, footerTemplate: `<div style="width:100%;text-align:center;font-size:8pt;color:#aaa;font-family:Arial,sans-serif">Seite <span class="pageNumber"></span> von <span class="totalPages"></span></div>`, printBackground: true });
     await browser.close();
     const nr = (vorgang.event?.auftragsnr || req.params.id).replace(/[^a-zA-Z0-9_-]/g,"_");
     res.set({ "Content-Type": "application/pdf", "Content-Disposition": `attachment; filename="${nr}_Angebot.pdf"` });
@@ -936,7 +936,7 @@ app.post("/api/pdf/angebot/:id", requireAuth, async (req, res) => {
     const browser = await puppeteer.launch({ executablePath: process.env.CHROMIUM_PATH || "/usr/bin/chromium-browser", args: ["--no-sandbox","--disable-setuid-sandbox","--disable-dev-shm-usage","--disable-gpu"], headless: true });
     const page = await browser.newPage();
     await page.setContent(html, { waitUntil: "domcontentloaded" });
-    const pdf = await page.pdf({ format: "A4", margin: { top: "15mm", right: "12mm", bottom: "20mm", left: "12mm" }, displayHeaderFooter: true, headerTemplate: "<span></span>", footerTemplate: `<div style="width:100%;text-align:center;font-size:8pt;color:#aaa;font-family:Arial,sans-serif">Seite <span class="pageNumber"></span> von <span class="totalPages"></span></div>`, printBackground: true });
+    const pdf = await page.pdf({ format: "A4", margin: { top: "20mm", right: "12mm", bottom: "20mm", left: "12mm" }, displayHeaderFooter: true, headerTemplate: `<div style="width:100%;padding:3mm 12mm 0;font-family:Arial,sans-serif;font-size:7.5pt;color:#999;text-align:right">${(vorgang.event?.auftragsnr||"")}</div>`, footerTemplate: `<div style="width:100%;text-align:center;font-size:8pt;color:#aaa;font-family:Arial,sans-serif">Seite <span class="pageNumber"></span> von <span class="totalPages"></span></div>`, printBackground: true });
     await browser.close();
     const nr = (vorgang.event?.auftragsnr || req.params.id).replace(/[^a-zA-Z0-9_-]/g,"_");
     res.set({ "Content-Type": "application/pdf", "Content-Disposition": `attachment; filename="${nr}_Angebot.pdf"` });
@@ -1202,7 +1202,7 @@ function buildAngebotHTML(ev, dayCalcs, totalCosts, activeDays, stamm, kosten, u
     <td style="${TDR};font-weight:bold;font-size:11pt"><strong>${euro(endPreis)}</strong></td>
   </tr>` : "";
 
-  const bemerkung = ev.bemerkung ? `<table style="width:100%;border-collapse:collapse;margin-top:8px;border:1px solid #000">
+  const bemerkung = ev.bemerkung ? `<table class="no-break" style="width:100%;border-collapse:collapse;margin-top:8px;border:1px solid #000">
     <tbody><tr>
       <td style="${TD};font-weight:bold;width:90px;vertical-align:top;white-space:nowrap">Bemerkung:</td>
       <td style="${TD};white-space:pre-wrap">${esc(ev.bemerkung)}</td>
@@ -1211,7 +1211,12 @@ function buildAngebotHTML(ev, dayCalcs, totalCosts, activeDays, stamm, kosten, u
 
   return `<!DOCTYPE html><html lang="de"><head><meta charset="utf-8"><style>
     *{box-sizing:border-box}body{margin:0;font-family:Arial,Helvetica,sans-serif;font-size:10pt;color:#000}
-    @media print{body{-webkit-print-color-adjust:exact;print-color-adjust:exact}}
+    @media print{body{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+      .no-break{page-break-inside:avoid!important;break-inside:avoid!important}
+      .break-before{page-break-before:auto}
+      tr{page-break-inside:avoid;break-inside:avoid}
+    }
+    .beauftragung{page-break-inside:avoid;break-inside:avoid}
   </style></head><body>
   <div style="font-family:Arial,Helvetica,sans-serif;font-size:10pt;color:#000;padding:0 0 10mm 0">
     <!-- KOPFZEILE -->
@@ -1273,7 +1278,8 @@ function buildAngebotHTML(ev, dayCalcs, totalCosts, activeDays, stamm, kosten, u
       </tbody>
     </table>
     ${bemerkung}
-    <!-- UNTERSCHRIFT BRK -->
+    <!-- UNTERSCHRIFT BRK + BEAUFTRAGUNG wrapper -->
+    <div style="page-break-inside:avoid;break-inside:avoid">
     <div style="margin-top:28px;display:flex;justify-content:flex-end;font-size:9pt">
       <div style="text-align:center;min-width:200px">
         ${user.unterschrift
@@ -1284,18 +1290,19 @@ function buildAngebotHTML(ev, dayCalcs, totalCosts, activeDays, stamm, kosten, u
       </div>
     </div>
     <!-- BEAUFTRAGUNG -->
-    <div style="margin-top:24px;border:2px solid #000;padding:18px 20px">
+    <div style="margin-top:24px;border:2px solid #000;padding:18px 20px;page-break-inside:avoid;break-inside:avoid">
       <div style="font-weight:bold;font-size:11pt;margin-bottom:10px">Beauftragung / Auftragsbestätigung</div>
       <div style="font-size:9.5pt;margin-bottom:8px;line-height:1.8">
         Hiermit bestätige ich die Beauftragung des Sanitätswachdienstes gemäß obigem Angebot und erkenne die angegebenen Konditionen an.
       </div>
-      <div style="height:60px"></div>
+      <div style="min-height:35px;max-height:60px"></div>
       <div style="display:flex;justify-content:space-between;gap:28px;margin-top:4px">
         <div style="flex:1;text-align:center"><div style="border-top:1px solid #000;padding-top:5px;margin-bottom:3px">&nbsp;</div><div style="font-size:8pt;color:${ROT};font-weight:600">Ort, Datum</div></div>
         <div style="flex:2;text-align:center"><div style="border-top:1px solid #000;padding-top:5px;margin-bottom:3px">&nbsp;</div><div style="font-size:8pt;color:${ROT};font-weight:600">Unterschrift Auftraggeber</div></div>
         <div style="flex:2;text-align:center"><div style="border-top:1px solid #000;padding-top:5px;margin-bottom:3px">&nbsp;</div><div style="font-size:8pt;color:${ROT};font-weight:600">Name in Druckbuchstaben</div></div>
       </div>
     </div>
+    </div><!-- end wrapper -->
   </div>
   </body></html>`;
 }
