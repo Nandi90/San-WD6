@@ -202,9 +202,11 @@ router.put("/:id", requireWriteAccess, (req, res) => {
     const oldRow = getDb().prepare("SELECT data FROM vorgaenge WHERE id = ?").get(id);
     const oldData = oldRow ? JSON.parse(oldRow.data) : {};
     const oldCL = oldData.event?.checklist || oldData.checklist || {};
-    const isInitialLock = (!!newCL.angebotVersendet && !oldCL.angebotVersendet) || (!!newCL.abgeschlossen && !oldCL.abgeschlossen);
-    if (!isInitialLock) return res.status(423).json({ error: "Vorgang ist versendet - erst entsperren", reason: "versendet" });
-    console.log("Initial-Lock Save erlaubt:", id);
+    // Checklist-Aenderung erkennen (irgendein Feld anders)
+    const clChanged = JSON.stringify(newCL) !== JSON.stringify(oldCL);
+    // Nur blocken wenn KEINE Checklist-Aenderung vorliegt
+    if (!clChanged) return res.status(423).json({ error: "Vorgang ist versendet - erst entsperren", reason: "versendet" });
+    console.log("Checklist-Update bei gesperrtem Vorgang erlaubt:", id);
   }
   if (lock) return res.status(423).json({ error: "Gesperrt durch " + lock.user_name, lockedBy: lock.user_name });
   const year = req.body.year || new Date().getFullYear();

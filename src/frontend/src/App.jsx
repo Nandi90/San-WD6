@@ -395,13 +395,16 @@ function ConfirmModal({open,title,message,icon,onConfirm,onCancel,confirmText="B
 }
 function VorgangChecklist({checklist={},onChange,onLockSave,eventDate}){
   const [confirmKey,setConfirmKey]=useState(null);
+  const isLocked=!!(checklist.angebotVersendet||checklist.abgeschlossen);
   const toggle=(key)=>{
     if((key==="angebotVersendet"||key==="abgeschlossen")&&checklist[key])return;
     if((key==="angebotVersendet"||key==="abgeschlossen")&&!checklist[key]){
       setConfirmKey(key);return;
     }
     const now=Date.now();const cur=checklist[key];
-    onChange({...checklist,[key]:cur?null:now});
+    const newCL={...checklist,[key]:cur?null:now};
+    onChange(newCL);
+    if(isLocked&&onLockSave)onLockSave(newCL);
   };
   const confirmLock=()=>{
     if(!confirmKey)return;
