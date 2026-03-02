@@ -393,7 +393,7 @@ function ConfirmModal({open,title,message,icon,onConfirm,onCancel,confirmText="B
     </div>
   </div>);
 }
-function VorgangChecklist({checklist={},onChange,onSave,eventDate}){
+function VorgangChecklist({checklist={},onChange,onLockSave,eventDate}){
   const [confirmKey,setConfirmKey]=useState(null);
   const toggle=(key)=>{
     if((key==="angebotVersendet"||key==="abgeschlossen")&&checklist[key])return;
@@ -409,7 +409,7 @@ function VorgangChecklist({checklist={},onChange,onSave,eventDate}){
     const newCL={...checklist,[confirmKey]:now};
     onChange(newCL);
     setConfirmKey(null);
-    if(onSave)setTimeout(()=>onSave(),150);
+    if(onLockSave)onLockSave(newCL);
   };
   // Wiedervorlage: 4 Wochen nach Event
   const wvDate=eventDate?new Date(new Date(eventDate).getTime()+28*24*60*60*1000):null;
@@ -1650,7 +1650,7 @@ export default function App(){
             {/* RIGHT COLUMN: Checkliste */}
             <div>
               <Card title="Checkliste" accent="#d4920a" sub="Vorgangs-Status">
-                <VorgangChecklist checklist={event.checklist||{}} onChange={updateChecklist} onSave={saveEvent} eventDate={activeDays[activeDays.length-1]?.date||activeDays[0]?.date}/>
+                <VorgangChecklist checklist={event.checklist||{}} onChange={updateChecklist} onLockSave={async(newCL)=>{const id=currentEventId;if(!id||!user)return;try{const bc=BEREITSCHAFTEN[stammdaten.bereitschaftIdx]?.code;const lockEvent={...event,checklist:newCL};await API.saveVorgang(id,{id,event:lockEvent,days,year,updatedAt:Date.now(),activeDays:days.filter(d=>d.active).length,createdBy:user.name,bereitschaftCode:bc});console.log("Lock-Save OK:",id);toast("Status gespeichert","success");}catch(e){console.error("Lock-Save Fehler:",e);toast("Speichern fehlgeschlagen: "+e.message,"error");}}} eventDate={activeDays[activeDays.length-1]?.date||activeDays[0]?.date}/>
               </Card>
               <Card title="Zusammenfassung">
                 <div style={{display:"grid",gap:6}}>
