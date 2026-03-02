@@ -23,6 +23,57 @@ const pdfRouter = require("./routes/pdf");
 const ilsRouter = require("./routes/ils");
 const klauselnRouter = require("./routes/klauseln");
 
+
+// ═══════════════════════════════════════════════════════════════════
+// Persistent Chromium Browser Pool (PDF Performance)
+// ═══════════════════════════════════════════════════════════════════
+const BrowserPool = (() => {
+  let _browser = null;
+  let _launching = null;
+  const CHROMIUM = process.env.CHROMIUM_PATH || "/usr/bin/chromium-browser";
+  const ARGS = ["--no-sandbox","--disable-setuid-sandbox","--disable-dev-shm-usage","--disable-gpu","--disable-extensions","--disable-translate"];
+
+  async function get() {
+    if (_browser && _browser.isConnected()) return _browser;
+    if (_launching) return _launching;
+    _launching = (async () => {
+      // puppeteer via BrowserPool
+      _browser = await puppeteer.launch({ executablePath: CHROMIUM, args: ARGS, headless: true });
+      _browser.on("disconnected", () => { _browser = null; });
+      console.log("🖨️ Chromium Browser gestartet (persistent)");
+      return _browser;
+    })();
+    const b = await _launching;
+    _launching = null;
+    return b;
+  }
+
+  async function renderPDF(html, opts = {}) {
+    const browser = await get();
+    const page = await browser.newPage();
+    try {
+      await page.setContent(html, { waitUntil: "domcontentloaded" });
+      const pdf = await page.pdf({
+        format: "A4",
+        margin: { top: opts.marginTop || "15mm", right: "12mm", bottom: "20mm", left: opts.marginLeft || "12mm" },
+        displayHeaderFooter: true,
+        headerTemplate: opts.header || "<span></span>",
+        footerTemplate: opts.footer || "<span></span>",
+        printBackground: true
+      });
+      return pdf;
+    } finally {
+      await page.close();
+    }
+  }
+
+  // Graceful shutdown
+  process.on("SIGTERM", async () => { if (_browser) await _browser.close(); });
+  process.on("SIGINT", async () => { if (_browser) await _browser.close(); });
+
+  return { get, renderPDF };
+})();
+
 const app = express();
 const PORT = process.env.PORT || 3000;
 
@@ -392,7 +443,7 @@ app.put("/api/profile", (req, res) => {
 
 // ── PDF Vertrag (Puppeteer) ──────────────────────────────────────────
 app.post("/api/pdf/vertrag/:id", requireAuth, async (req, res) => {
-  const puppeteer = require("puppeteer-core");
+  // puppeteer via BrowserPool
   const { id } = req.params;
   try {
     const db = require("./db").getDb();
@@ -418,7 +469,7 @@ app.post("/api/pdf/vertrag/:id", requireAuth, async (req, res) => {
       footerTemplate: `<div style="width:100%;padding:0 12mm;font-family:Arial,sans-serif;font-size:7pt;color:#999;display:flex;justify-content:space-between;border-top:0.5px solid #ddd;padding-top:2mm"><span>Vereinbarung SanWD · Anlagen: Gefahrenanalyse (1), Kostenaufstellung (2), AAB (3)</span><span>${(vorgang.event?.auftragsnr||"").replace(/"/g,"&quot;")}</span><span>Seite <span class="pageNumber"></span>/<span class="totalPages"></span></span></div>`,
       printBackground: true
     });
-    await browser.close();
+    // browser bleibt im Pool offen
     res.set({ "Content-Type":"application/pdf", "Content-Disposition":`inline; filename="Vertrag-${id}.pdf"` });
     res.send(pdf);
   } catch(e) {
@@ -640,12 +691,11 @@ function buildVertragHTML(vorgang, stamm, user) {
 }
 
 
-
 // ═══════════════════════════════════════════════════════════════════
 // PDF: Gefahrenanalyse (serverseitig)
 // ═══════════════════════════════════════════════════════════════════
 app.post("/api/pdf/gefahren/:id", requireAuth, async (req, res) => {
-  const puppeteer = require("puppeteer-core");
+  // puppeteer via BrowserPool
   try {
     const db = require("./db").getDb();
     const row = db.prepare("SELECT data FROM vorgaenge WHERE id=?").get(req.params.id);
@@ -655,11 +705,10 @@ app.post("/api/pdf/gefahren/:id", requireAuth, async (req, res) => {
     const { dayCalcs, activeDays } = req.body;
     if (!dayCalcs || !dayCalcs.length) return res.status(400).json({ error: "Keine Tage vorhanden" });
     const html = buildGefahrenHTML(vorgang.event || {}, activeDays || [], dayCalcs, stamm);
-    const browser = await puppeteer.launch({ executablePath: process.env.CHROMIUM_PATH || "/usr/bin/chromium-browser", args: ["--no-sandbox","--disable-setuid-sandbox","--disable-dev-shm-usage","--disable-gpu"], headless: true });
-    const page = await browser.newPage();
-    await page.setContent(html, { waitUntil: "domcontentloaded" });
-    const pdf = await page.pdf({ format: "A4", margin: { top: "20mm", right: "12mm", bottom: "20mm", left: "12mm" }, displayHeaderFooter: true, headerTemplate: `<div style="width:100%;padding:2mm 12mm 0;font-family:Arial,sans-serif;font-size:7.5pt;color:#888;display:flex;justify-content:space-between"><span>Gefahrenanalyse</span><span>${(vorgang.event?.auftragsnr||"").replace(/"/g,"&quot;")}</span></div>`, footerTemplate: `<div style="width:100%;padding:0 12mm;font-family:Arial,sans-serif;font-size:7pt;color:#999;display:flex;justify-content:space-between;border-top:0.5px solid #ddd;padding-top:2mm"><span>Gefahrenanalyse · Anlage 1 zur Vereinbarung SanWD</span><span>${(vorgang.event?.auftragsnr||"").replace(/"/g,"&quot;")}</span><span>Seite <span class="pageNumber"></span>/<span class="totalPages"></span></span></div>`, printBackground: true });
-    await browser.close();
+
+
+    const pdf = await BrowserPool.renderPDF(html, { marginTop: "20mm", marginLeft: "12mm", header: `<div style="width:100%;padding:2mm 12mm 0;font-family:Arial,sans-serif;font-size:7.5pt;color:#888;display:flex;justify-content:space-between"><span>Gefahrenanalyse</span><span>${(vorgang.event?.auftragsnr||"").replace(/"/g,"&quot;")}</span></div>`, footer: `<div style="width:100%;padding:0 12mm;font-family:Arial,sans-serif;font-size:7pt;color:#999;display:flex;justify-content:space-between;border-top:0.5px solid #ddd;padding-top:2mm"><span>Gefahrenanalyse · Anlage 1 zur Vereinbarung SanWD</span><span>${(vorgang.event?.auftragsnr||"").replace(/"/g,"&quot;")}</span><span>Seite <span class="pageNumber"></span>/<span class="totalPages"></span></span></div>` });
+
     const nr = (vorgang.event?.auftragsnr || req.params.id).replace(/[^a-zA-Z0-9_-]/g,"_");
     res.set({ "Content-Type": "application/pdf", "Content-Disposition": `attachment; filename="${nr}_Gefahrenanalyse.pdf"` });
     res.send(pdf);
@@ -670,7 +719,7 @@ app.post("/api/pdf/gefahren/:id", requireAuth, async (req, res) => {
 // PDF: Angebot (serverseitig)
 // ═══════════════════════════════════════════════════════════════════
 app.post("/api/pdf/angebot/:id", requireAuth, async (req, res) => {
-  const puppeteer = require("puppeteer-core");
+  // puppeteer via BrowserPool
   try {
     const db = require("./db").getDb();
     const row = db.prepare("SELECT data FROM vorgaenge WHERE id=?").get(req.params.id);
@@ -681,11 +730,10 @@ app.post("/api/pdf/angebot/:id", requireAuth, async (req, res) => {
     const user = db.prepare("SELECT name, titel, ort, email, telefon, mobil, unterschrift FROM users WHERE sub=?").get(req.session.user.sub) || {};
     const { dayCalcs, totalCosts, activeDays } = req.body;
     const html = buildAngebotHTML(vorgang.event || {}, dayCalcs || [], totalCosts || 0, activeDays || [], stamm, kosten, user);
-    const browser = await puppeteer.launch({ executablePath: process.env.CHROMIUM_PATH || "/usr/bin/chromium-browser", args: ["--no-sandbox","--disable-setuid-sandbox","--disable-dev-shm-usage","--disable-gpu"], headless: true });
-    const page = await browser.newPage();
-    await page.setContent(html, { waitUntil: "domcontentloaded" });
-    const pdf = await page.pdf({ format: "A4", margin: { top: "20mm", right: "12mm", bottom: "20mm", left: "12mm" }, displayHeaderFooter: true, headerTemplate: `<div style="width:100%;padding:2mm 12mm 0;font-family:Arial,sans-serif;font-size:7.5pt;color:#888;display:flex;justify-content:space-between"><span>Fortsetzung Angebot</span><span>${(vorgang.event?.auftragsnr||"").replace(/"/g,"&quot;")}</span></div>`, footerTemplate: `<div style="width:100%;padding:0 12mm;font-family:Arial,sans-serif;font-size:7pt;color:#999;display:flex;justify-content:space-between;border-top:0.5px solid #ddd;padding-top:2mm"><span>BRK Sanitätswachdienst · Kostenaufstellung</span><span>${(vorgang.event?.auftragsnr||"").replace(/"/g,"&quot;")}</span><span>Seite <span class="pageNumber"></span>/<span class="totalPages"></span></span></div>`, printBackground: true });
-    await browser.close();
+
+
+    const pdf = await BrowserPool.renderPDF(html, { marginTop: "20mm", marginLeft: "12mm", header: `<div style="width:100%;padding:2mm 12mm 0;font-family:Arial,sans-serif;font-size:7.5pt;color:#888;display:flex;justify-content:space-between"><span>Fortsetzung Angebot</span><span>${(vorgang.event?.auftragsnr||"").replace(/"/g,"&quot;")}</span></div>`, footer: `<div style="width:100%;padding:0 12mm;font-family:Arial,sans-serif;font-size:7pt;color:#999;display:flex;justify-content:space-between;border-top:0.5px solid #ddd;padding-top:2mm"><span>BRK Sanitätswachdienst · Kostenaufstellung</span><span>${(vorgang.event?.auftragsnr||"").replace(/"/g,"&quot;")}</span><span>Seite <span class="pageNumber"></span>/<span class="totalPages"></span></span></div>` });
+
     const nr = (vorgang.event?.auftragsnr || req.params.id).replace(/[^a-zA-Z0-9_-]/g,"_");
     res.set({ "Content-Type": "application/pdf", "Content-Disposition": `attachment; filename="${nr}_Angebot.pdf"` });
     res.send(pdf);
@@ -696,7 +744,7 @@ app.post("/api/pdf/angebot/:id", requireAuth, async (req, res) => {
 // PDF: AAB (serverseitig)
 // ═══════════════════════════════════════════════════════════════════
 app.post("/api/pdf/aab/:id", requireAuth, async (req, res) => {
-  const puppeteer = require("puppeteer-core");
+  // puppeteer via BrowserPool
   try {
     const db = require("./db").getDb();
     const row = db.prepare("SELECT data FROM vorgaenge WHERE id=?").get(req.params.id);
@@ -704,11 +752,10 @@ app.post("/api/pdf/aab/:id", requireAuth, async (req, res) => {
     const stamm = db.prepare("SELECT * FROM bereitschaften WHERE code=?").get(req.session.user.bereitschaftCode) || {};
     const klauseln = db.prepare("SELECT id, titel, inhalt, reihenfolge FROM klauseln WHERE dokument='aab' ORDER BY reihenfolge").all();
     const html = buildAABHTML(stamm, req.session.user.bereitschaftCode, klauseln, vorgang.event?.auftragsnr||'');
-    const browser = await puppeteer.launch({ executablePath: process.env.CHROMIUM_PATH || "/usr/bin/chromium-browser", args: ["--no-sandbox","--disable-setuid-sandbox","--disable-dev-shm-usage","--disable-gpu"], headless: true });
-    const page = await browser.newPage();
-    await page.setContent(html, { waitUntil: "domcontentloaded" });
-    const pdf = await page.pdf({ format: "A4", margin: { top: "20mm", right: "12mm", bottom: "20mm", left: "12mm" }, displayHeaderFooter: true, headerTemplate: `<div style="width:100%;padding:2mm 12mm 0;font-family:Arial,sans-serif;font-size:7.5pt;color:#888;display:flex;justify-content:space-between"><span>Allgemeine Auftragsbedingungen</span><span>${(vorgang.event?.auftragsnr||"").replace(/"/g,"&quot;")}</span></div>`, footerTemplate: `<div style="width:100%;padding:0 12mm;font-family:Arial,sans-serif;font-size:7pt;color:#999;display:flex;justify-content:space-between;border-top:0.5px solid #ddd;padding-top:2mm"><span>Allgemeine Auftragsbedingungen · Anlage 3 zur Vereinbarung SanWD</span><span>${(vorgang.event?.auftragsnr||"").replace(/"/g,"&quot;")}</span><span>Seite <span class="pageNumber"></span>/<span class="totalPages"></span></span></div>`, printBackground: true });
-    await browser.close();
+
+
+    const pdf = await BrowserPool.renderPDF(html, { marginTop: "20mm", marginLeft: "12mm", header: `<div style="width:100%;padding:2mm 12mm 0;font-family:Arial,sans-serif;font-size:7.5pt;color:#888;display:flex;justify-content:space-between"><span>Allgemeine Auftragsbedingungen</span><span>${(vorgang.event?.auftragsnr||"").replace(/"/g,"&quot;")}</span></div>`, footer: `<div style="width:100%;padding:0 12mm;font-family:Arial,sans-serif;font-size:7pt;color:#999;display:flex;justify-content:space-between;border-top:0.5px solid #ddd;padding-top:2mm"><span>Allgemeine Auftragsbedingungen · Anlage 3 zur Vereinbarung SanWD</span><span>${(vorgang.event?.auftragsnr||"").replace(/"/g,"&quot;")}</span><span>Seite <span class="pageNumber"></span>/<span class="totalPages"></span></span></div>` });
+
     const nr = (vorgang.event?.auftragsnr || "AAB").replace(/[^a-zA-Z0-9_-]/g,"_");
     res.set({ "Content-Type": "application/pdf", "Content-Disposition": `attachment; filename="${nr}_AAB.pdf"` });
     res.send(pdf);
@@ -719,7 +766,7 @@ app.post("/api/pdf/aab/:id", requireAuth, async (req, res) => {
 // PDF: Angebotsmappe (Gefahren + Angebot + AAB + Vertrag) – MERGED
 // ═══════════════════════════════════════════════════════════════════
 app.post("/api/pdf/mappe/:id", requireAuth, async (req, res) => {
-  const puppeteer = require("puppeteer-core");
+  // puppeteer via BrowserPool
   const { PDFDocument } = require("pdf-lib");
   try {
     const db = require("./db").getDb();
@@ -731,7 +778,7 @@ app.post("/api/pdf/mappe/:id", requireAuth, async (req, res) => {
     const klauselnAAB = db.prepare("SELECT id, titel, inhalt, reihenfolge FROM klauseln WHERE dokument='aab' ORDER BY reihenfolge").all();
     const { dayCalcs, totalCosts, activeDays } = req.body;
 
-    const browser = await puppeteer.launch({ executablePath: process.env.CHROMIUM_PATH || "/usr/bin/chromium-browser", args: ["--no-sandbox","--disable-setuid-sandbox","--disable-dev-shm-usage","--disable-gpu"], headless: true });
+    const browser = await BrowserPool.get();
     const footerTpl = `<div style="width:100%;padding:0 12mm;font-family:Arial,sans-serif;font-size:7pt;color:#999;display:flex;justify-content:space-between;border-top:0.5px solid #ddd;padding-top:2mm"><span>Angebotsmappe · BRK Sanitätswachdienst</span><span>${(vorgang.event?.auftragsnr||"").replace(/"/g,"&quot;")}</span><span>Seite <span class="pageNumber"></span>/<span class="totalPages"></span></span></div>`;
     const headerTpl = `<div style="width:100%;padding:2mm 12mm 0;font-family:Arial,sans-serif;font-size:7.5pt;color:#888;display:flex;justify-content:space-between"><span>Angebotsmappe · BRK Sanitätswachdienst</span><span>${(vorgang.event?.auftragsnr||"").replace(/"/g,"&quot;")}</span></div>`;
     const pdfOpts = (marginLeft="12mm") => ({ format: "A4", margin: { top: "18mm", right: "12mm", bottom: "20mm", left: marginLeft }, displayHeaderFooter: true, headerTemplate: headerTpl, footerTemplate: footerTpl, printBackground: true });
@@ -768,7 +815,7 @@ app.post("/api/pdf/mappe/:id", requireAuth, async (req, res) => {
       parts.push(await renderHTML(gefahrenHTML));
     }
 
-    await browser.close();
+    // browser bleibt im Pool offen
 
     // Merge
     const merged = await PDFDocument.create();
@@ -892,7 +939,7 @@ function buildEinsatzprotokollHTML(vorgang, stamm, dayIdx) {
 // PDF: Einsatzprotokoll (serverseitig via Puppeteer)
 // ═══════════════════════════════════════════════════════════════════
 app.post("/api/pdf/einsatzprotokoll/:id", requireAuth, async (req, res) => {
-  const puppeteer = require("puppeteer-core");
+  // puppeteer via BrowserPool
   try {
     const db = require("./db").getDb();
     const row = db.prepare("SELECT data, bereitschaft_code FROM vorgaenge WHERE id=?").get(req.params.id);
@@ -915,7 +962,7 @@ app.post("/api/pdf/einsatzprotokoll/:id", requireAuth, async (req, res) => {
       margin: { top: "10mm", right: "12mm", bottom: "15mm", left: "12mm" },
       printBackground: true
     });
-    await browser.close();
+    // browser bleibt im Pool offen
     const nr = (vorgang.event?.auftragsnr || req.params.id).replace(/[^a-zA-Z0-9_-]/g,"_");
     res.set({
       "Content-Type": "application/pdf",
@@ -932,7 +979,7 @@ app.post("/api/pdf/einsatzprotokoll/:id", requireAuth, async (req, res) => {
 // PDF: Angebot (serverseitig)
 // ═══════════════════════════════════════════════════════════════════
 app.post("/api/pdf/angebot/:id", requireAuth, async (req, res) => {
-  const puppeteer = require("puppeteer-core");
+  // puppeteer via BrowserPool
   try {
     const db = require("./db").getDb();
     const row = db.prepare("SELECT data FROM vorgaenge WHERE id=?").get(req.params.id);
@@ -943,11 +990,10 @@ app.post("/api/pdf/angebot/:id", requireAuth, async (req, res) => {
     const user = db.prepare("SELECT name, titel, ort, email, telefon, mobil, unterschrift FROM users WHERE sub=?").get(req.session.user.sub) || {};
     const { dayCalcs, totalCosts, activeDays } = req.body;
     const html = buildAngebotHTML(vorgang.event || {}, dayCalcs || [], totalCosts || 0, activeDays || [], stamm, kosten, user);
-    const browser = await puppeteer.launch({ executablePath: process.env.CHROMIUM_PATH || "/usr/bin/chromium-browser", args: ["--no-sandbox","--disable-setuid-sandbox","--disable-dev-shm-usage","--disable-gpu"], headless: true });
-    const page = await browser.newPage();
-    await page.setContent(html, { waitUntil: "domcontentloaded" });
-    const pdf = await page.pdf({ format: "A4", margin: { top: "20mm", right: "12mm", bottom: "20mm", left: "12mm" }, displayHeaderFooter: true, headerTemplate: `<div style="width:100%;padding:2mm 12mm 0;font-family:Arial,sans-serif;font-size:7.5pt;color:#888;display:flex;justify-content:space-between"><span>Fortsetzung Angebot</span><span>${(vorgang.event?.auftragsnr||"").replace(/"/g,"&quot;")}</span></div>`, footerTemplate: `<div style="width:100%;padding:0 12mm;font-family:Arial,sans-serif;font-size:7pt;color:#999;display:flex;justify-content:space-between;border-top:0.5px solid #ddd;padding-top:2mm"><span>BRK Sanitätswachdienst · Kostenaufstellung</span><span>${(vorgang.event?.auftragsnr||"").replace(/"/g,"&quot;")}</span><span>Seite <span class="pageNumber"></span>/<span class="totalPages"></span></span></div>`, printBackground: true });
-    await browser.close();
+
+
+    const pdf = await BrowserPool.renderPDF(html, { marginTop: "20mm", marginLeft: "12mm", header: `<div style="width:100%;padding:2mm 12mm 0;font-family:Arial,sans-serif;font-size:7.5pt;color:#888;display:flex;justify-content:space-between"><span>Fortsetzung Angebot</span><span>${(vorgang.event?.auftragsnr||"").replace(/"/g,"&quot;")}</span></div>`, footer: `<div style="width:100%;padding:0 12mm;font-family:Arial,sans-serif;font-size:7pt;color:#999;display:flex;justify-content:space-between;border-top:0.5px solid #ddd;padding-top:2mm"><span>BRK Sanitätswachdienst · Kostenaufstellung</span><span>${(vorgang.event?.auftragsnr||"").replace(/"/g,"&quot;")}</span><span>Seite <span class="pageNumber"></span>/<span class="totalPages"></span></span></div>` });
+
     const nr = (vorgang.event?.auftragsnr || req.params.id).replace(/[^a-zA-Z0-9_-]/g,"_");
     res.set({ "Content-Type": "application/pdf", "Content-Disposition": `attachment; filename="${nr}_Angebot.pdf"` });
     res.send(pdf);
@@ -958,7 +1004,7 @@ app.post("/api/pdf/angebot/:id", requireAuth, async (req, res) => {
 // PDF: AAB (serverseitig)
 // ═══════════════════════════════════════════════════════════════════
 app.post("/api/pdf/aab/:id", requireAuth, async (req, res) => {
-  const puppeteer = require("puppeteer-core");
+  // puppeteer via BrowserPool
   try {
     const db = require("./db").getDb();
     const row = db.prepare("SELECT data FROM vorgaenge WHERE id=?").get(req.params.id);
@@ -966,11 +1012,10 @@ app.post("/api/pdf/aab/:id", requireAuth, async (req, res) => {
     const stamm = db.prepare("SELECT * FROM bereitschaften WHERE code=?").get(req.session.user.bereitschaftCode) || {};
     const klauseln = db.prepare("SELECT id, titel, inhalt, reihenfolge FROM klauseln WHERE dokument='aab' ORDER BY reihenfolge").all();
     const html = buildAABHTML(stamm, req.session.user.bereitschaftCode, klauseln, vorgang.event?.auftragsnr||'');
-    const browser = await puppeteer.launch({ executablePath: process.env.CHROMIUM_PATH || "/usr/bin/chromium-browser", args: ["--no-sandbox","--disable-setuid-sandbox","--disable-dev-shm-usage","--disable-gpu"], headless: true });
-    const page = await browser.newPage();
-    await page.setContent(html, { waitUntil: "domcontentloaded" });
-    const pdf = await page.pdf({ format: "A4", margin: { top: "20mm", right: "12mm", bottom: "20mm", left: "12mm" }, displayHeaderFooter: true, headerTemplate: `<div style="width:100%;padding:2mm 12mm 0;font-family:Arial,sans-serif;font-size:7.5pt;color:#888;display:flex;justify-content:space-between"><span>Allgemeine Auftragsbedingungen</span><span>${(vorgang.event?.auftragsnr||"").replace(/"/g,"&quot;")}</span></div>`, footerTemplate: `<div style="width:100%;padding:0 12mm;font-family:Arial,sans-serif;font-size:7pt;color:#999;display:flex;justify-content:space-between;border-top:0.5px solid #ddd;padding-top:2mm"><span>Allgemeine Auftragsbedingungen · Anlage 3 zur Vereinbarung SanWD</span><span>${(vorgang.event?.auftragsnr||"").replace(/"/g,"&quot;")}</span><span>Seite <span class="pageNumber"></span>/<span class="totalPages"></span></span></div>`, printBackground: true });
-    await browser.close();
+
+
+    const pdf = await BrowserPool.renderPDF(html, { marginTop: "20mm", marginLeft: "12mm", header: `<div style="width:100%;padding:2mm 12mm 0;font-family:Arial,sans-serif;font-size:7.5pt;color:#888;display:flex;justify-content:space-between"><span>Allgemeine Auftragsbedingungen</span><span>${(vorgang.event?.auftragsnr||"").replace(/"/g,"&quot;")}</span></div>`, footer: `<div style="width:100%;padding:0 12mm;font-family:Arial,sans-serif;font-size:7pt;color:#999;display:flex;justify-content:space-between;border-top:0.5px solid #ddd;padding-top:2mm"><span>Allgemeine Auftragsbedingungen · Anlage 3 zur Vereinbarung SanWD</span><span>${(vorgang.event?.auftragsnr||"").replace(/"/g,"&quot;")}</span><span>Seite <span class="pageNumber"></span>/<span class="totalPages"></span></span></div>` });
+
     const nr = (vorgang.event?.auftragsnr || "AAB").replace(/[^a-zA-Z0-9_-]/g,"_");
     res.set({ "Content-Type": "application/pdf", "Content-Disposition": `attachment; filename="${nr}_AAB.pdf"` });
     res.send(pdf);
@@ -981,7 +1026,7 @@ app.post("/api/pdf/aab/:id", requireAuth, async (req, res) => {
 // PDF: Angebotsmappe (Gefahren + Angebot + AAB + Vertrag) – MERGED
 // ═══════════════════════════════════════════════════════════════════
 app.post("/api/pdf/mappe/:id", requireAuth, async (req, res) => {
-  const puppeteer = require("puppeteer-core");
+  // puppeteer via BrowserPool
   const { PDFDocument } = require("pdf-lib");
   try {
     const db = require("./db").getDb();
@@ -993,7 +1038,7 @@ app.post("/api/pdf/mappe/:id", requireAuth, async (req, res) => {
     const klauselnAAB = db.prepare("SELECT id, titel, inhalt, reihenfolge FROM klauseln WHERE dokument='aab' ORDER BY reihenfolge").all();
     const { dayCalcs, totalCosts, activeDays } = req.body;
 
-    const browser = await puppeteer.launch({ executablePath: process.env.CHROMIUM_PATH || "/usr/bin/chromium-browser", args: ["--no-sandbox","--disable-setuid-sandbox","--disable-dev-shm-usage","--disable-gpu"], headless: true });
+    const browser = await BrowserPool.get();
     const footerTpl = `<div style="width:100%;padding:0 12mm;font-family:Arial,sans-serif;font-size:7pt;color:#999;display:flex;justify-content:space-between;border-top:0.5px solid #ddd;padding-top:2mm"><span>Angebotsmappe · BRK Sanitätswachdienst</span><span>${(vorgang.event?.auftragsnr||"").replace(/"/g,"&quot;")}</span><span>Seite <span class="pageNumber"></span>/<span class="totalPages"></span></span></div>`;
     const headerTpl = `<div style="width:100%;padding:2mm 12mm 0;font-family:Arial,sans-serif;font-size:7.5pt;color:#888;display:flex;justify-content:space-between"><span>Angebotsmappe · BRK Sanitätswachdienst</span><span>${(vorgang.event?.auftragsnr||"").replace(/"/g,"&quot;")}</span></div>`;
     const pdfOpts = (marginLeft="12mm") => ({ format: "A4", margin: { top: "18mm", right: "12mm", bottom: "20mm", left: marginLeft }, displayHeaderFooter: true, headerTemplate: headerTpl, footerTemplate: footerTpl, printBackground: true });
@@ -1030,7 +1075,7 @@ app.post("/api/pdf/mappe/:id", requireAuth, async (req, res) => {
       parts.push(await renderHTML(gefahrenHTML));
     }
 
-    await browser.close();
+    // browser bleibt im Pool offen
 
     // Merge
     const merged = await PDFDocument.create();
@@ -1442,11 +1487,7 @@ function buildAABHTML(stamm, bereitschaftCode, klauseln, auftragsnr) {
     </div>
     <div style="font-size:12pt;font-weight:bold;text-align:center;margin-bottom:14px;border-bottom:2pt solid ${ROT};padding-bottom:6px">Allgemeine Auftragsbedingungen</div>
     ${sektionen}
-    <div style="margin-top:8px;border-top:1px solid #ccc;padding-top:4px;display:flex;justify-content:space-between;font-size:7pt;color:#999">
-      <span>${kvName} · Sanitätswachdienst</span>
-      <span>Stand: ${new Date().toLocaleDateString("de-DE")}</span>
-    </div>
-  </div>
+    <!-- Footer entfernt - Puppeteer footerTemplate -->
   </body></html>`;
 }
 
