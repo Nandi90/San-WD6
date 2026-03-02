@@ -539,7 +539,7 @@ function buildVertragHTML(vorgang, stamm, user) {
   <div style="margin-bottom:6px">und der Firma / Organisation / Verein: <strong>${esc(ev.veranstalter||ev.rechnungsempfaenger||"[Veranstalter]")}</strong><br>vertreten durch:</div>
   <div class="party-block avoid">
     <strong>${esc(ev.rechnungsempfaenger||ev.veranstalter||"")}</strong><br>
-    ${esc(ev.reStrasse||"")}<br>
+    ${ev.ansprechpartner?esc(ev.ansprechpartner)+"<br>":""}${esc(ev.reStrasse||"")}<br>
     ${esc(ev.rePlzOrt||"")}
     <div class="party-label">- nachstehend "Veranstalter" genannt -</div>
   </div>
@@ -745,23 +745,27 @@ app.post("/api/pdf/mappe/:id", requireAuth, async (req, res) => {
 
     const parts = [];
 
-    // 1. Gefahrenanalyse (falls dayCalcs vorhanden)
-    if (dayCalcs && dayCalcs.length > 0) {
-      const gefahrenHTML = buildGefahrenHTML(vorgang.event || {}, activeDays || [], dayCalcs, stamm);
-      parts.push(await renderHTML(gefahrenHTML));
-    }
+    // 0. Deckblatt
+    const deckblattHTML = buildDeckblattHTML(vorgang.event || {}, activeDays || [], stamm, user);
+    parts.push(await renderHTML(deckblattHTML));
 
-    // 2. Angebot
+    // 1. Angebot (Kostenaufstellung)
     const angebotHTML = buildAngebotHTML(vorgang.event || {}, dayCalcs || [], totalCosts || 0, activeDays || [], stamm, {}, user);
     parts.push(await renderHTML(angebotHTML, "20mm"));
+
+    // 2. Vertrag
+    const vertragHTML = buildVertragHTML(vorgang, stamm, user);
+    parts.push(await renderHTML(vertragHTML));
 
     // 3. AAB
     const aabHTML = buildAABHTML(stamm, req.session.user.bereitschaftCode, klauselnAAB, vorgang.event?.auftragsnr||'');
     parts.push(await renderHTML(aabHTML));
 
-    // 4. Vertrag
-    const vertragHTML = buildVertragHTML(vorgang, stamm, user);
-    parts.push(await renderHTML(vertragHTML));
+    // 4. Gefahrenanalyse
+    if (dayCalcs && dayCalcs.length > 0) {
+      const gefahrenHTML = buildGefahrenHTML(vorgang.event || {}, activeDays || [], dayCalcs, stamm);
+      parts.push(await renderHTML(gefahrenHTML));
+    }
 
     await browser.close();
 
@@ -1002,23 +1006,27 @@ app.post("/api/pdf/mappe/:id", requireAuth, async (req, res) => {
 
     const parts = [];
 
-    // 1. Gefahrenanalyse (falls dayCalcs vorhanden)
-    if (dayCalcs && dayCalcs.length > 0) {
-      const gefahrenHTML = buildGefahrenHTML(vorgang.event || {}, activeDays || [], dayCalcs, stamm);
-      parts.push(await renderHTML(gefahrenHTML));
-    }
+    // 0. Deckblatt
+    const deckblattHTML = buildDeckblattHTML(vorgang.event || {}, activeDays || [], stamm, user);
+    parts.push(await renderHTML(deckblattHTML));
 
-    // 2. Angebot
+    // 1. Angebot (Kostenaufstellung)
     const angebotHTML = buildAngebotHTML(vorgang.event || {}, dayCalcs || [], totalCosts || 0, activeDays || [], stamm, {}, user);
     parts.push(await renderHTML(angebotHTML, "20mm"));
+
+    // 2. Vertrag
+    const vertragHTML = buildVertragHTML(vorgang, stamm, user);
+    parts.push(await renderHTML(vertragHTML));
 
     // 3. AAB
     const aabHTML = buildAABHTML(stamm, req.session.user.bereitschaftCode, klauselnAAB, vorgang.event?.auftragsnr||'');
     parts.push(await renderHTML(aabHTML));
 
-    // 4. Vertrag
-    const vertragHTML = buildVertragHTML(vorgang, stamm, user);
-    parts.push(await renderHTML(vertragHTML));
+    // 4. Gefahrenanalyse
+    if (dayCalcs && dayCalcs.length > 0) {
+      const gefahrenHTML = buildGefahrenHTML(vorgang.event || {}, activeDays || [], dayCalcs, stamm);
+      parts.push(await renderHTML(gefahrenHTML));
+    }
 
     await browser.close();
 
@@ -1130,6 +1138,84 @@ function buildGefahrenHTML(ev, activeDays, dayCalcs, stamm) {
 // ═══════════════════════════════════════════════════════════════════
 // HTML Builder: Angebot
 // ═══════════════════════════════════════════════════════════════════
+
+// ═══════════════════════════════════════════════════════════════════
+// HTML Builder: Deckblatt Angebotsmappe
+// ═══════════════════════════════════════════════════════════════════
+function buildDeckblattHTML(ev, activeDays, stamm, user) {
+  const esc = s => (s||"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+  const fDate = s => s ? new Date(s).toLocaleDateString("de-DE") : "";
+  const ROT = "#c0392b";
+  const berName = esc(stamm.name || "");
+  const kvName = esc(stamm.kv_name || "");
+  const logoB64 = stamm.logo ? Buffer.from(stamm.logo).toString("base64") : null;
+  const logoHtml = logoB64
+    ? `<img src="data:image/png;base64,${logoB64}" style="height:90px;width:auto;display:block;margin:0 auto 12px">`
+    : `<div style="font-size:48pt;color:${ROT};text-align:center;margin-bottom:12px">&#10010;</div>`;
+
+  const firstDay = activeDays[0];
+  const lastDay = activeDays[activeDays.length - 1];
+  const dauerText = firstDay && lastDay
+    ? (firstDay.date === lastDay.date
+      ? fDate(firstDay.date)
+      : fDate(firstDay.date) + " – " + fDate(lastDay.date))
+    : "";
+  const tageText = activeDays.length > 1 ? activeDays.length + " Einsatztage" : "1 Einsatztag";
+
+  return `<!DOCTYPE html><html lang="de"><head><meta charset="utf-8"><style>
+    *{box-sizing:border-box;margin:0;padding:0}
+    body{font-family:Arial,Helvetica,sans-serif;color:#000}
+  </style></head><body>
+  <div style="height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:20mm">
+
+    <!-- Logo -->
+    <div style="margin-bottom:30px">
+      ${logoHtml}
+    </div>
+
+    <!-- Organisation -->
+    <div style="font-size:10pt;color:#666;letter-spacing:1.5px;text-transform:uppercase;margin-bottom:6px">Bayerisches Rotes Kreuz</div>
+    <div style="font-size:13pt;color:#333;font-weight:600;margin-bottom:4px">${kvName}</div>
+    <div style="font-size:11pt;color:${ROT};font-weight:700;margin-bottom:40px">${berName}</div>
+
+    <!-- Trennlinie -->
+    <div style="width:60%;height:2px;background:${ROT};margin-bottom:40px"></div>
+
+    <!-- Dokumenttitel -->
+    <div style="font-size:10pt;color:#888;letter-spacing:2px;text-transform:uppercase;margin-bottom:10px">Angebotsmappe</div>
+    <div style="font-size:9pt;color:#aaa;margin-bottom:35px">Sanitätswachdienst</div>
+
+    <!-- Veranstaltung -->
+    <div style="font-size:18pt;font-weight:bold;color:#1a1a2e;margin-bottom:10px;line-height:1.3">${esc(ev.name||"[Veranstaltung]")}</div>
+    <div style="font-size:11pt;color:#555;margin-bottom:6px">${esc(ev.ort||"")}${ev.adresse?", "+esc(ev.adresse):""}</div>
+    <div style="font-size:11pt;color:#333;font-weight:600;margin-bottom:4px">${dauerText}</div>
+    <div style="font-size:9pt;color:#888;margin-bottom:40px">${tageText}</div>
+
+    <!-- Auftragsnr -->
+    <div style="display:inline-block;border:1.5px solid ${ROT};border-radius:4px;padding:8px 24px;margin-bottom:50px">
+      <div style="font-size:8pt;color:#888;margin-bottom:2px">Auftrags-Nr.</div>
+      <div style="font-size:14pt;font-weight:bold;color:${ROT}">${esc(ev.auftragsnr||"—")}</div>
+    </div>
+
+    <!-- Anlagen -->
+    <div style="width:60%;text-align:left;margin-top:10px">
+      <div style="font-size:8pt;color:#888;text-transform:uppercase;letter-spacing:1px;margin-bottom:8px;border-bottom:1px solid #ddd;padding-bottom:4px">Inhalt dieser Mappe</div>
+      <div style="font-size:9pt;color:#555;line-height:2">
+        <div style="display:flex;justify-content:space-between"><span>1. Kostenaufstellung (Angebot)</span><span style="color:#bbb">mit Beauftragung</span></div>
+        <div style="display:flex;justify-content:space-between"><span>2. Vereinbarung Sanitätswachdienst</span><span style="color:#bbb">Vertrag</span></div>
+        <div style="display:flex;justify-content:space-between"><span>3. Allgemeine Auftragsbedingungen</span><span style="color:#bbb">AAB</span></div>
+        <div style="display:flex;justify-content:space-between"><span>4. Gefahrenanalyse</span><span style="color:#bbb">Anlage 1</span></div>
+      </div>
+    </div>
+
+    <!-- Ersteller -->
+    <div style="margin-top:40px;font-size:8pt;color:#bbb">
+      Erstellt von ${esc(user.name||"")} · ${new Date().toLocaleDateString("de-DE")}
+    </div>
+  </div>
+  </body></html>`;
+}
+
 function buildAngebotHTML(ev, dayCalcs, totalCosts, activeDays, stamm, kosten, user) {
   const ROT = "#c0392b";
   const esc = s => (s||"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
