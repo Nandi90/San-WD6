@@ -595,14 +595,14 @@ function buildVertragHTML(vorgang, stamm, user) {
   <div class="p avoid">6. Der Veranstalter verpflichtet sich ferner, dem BRK alle etwaigen Auflagen von Genehmigungsbehörden oder sonstigen Behörden und Organisationen, die die Veranstaltung betreffen, rechtzeitig und vollständig bekannt zu geben.</div>
 
   <div class="avoid">
-    <div class="section break">§4 Vergütung</div>
+    <div class="section">§4 Vergütung</div>
     <div class="p">Der Veranstalter verpflichtet sich, an das BRK für die sanitätsdienstliche Absicherung der Veranstaltung ein Entgelt zu entrichten. Die Vergütung und die Abrechnungsmodalitäten sind im Einzelnen in Anlage 2 geregelt, die Bestandteil dieser Vereinbarung ist.</div>
   </div>
-
-  <!-- §5+6 neue Seite -->
   <div class="avoid">
     <div class="section">§5 Haftung</div>
     <div class="p">Die Haftung des BRK aus dieser Vereinbarung wird auf Vorsatz und grobe Fahrlässigkeit beschränkt.</div>
+  </div>
+  <div class="avoid">
     <div class="section">§6 Allgemeine Regeln</div>
     <div class="p">Änderungen oder Ergänzungen dieser Vereinbarung bedürfen der Schriftform. Mündliche Nebenabreden sind nicht getroffen worden.</div>
     <div class="p">Soweit eine der Regelungen dieser Vereinbarung unwirksam ist oder wird, berührt dies nicht die Wirksamkeit der Vereinbarung insgesamt. In diesem Fall verpflichten sich die Parteien, die unwirksame Regelung durch eine wirksame zu ersetzen, die dem wirtschaftlichen Zweck der unwirksamen Regelung möglichst nahe kommt.</div>
@@ -733,7 +733,8 @@ app.post("/api/pdf/mappe/:id", requireAuth, async (req, res) => {
 
     const browser = await puppeteer.launch({ executablePath: process.env.CHROMIUM_PATH || "/usr/bin/chromium-browser", args: ["--no-sandbox","--disable-setuid-sandbox","--disable-dev-shm-usage","--disable-gpu"], headless: true });
     const footerTpl = `<div style="width:100%;padding:0 12mm;font-family:Arial,sans-serif;font-size:7pt;color:#999;display:flex;justify-content:space-between;border-top:0.5px solid #ddd;padding-top:2mm"><span>Angebotsmappe · BRK Sanitätswachdienst</span><span>${(vorgang.event?.auftragsnr||"").replace(/"/g,"&quot;")}</span><span>Seite <span class="pageNumber"></span>/<span class="totalPages"></span></span></div>`;
-    const pdfOpts = (marginLeft="12mm") => ({ format: "A4", margin: { top: "15mm", right: "12mm", bottom: "20mm", left: marginLeft }, displayHeaderFooter: true, headerTemplate: "<span></span>", footerTemplate: footerTpl, printBackground: true });
+    const headerTpl = `<div style="width:100%;padding:2mm 12mm 0;font-family:Arial,sans-serif;font-size:7.5pt;color:#888;display:flex;justify-content:space-between"><span>Angebotsmappe · BRK Sanitätswachdienst</span><span>${(vorgang.event?.auftragsnr||"").replace(/"/g,"&quot;")}</span></div>`;
+    const pdfOpts = (marginLeft="12mm") => ({ format: "A4", margin: { top: "18mm", right: "12mm", bottom: "20mm", left: marginLeft }, displayHeaderFooter: true, headerTemplate: headerTpl, footerTemplate: footerTpl, printBackground: true });
 
     const renderHTML = async (html, ml="12mm") => {
       const page = await browser.newPage();
@@ -994,7 +995,8 @@ app.post("/api/pdf/mappe/:id", requireAuth, async (req, res) => {
 
     const browser = await puppeteer.launch({ executablePath: process.env.CHROMIUM_PATH || "/usr/bin/chromium-browser", args: ["--no-sandbox","--disable-setuid-sandbox","--disable-dev-shm-usage","--disable-gpu"], headless: true });
     const footerTpl = `<div style="width:100%;padding:0 12mm;font-family:Arial,sans-serif;font-size:7pt;color:#999;display:flex;justify-content:space-between;border-top:0.5px solid #ddd;padding-top:2mm"><span>Angebotsmappe · BRK Sanitätswachdienst</span><span>${(vorgang.event?.auftragsnr||"").replace(/"/g,"&quot;")}</span><span>Seite <span class="pageNumber"></span>/<span class="totalPages"></span></span></div>`;
-    const pdfOpts = (marginLeft="12mm") => ({ format: "A4", margin: { top: "15mm", right: "12mm", bottom: "20mm", left: marginLeft }, displayHeaderFooter: true, headerTemplate: "<span></span>", footerTemplate: footerTpl, printBackground: true });
+    const headerTpl = `<div style="width:100%;padding:2mm 12mm 0;font-family:Arial,sans-serif;font-size:7.5pt;color:#888;display:flex;justify-content:space-between"><span>Angebotsmappe · BRK Sanitätswachdienst</span><span>${(vorgang.event?.auftragsnr||"").replace(/"/g,"&quot;")}</span></div>`;
+    const pdfOpts = (marginLeft="12mm") => ({ format: "A4", margin: { top: "18mm", right: "12mm", bottom: "20mm", left: marginLeft }, displayHeaderFooter: true, headerTemplate: headerTpl, footerTemplate: footerTpl, printBackground: true });
 
     const renderHTML = async (html, ml="12mm") => {
       const page = await browser.newPage();
@@ -1369,8 +1371,7 @@ function buildAngebotHTML(ev, dayCalcs, totalCosts, activeDays, stamm, kosten, u
       </tbody>
     </table>
     ${bemerkung}
-    <!-- UNTERSCHRIFT + BEAUFTRAGUNG (zusammen) -->
-    <div style="page-break-inside:avoid;break-inside:avoid">
+    <!-- UNTERSCHRIFT (bleibt bei Tabelle) -->
     <div style="margin-top:14px;display:flex;justify-content:flex-end;font-size:9pt">
       <div style="text-align:center;min-width:200px">
         ${user.unterschrift
@@ -1381,19 +1382,24 @@ function buildAngebotHTML(ev, dayCalcs, totalCosts, activeDays, stamm, kosten, u
       </div>
     </div>
     <!-- BEAUFTRAGUNG -->
-    <div style="margin-top:24px;border:2px solid #000;padding:18px 20px;page-break-inside:avoid;break-inside:avoid">
-      <div style="font-weight:bold;font-size:11pt;margin-bottom:10px">Beauftragung / Auftragsbestätigung</div>
-      <div style="font-size:9.5pt;margin-bottom:8px;line-height:1.8">
-        Hiermit bestätige ich die Beauftragung des Sanitätswachdienstes gemäß obigem Angebot und erkenne die angegebenen Konditionen an.
+    <div style="margin-top:24px;page-break-inside:avoid;break-inside:avoid">
+      <div style="font-size:8pt;color:#888;text-align:right;margin-bottom:4px">
+        Bezug: Angebot ${esc(ev.auftragsnr||"")} vom ${new Date().toLocaleDateString("de-DE")} &middot; ${esc(ev.name||"")}
       </div>
-      <div style="min-height:20px;max-height:40px"></div>
+      <div style="border:2px solid #000;padding:18px 20px">
+        <div style="font-weight:bold;font-size:11pt;margin-bottom:10px">Beauftragung / Auftragsbestätigung</div>
+        <div style="font-size:9.5pt;margin-bottom:8px;line-height:1.8">
+          Hiermit bestätige ich die Beauftragung des Sanitätswachdienstes gemäß obigem Angebot und erkenne die angegebenen Konditionen an.
+        </div>
+        <div style="min-height:25px;max-height:45px"></div>
       <div style="display:flex;justify-content:space-between;gap:28px;margin-top:4px">
         <div style="flex:1;text-align:center"><div style="border-top:1px solid #000;padding-top:5px;margin-bottom:3px">&nbsp;</div><div style="font-size:8pt;color:${ROT};font-weight:600">Ort, Datum</div></div>
         <div style="flex:2;text-align:center"><div style="border-top:1px solid #000;padding-top:5px;margin-bottom:3px">&nbsp;</div><div style="font-size:8pt;color:${ROT};font-weight:600">Unterschrift Auftraggeber</div></div>
         <div style="flex:2;text-align:center"><div style="border-top:1px solid #000;padding-top:5px;margin-bottom:3px">&nbsp;</div><div style="font-size:8pt;color:${ROT};font-weight:600">Name in Druckbuchstaben</div></div>
       </div>
     </div>
-    </div><!-- end wrapper -->
+    </div>
+
   </div>
   </body></html>`;
 }
