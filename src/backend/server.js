@@ -487,7 +487,7 @@ function buildVertragHTML(vorgang, stamm, user) {
     .doc-subtitle { font-size: 13pt; font-weight: bold; text-align: center; margin: 0 0 16px 0; }
 
     /* ── Paragraphen ── */
-    .section { font-weight: bold; margin-top: 12px; margin-bottom: 4px; padding-left: 3px; border-left: 3px solid ${ROT}; }
+    .section { font-weight: bold; margin-top: 12px; margin-bottom: 4px; padding-left: 3px; border-left: 3px solid ${ROT}; page-break-after: avoid; break-after: avoid; }
     .p { margin-bottom: 6px; }
     .avoid { page-break-inside: avoid; }
     .break { page-break-before: always; }
@@ -565,8 +565,10 @@ function buildVertragHTML(vorgang, stamm, user) {
   </div>
 
   <!-- §2 -->
+  <div style="page-break-inside:avoid;break-inside:avoid">
   <div class="section">§2 Verpflichtung des BRK</div>
   <div class="p avoid">1. Das BRK verpflichtet sich, nach Maßgabe dieser Vereinbarung einschließlich Anlagen die vorstehende Veranstaltung sanitätsdienstlich abzusichern. Hierzu stellt das BRK geeignetes Personal und die erforderliche Ausrüstung. Anzahl und Qualifikation des eingesetzten Personals, die erforderliche Ausstattung und Ausrüstung sowie die Bereitstellungszeiten richten sich nach Anlage 1, die Bestandteil dieser Vereinbarung ist.</div>
+  </div><!-- §2 header+first grouped -->
   <div class="p avoid">2. Das BRK ist gegenüber den Besuchern der Veranstaltung, die einer sanitätsdienstlichen Betreuung bedürfen (Patienten) verpflichtet, die sanitätsdienstliche Hilfe zu erbringen. Die Patienten haben gegen das BRK einen unmittelbaren Anspruch auf diese Leistungen. Die Leistungen werden vom Veranstalter gem. §5 dieses Vertrages vergütet. Die vorliegende Vereinbarung ist somit ein Vertrag zugunsten Dritter.</div>
   <div class="p avoid">3. Die medizinische Versorgung und der Transport von Notfallpatienten im Sinne des Art. 2 Abs. 2 BayRDG ist nicht Gegenstand dieser Vereinbarung. Soweit Versorgung und/oder Transport von Notfallpatienten erforderlich ist, wird dies durch die Rettungsleitstelle/Integrierte Leitstelle Ingolstadt gemäß Art. 9 BayRDG erledigt. Das BRK wird zur Erstversorgung der Patienten tätig, bis ein Rettungsmittel des öffentlich-rechtlichen Rettungsdienstes eingetroffen ist.</div>
   <div class="p avoid">4. Die Verpflichtungen in den Ziffern 1-3 dieses Abschnitts beschränken sich (auch gegenüber dritten) auf eine sanitätsdienstliche Absicherung, die im Regelfall nach billigem Ermessen des BRK auf der Grundlage der mitgeteilten Daten des Veranstalters (§§ 1, 3 Abs. 1) voraussichtlich als angemessen zu erwarten ist. Das BRK behält sich für den Katastrophenfall (auch außerhalb der Veranstaltung) nach dem BayKSG vor, Einsatzkräfte nach billigem Ermessen unter Beachtung der Verhältnismäßigkeit und den Anforderungen des BayKSG jederzeit von der Veranstaltung abzuziehen. Hierüber ist der Veranstalter unverzüglich zu unterrichten. In diesem Falle vermindert sich das nach §4 zu entrichtende Entgelt anteilig im Verhältnis der abgezogenen Einsatzkräfte.</div>
@@ -579,7 +581,10 @@ function buildVertragHTML(vorgang, stamm, user) {
   </div>
 
   <!-- §3 neue Seite -->
+  <div style="page-break-inside:avoid;break-inside:avoid">
   <div class="section">§ 3 Verpflichtung des Veranstalters</div>
+
+  </div><!-- §3 header+first grouped -->
   <div class="p avoid">1. Der Veranstalter informiert das BRK rechtzeitig und vollständig über alle Umstände, die für die Planung des sanitätsdienstlichen Einsatzes erforderlich sind. Dies sind insbesondere:
     <div style="padding-left:18px;margin-top:3px;color:${DUNKELGRAU}">· Erwartete Teilnehmerzahl<br>· Erwartete Zuschauer- bzw. Besucherzahl<br>· Erwartete Personen mit erhöhtem Sicherheitsrisiko (VIP)<br>· Besondere oder aus früheren Veranstaltungen bekannte Risiken der Veranstaltung<br>· Risikoschwerpunkte<br>· Streckenverlauf einschließlich Standort der Streckenposten des Veranstalters<br>· Zu- und Abwege zur Veranstaltung einschließlich Rettungswege<br>· Veranstaltungsdauer einschl. Vor- und Nachlaufzeiten</div>
   </div>
@@ -679,7 +684,7 @@ app.post("/api/pdf/angebot/:id", requireAuth, async (req, res) => {
     const browser = await puppeteer.launch({ executablePath: process.env.CHROMIUM_PATH || "/usr/bin/chromium-browser", args: ["--no-sandbox","--disable-setuid-sandbox","--disable-dev-shm-usage","--disable-gpu"], headless: true });
     const page = await browser.newPage();
     await page.setContent(html, { waitUntil: "domcontentloaded" });
-    const pdf = await page.pdf({ format: "A4", margin: { top: "20mm", right: "12mm", bottom: "20mm", left: "12mm" }, displayHeaderFooter: true, headerTemplate: `<div style="width:100%;padding:3mm 12mm 0;font-family:Arial,sans-serif;font-size:7.5pt;color:#999;text-align:right">${(vorgang.event?.auftragsnr||"")}</div>`, footerTemplate: `<div style="width:100%;text-align:center;font-size:8pt;color:#aaa;font-family:Arial,sans-serif">Seite <span class="pageNumber"></span> von <span class="totalPages"></span></div>`, printBackground: true });
+    const pdf = await page.pdf({ format: "A4", margin: { top: "20mm", right: "12mm", bottom: "20mm", left: "12mm" }, displayHeaderFooter: true, headerTemplate: `<div style="width:100%;padding:2mm 12mm 0;font-family:Arial,sans-serif;font-size:7.5pt;color:#888;display:flex;justify-content:space-between"><span>Fortsetzung Angebot</span><span>${(vorgang.event?.auftragsnr||"").replace(/"/g,"&quot;")}</span></div>`, footerTemplate: `<div style="width:100%;text-align:center;font-size:8pt;color:#aaa;font-family:Arial,sans-serif">Seite <span class="pageNumber"></span> von <span class="totalPages"></span></div>`, printBackground: true });
     await browser.close();
     const nr = (vorgang.event?.auftragsnr || req.params.id).replace(/[^a-zA-Z0-9_-]/g,"_");
     res.set({ "Content-Type": "application/pdf", "Content-Disposition": `attachment; filename="${nr}_Angebot.pdf"` });
@@ -936,7 +941,7 @@ app.post("/api/pdf/angebot/:id", requireAuth, async (req, res) => {
     const browser = await puppeteer.launch({ executablePath: process.env.CHROMIUM_PATH || "/usr/bin/chromium-browser", args: ["--no-sandbox","--disable-setuid-sandbox","--disable-dev-shm-usage","--disable-gpu"], headless: true });
     const page = await browser.newPage();
     await page.setContent(html, { waitUntil: "domcontentloaded" });
-    const pdf = await page.pdf({ format: "A4", margin: { top: "20mm", right: "12mm", bottom: "20mm", left: "12mm" }, displayHeaderFooter: true, headerTemplate: `<div style="width:100%;padding:3mm 12mm 0;font-family:Arial,sans-serif;font-size:7.5pt;color:#999;text-align:right">${(vorgang.event?.auftragsnr||"")}</div>`, footerTemplate: `<div style="width:100%;text-align:center;font-size:8pt;color:#aaa;font-family:Arial,sans-serif">Seite <span class="pageNumber"></span> von <span class="totalPages"></span></div>`, printBackground: true });
+    const pdf = await page.pdf({ format: "A4", margin: { top: "20mm", right: "12mm", bottom: "20mm", left: "12mm" }, displayHeaderFooter: true, headerTemplate: `<div style="width:100%;padding:2mm 12mm 0;font-family:Arial,sans-serif;font-size:7.5pt;color:#888;display:flex;justify-content:space-between"><span>Fortsetzung Angebot</span><span>${(vorgang.event?.auftragsnr||"").replace(/"/g,"&quot;")}</span></div>`, footerTemplate: `<div style="width:100%;text-align:center;font-size:8pt;color:#aaa;font-family:Arial,sans-serif">Seite <span class="pageNumber"></span> von <span class="totalPages"></span></div>`, printBackground: true });
     await browser.close();
     const nr = (vorgang.event?.auftragsnr || req.params.id).replace(/[^a-zA-Z0-9_-]/g,"_");
     res.set({ "Content-Type": "application/pdf", "Content-Disposition": `attachment; filename="${nr}_Angebot.pdf"` });
@@ -1278,9 +1283,9 @@ function buildAngebotHTML(ev, dayCalcs, totalCosts, activeDays, stamm, kosten, u
       </tbody>
     </table>
     ${bemerkung}
-    <!-- UNTERSCHRIFT BRK + BEAUFTRAGUNG wrapper -->
+    <!-- UNTERSCHRIFT + BEAUFTRAGUNG (zusammen) -->
     <div style="page-break-inside:avoid;break-inside:avoid">
-    <div style="margin-top:28px;display:flex;justify-content:flex-end;font-size:9pt">
+    <div style="margin-top:14px;display:flex;justify-content:flex-end;font-size:9pt">
       <div style="text-align:center;min-width:200px">
         ${user.unterschrift
           ? '<img src="'+user.unterschrift+'" style="height:50px;width:auto;display:block;margin:0 auto 2px">'
@@ -1295,7 +1300,7 @@ function buildAngebotHTML(ev, dayCalcs, totalCosts, activeDays, stamm, kosten, u
       <div style="font-size:9.5pt;margin-bottom:8px;line-height:1.8">
         Hiermit bestätige ich die Beauftragung des Sanitätswachdienstes gemäß obigem Angebot und erkenne die angegebenen Konditionen an.
       </div>
-      <div style="min-height:35px;max-height:60px"></div>
+      <div style="min-height:20px;max-height:40px"></div>
       <div style="display:flex;justify-content:space-between;gap:28px;margin-top:4px">
         <div style="flex:1;text-align:center"><div style="border-top:1px solid #000;padding-top:5px;margin-bottom:3px">&nbsp;</div><div style="font-size:8pt;color:${ROT};font-weight:600">Ort, Datum</div></div>
         <div style="flex:2;text-align:center"><div style="border-top:1px solid #000;padding-top:5px;margin-bottom:3px">&nbsp;</div><div style="font-size:8pt;color:${ROT};font-weight:600">Unterschrift Auftraggeber</div></div>
