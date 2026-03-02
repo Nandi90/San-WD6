@@ -37,7 +37,7 @@ const BrowserPool = (() => {
     if (_browser && _browser.isConnected()) return _browser;
     if (_launching) return _launching;
     _launching = (async () => {
-      // puppeteer via BrowserPool
+      const puppeteer = require("puppeteer-core");
       _browser = await puppeteer.launch({ executablePath: CHROMIUM, args: ARGS, headless: true });
       _browser.on("disconnected", () => { _browser = null; });
       console.log("🖨️ Chromium Browser gestartet (persistent)");
@@ -454,11 +454,7 @@ app.post("/api/pdf/vertrag/:id", requireAuth, async (req, res) => {
     const kosten = db.prepare("SELECT * FROM kostensaetze WHERE bereitschaft_code=?").get(req.session.user.bereitschaftCode) || {};
     const user = db.prepare("SELECT name, titel, ort, email, telefon, mobil, unterschrift FROM users WHERE sub=?").get(req.session.user.sub) || {};
     const html = buildVertragHTML(vorgang, stamm, user);
-    const browser = await puppeteer.launch({
-      executablePath: process.env.CHROMIUM_PATH || "/usr/bin/chromium-browser",
-      args: ["--no-sandbox","--disable-setuid-sandbox","--disable-dev-shm-usage","--disable-gpu"],
-      headless: true
-    });
+    const browser = await BrowserPool.get();
     const page = await browser.newPage();
     await page.setContent(html, { waitUntil: "domcontentloaded" });
     const pdf = await page.pdf({
@@ -469,7 +465,7 @@ app.post("/api/pdf/vertrag/:id", requireAuth, async (req, res) => {
       footerTemplate: `<div style="width:100%;padding:0 12mm;font-family:Arial,sans-serif;font-size:7pt;color:#999;display:flex;justify-content:space-between;border-top:0.5px solid #ddd;padding-top:2mm"><span>Vereinbarung SanWD · Anlagen: Gefahrenanalyse (1), Kostenaufstellung (2), AAB (3)</span><span>${(vorgang.event?.auftragsnr||"").replace(/"/g,"&quot;")}</span><span>Seite <span class="pageNumber"></span>/<span class="totalPages"></span></span></div>`,
       printBackground: true
     });
-    // browser bleibt im Pool offen
+    // browser bleibt im Pool offen (pages werden in renderHTML geschlossen)
     res.set({ "Content-Type":"application/pdf", "Content-Disposition":`inline; filename="Vertrag-${id}.pdf"` });
     res.send(pdf);
   } catch(e) {
@@ -659,27 +655,32 @@ function buildVertragHTML(vorgang, stamm, user) {
     <div class="p">Soweit eine der Regelungen dieser Vereinbarung unwirksam ist oder wird, berührt dies nicht die Wirksamkeit der Vereinbarung insgesamt. In diesem Fall verpflichten sich die Parteien, die unwirksame Regelung durch eine wirksame zu ersetzen, die dem wirtschaftlichen Zweck der unwirksamen Regelung möglichst nahe kommt.</div>
   </div>
 
-  <!-- Unterschriften -->
+  <!-- Unterschriften (gleiche Hoehe) -->
   <table class="sig-table avoid">
     <tr>
       <td class="sig-cell">
-        <div style="font-size:9pt;padding-bottom:4px">${ort}, ${today}</div>
+        <div style="font-size:9pt;margin-bottom:4px">${ort}, ${today}</div>
         <div class="sig-line" style="color:${DUNKELGRAU}">Ort, Datum</div>
       </td>
       <td style="width:10%"></td>
       <td class="sig-cell">
-        <div style="font-size:9pt;padding-bottom:4px">&nbsp;</div>
+        <div style="font-size:9pt;margin-bottom:4px">&nbsp;</div>
         <div class="sig-line" style="color:${DUNKELGRAU}">Ort, Datum</div>
       </td>
     </tr>
-    <tr><td colspan="3" style="height:16px"></td></tr>
+    <tr><td colspan="3" style="height:12px"></td></tr>
     <tr>
-      <td class="sig-cell">
-        ${unterschriftHtml}
-        <div class="sig-line"><strong>${unterzeichner}</strong><br><span style="color:${DUNKELGRAU}">${titel}</span></div>
+      <td class="sig-cell" style="vertical-align:bottom">
+        <div style="height:49px;position:relative">
+          ${unterschriftHtml}
+        </div>
+        <div class="sig-line">
+          <strong style="font-size:9pt">${unterzeichner}</strong><br>
+          <span style="color:${DUNKELGRAU};font-size:7.5pt">${titel}</span>
+        </div>
       </td>
       <td style="width:10%"></td>
-      <td class="sig-cell">
+      <td class="sig-cell" style="vertical-align:bottom">
         <div style="height:49px"></div>
         <div class="sig-line" style="color:${DUNKELGRAU}">Name, Veranstalter</div>
       </td>
@@ -767,7 +768,7 @@ app.post("/api/pdf/aab/:id", requireAuth, async (req, res) => {
 // ═══════════════════════════════════════════════════════════════════
 app.post("/api/pdf/mappe/:id", requireAuth, async (req, res) => {
   // puppeteer via BrowserPool
-  const { PDFDocument } = require("pdf-lib");
+  // pdf-lib nicht mehr noetig - Single-Render
   try {
     const db = require("./db").getDb();
     const row = db.prepare("SELECT data FROM vorgaenge WHERE id=?").get(req.params.id);
@@ -791,45 +792,61 @@ app.post("/api/pdf/mappe/:id", requireAuth, async (req, res) => {
       return pdf;
     };
 
-    const parts = [];
-
-    // 0. Deckblatt
+    // Alle HTML-Teile vorbereiten und zu einem Dokument kombinieren
     const deckblattHTML = buildDeckblattHTML(vorgang.event || {}, activeDays || [], stamm, user);
-    parts.push(await renderHTML(deckblattHTML));
-
-    // 1. Angebot (Kostenaufstellung)
     const angebotHTML = buildAngebotHTML(vorgang.event || {}, dayCalcs || [], totalCosts || 0, activeDays || [], stamm, {}, user);
-    parts.push(await renderHTML(angebotHTML, "20mm"));
-
-    // 2. Vertrag
     const vertragHTML = buildVertragHTML(vorgang, stamm, user);
-    parts.push(await renderHTML(vertragHTML));
-
-    // 3. AAB
     const aabHTML = buildAABHTML(stamm, req.session.user.bereitschaftCode, klauselnAAB, vorgang.event?.auftragsnr||'');
-    parts.push(await renderHTML(aabHTML));
+    const gefahrenHTML = (dayCalcs && dayCalcs.length > 0) ? buildGefahrenHTML(vorgang.event || {}, activeDays || [], dayCalcs, stamm) : null;
 
-    // 4. Gefahrenanalyse
-    if (dayCalcs && dayCalcs.length > 0) {
-      const gefahrenHTML = buildGefahrenHTML(vorgang.event || {}, activeDays || [], dayCalcs, stamm);
-      parts.push(await renderHTML(gefahrenHTML));
-    }
+    // Body-Inhalt aus jedem HTML extrahieren
+    const extractBody = (html) => {
+      const m = html.match(/<body[^>]*>([\s\S]*)<\/body>/i);
+      return m ? m[1] : html;
+    };
 
-    // browser bleibt im Pool offen
+    // Kombiniertes HTML mit Seitenumbruechen
+    const combinedHTML = `<!DOCTYPE html><html lang="de"><head><meta charset="utf-8"><style>
+      *{box-sizing:border-box}body{margin:0;font-family:Arial,Helvetica,sans-serif;font-size:10pt;color:#000}
+      @media print{body{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+        .page-break{page-break-before:always;break-before:page}
+        .no-break{page-break-inside:avoid!important;break-inside:avoid!important}
+        tr{page-break-inside:avoid;break-inside:avoid}
+      }
+      .doc-header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px;padding-bottom:6px;border-bottom:2px solid #c0392b}
+      .doc-header-left{display:flex;align-items:center;gap:8px}
+      .doc-header-org{font-size:8pt;color:#555;margin-top:3px}
+      .doc-header-right{text-align:right;font-size:8pt;color:#555}
+      .doc-header-right strong{color:#000}
+      .doc-title{font-size:11pt;font-weight:bold;text-align:center;color:#c0392b;margin:12px 0 4px}
+      .doc-subtitle{font-size:13pt;font-weight:bold;text-align:center;margin:0 0 16px}
+      .section{font-weight:bold;margin-top:12px;margin-bottom:4px;padding-left:3px;border-left:3px solid #c0392b;page-break-after:avoid;break-after:avoid}
+      .p{margin-bottom:6px}
+      .avoid{page-break-inside:avoid}
+      .break{page-break-before:always}
+      table{width:100%;border-collapse:collapse;font-size:9pt;margin-bottom:6px}
+      .info-table td{padding:2px 0;vertical-align:top}
+      .info-table td:first-child{width:155px;color:#555}
+      .party-block{background:#f5f5f5;border-left:3px solid #c0392b;padding:8px 10px;margin-bottom:10px;line-height:1.65}
+      .party-label{text-align:right;font-style:italic;color:#555;font-size:8.5pt;margin-top:4px}
+      .sig-table{width:100%;margin-top:24px;border-collapse:collapse}
+      .sig-cell{width:45%;text-align:center;vertical-align:bottom;padding:0 8px}
+      .sig-line{border-top:1px solid #000;padding-top:4px;font-size:8pt;margin-top:4px}
+    </style></head><body>
+      <div class="mappe-section">${extractBody(deckblattHTML)}</div>
+      <div class="mappe-section page-break">${extractBody(angebotHTML)}</div>
+      <div class="mappe-section page-break">${extractBody(vertragHTML)}</div>
+      <div class="mappe-section page-break">${extractBody(aabHTML)}</div>
+      ${gefahrenHTML ? '<div class="mappe-section page-break">' + extractBody(gefahrenHTML) + '</div>' : ''}
+    </body></html>`;
 
-    // Merge
-    const merged = await PDFDocument.create();
-    for (const pdfBytes of parts) {
-      const doc = await PDFDocument.load(pdfBytes);
-      const pages = await merged.copyPages(doc, doc.getPageIndices());
-      pages.forEach(p => merged.addPage(p));
-    }
-    const result = await merged.save();
+    // EIN EINZIGER PDF-Render
+    const result = await renderHTML(combinedHTML);
 
     const nr = (vorgang.event?.auftragsnr || req.params.id).replace(/[^a-zA-Z0-9_-]/g,"_");
     const name = (vorgang.event?.name || "Veranstaltung").substring(0,30).replace(/[^a-zA-Z0-9_äöüÄÖÜß -]/g,"").replace(/ /g,"_");
     res.set({ "Content-Type": "application/pdf", "Content-Disposition": `attachment; filename="${nr}_${name}_Angebotsmappe.pdf"` });
-    res.send(Buffer.from(result));
+    res.send(result);
   } catch(e) { console.error("Mappe PDF:", e); res.status(500).json({ error: e.message }); }
 });
 
@@ -950,11 +967,7 @@ app.post("/api/pdf/einsatzprotokoll/:id", requireAuth, async (req, res) => {
     const user = db.prepare("SELECT name, titel, mobil, telefon FROM users WHERE sub=?").get(req.session.user.sub) || {};
     const { dayIdx } = req.body;
     const html = buildEinsatzprotokollHTML(vorgang, stamm, dayIdx !== undefined ? dayIdx : 0);
-    const browser = await puppeteer.launch({
-      executablePath: process.env.CHROMIUM_PATH || "/usr/bin/chromium-browser",
-      args: ["--no-sandbox","--disable-setuid-sandbox","--disable-dev-shm-usage","--disable-gpu"],
-      headless: true
-    });
+    const browser = await BrowserPool.get();
     const page = await browser.newPage();
     await page.setContent(html, { waitUntil: "domcontentloaded" });
     const pdf = await page.pdf({
@@ -962,7 +975,7 @@ app.post("/api/pdf/einsatzprotokoll/:id", requireAuth, async (req, res) => {
       margin: { top: "10mm", right: "12mm", bottom: "15mm", left: "12mm" },
       printBackground: true
     });
-    // browser bleibt im Pool offen
+    // browser bleibt im Pool offen (pages werden in renderHTML geschlossen)
     const nr = (vorgang.event?.auftragsnr || req.params.id).replace(/[^a-zA-Z0-9_-]/g,"_");
     res.set({
       "Content-Type": "application/pdf",
@@ -1027,7 +1040,7 @@ app.post("/api/pdf/aab/:id", requireAuth, async (req, res) => {
 // ═══════════════════════════════════════════════════════════════════
 app.post("/api/pdf/mappe/:id", requireAuth, async (req, res) => {
   // puppeteer via BrowserPool
-  const { PDFDocument } = require("pdf-lib");
+  // pdf-lib nicht mehr noetig - Single-Render
   try {
     const db = require("./db").getDb();
     const row = db.prepare("SELECT data FROM vorgaenge WHERE id=?").get(req.params.id);
@@ -1051,45 +1064,61 @@ app.post("/api/pdf/mappe/:id", requireAuth, async (req, res) => {
       return pdf;
     };
 
-    const parts = [];
-
-    // 0. Deckblatt
+    // Alle HTML-Teile vorbereiten und zu einem Dokument kombinieren
     const deckblattHTML = buildDeckblattHTML(vorgang.event || {}, activeDays || [], stamm, user);
-    parts.push(await renderHTML(deckblattHTML));
-
-    // 1. Angebot (Kostenaufstellung)
     const angebotHTML = buildAngebotHTML(vorgang.event || {}, dayCalcs || [], totalCosts || 0, activeDays || [], stamm, {}, user);
-    parts.push(await renderHTML(angebotHTML, "20mm"));
-
-    // 2. Vertrag
     const vertragHTML = buildVertragHTML(vorgang, stamm, user);
-    parts.push(await renderHTML(vertragHTML));
-
-    // 3. AAB
     const aabHTML = buildAABHTML(stamm, req.session.user.bereitschaftCode, klauselnAAB, vorgang.event?.auftragsnr||'');
-    parts.push(await renderHTML(aabHTML));
+    const gefahrenHTML = (dayCalcs && dayCalcs.length > 0) ? buildGefahrenHTML(vorgang.event || {}, activeDays || [], dayCalcs, stamm) : null;
 
-    // 4. Gefahrenanalyse
-    if (dayCalcs && dayCalcs.length > 0) {
-      const gefahrenHTML = buildGefahrenHTML(vorgang.event || {}, activeDays || [], dayCalcs, stamm);
-      parts.push(await renderHTML(gefahrenHTML));
-    }
+    // Body-Inhalt aus jedem HTML extrahieren
+    const extractBody = (html) => {
+      const m = html.match(/<body[^>]*>([\s\S]*)<\/body>/i);
+      return m ? m[1] : html;
+    };
 
-    // browser bleibt im Pool offen
+    // Kombiniertes HTML mit Seitenumbruechen
+    const combinedHTML = `<!DOCTYPE html><html lang="de"><head><meta charset="utf-8"><style>
+      *{box-sizing:border-box}body{margin:0;font-family:Arial,Helvetica,sans-serif;font-size:10pt;color:#000}
+      @media print{body{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+        .page-break{page-break-before:always;break-before:page}
+        .no-break{page-break-inside:avoid!important;break-inside:avoid!important}
+        tr{page-break-inside:avoid;break-inside:avoid}
+      }
+      .doc-header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px;padding-bottom:6px;border-bottom:2px solid #c0392b}
+      .doc-header-left{display:flex;align-items:center;gap:8px}
+      .doc-header-org{font-size:8pt;color:#555;margin-top:3px}
+      .doc-header-right{text-align:right;font-size:8pt;color:#555}
+      .doc-header-right strong{color:#000}
+      .doc-title{font-size:11pt;font-weight:bold;text-align:center;color:#c0392b;margin:12px 0 4px}
+      .doc-subtitle{font-size:13pt;font-weight:bold;text-align:center;margin:0 0 16px}
+      .section{font-weight:bold;margin-top:12px;margin-bottom:4px;padding-left:3px;border-left:3px solid #c0392b;page-break-after:avoid;break-after:avoid}
+      .p{margin-bottom:6px}
+      .avoid{page-break-inside:avoid}
+      .break{page-break-before:always}
+      table{width:100%;border-collapse:collapse;font-size:9pt;margin-bottom:6px}
+      .info-table td{padding:2px 0;vertical-align:top}
+      .info-table td:first-child{width:155px;color:#555}
+      .party-block{background:#f5f5f5;border-left:3px solid #c0392b;padding:8px 10px;margin-bottom:10px;line-height:1.65}
+      .party-label{text-align:right;font-style:italic;color:#555;font-size:8.5pt;margin-top:4px}
+      .sig-table{width:100%;margin-top:24px;border-collapse:collapse}
+      .sig-cell{width:45%;text-align:center;vertical-align:bottom;padding:0 8px}
+      .sig-line{border-top:1px solid #000;padding-top:4px;font-size:8pt;margin-top:4px}
+    </style></head><body>
+      <div class="mappe-section">${extractBody(deckblattHTML)}</div>
+      <div class="mappe-section page-break">${extractBody(angebotHTML)}</div>
+      <div class="mappe-section page-break">${extractBody(vertragHTML)}</div>
+      <div class="mappe-section page-break">${extractBody(aabHTML)}</div>
+      ${gefahrenHTML ? '<div class="mappe-section page-break">' + extractBody(gefahrenHTML) + '</div>' : ''}
+    </body></html>`;
 
-    // Merge
-    const merged = await PDFDocument.create();
-    for (const pdfBytes of parts) {
-      const doc = await PDFDocument.load(pdfBytes);
-      const pages = await merged.copyPages(doc, doc.getPageIndices());
-      pages.forEach(p => merged.addPage(p));
-    }
-    const result = await merged.save();
+    // EIN EINZIGER PDF-Render
+    const result = await renderHTML(combinedHTML);
 
     const nr = (vorgang.event?.auftragsnr || req.params.id).replace(/[^a-zA-Z0-9_-]/g,"_");
     const name = (vorgang.event?.name || "Veranstaltung").substring(0,30).replace(/[^a-zA-Z0-9_äöüÄÖÜß -]/g,"").replace(/ /g,"_");
     res.set({ "Content-Type": "application/pdf", "Content-Disposition": `attachment; filename="${nr}_${name}_Angebotsmappe.pdf"` });
-    res.send(Buffer.from(result));
+    res.send(result);
   } catch(e) { console.error("Mappe PDF:", e); res.status(500).json({ error: e.message }); }
 });
 

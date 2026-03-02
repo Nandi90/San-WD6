@@ -163,6 +163,10 @@ router.get("/callback", async (req, res) => {
       bereitschaftCode,
     };
 
+    // Token-Infos fuer Session-Validierung
+    req.session.tokenExpiry = tokenSet.expires_at ? tokenSet.expires_at * 1000 : Date.now() + 300000;
+    req.session.refreshToken = tokenSet.refresh_token || "";
+    req.session.tokenEndpoint = client.issuer?.metadata?.token_endpoint || "";
     syncUser(req.session.user);
     audit(req.session.user, "login", "user", req.session.user.sub, `Rolle: ${rolle}`);
 
