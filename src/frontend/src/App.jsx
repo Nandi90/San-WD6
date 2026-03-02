@@ -1279,15 +1279,15 @@ function FeedbackButton({user,currentView,toast}){
 // MAIN APP
 // ═══════════════════════════════════════════════════════════════════════════
 const TABS=[{id:"events",label:"Vorgänge",icon:"📁"},{id:"event",label:"Veranstaltung",icon:"📋"},{id:"days",label:"Tage & Analyse",icon:"📊"},{id:"costs",label:"Kosten",icon:"💰"},{id:"pdf",label:"Dokumente",icon:"🖨️"},{id:"kunden",label:"Kunden",icon:"👥"},{id:"settings",label:"Stammdaten",icon:"⚙️"},{id:"releases",label:"Changelog",icon:"🆕"}];
-const APP_VERSION="v7.0";
-const LATEST_RELEASE={v:"v7.0",d:"27.02.2026",c:[
-  "🎉 Vollständiges Responsive Design für Smartphone und Tablet",
-  "☰ Hamburger-Menü: Slide-Drawer Navigation auf Mobile",
-  "⚠️ 4-Augen-Prinzip: Popup-Warnung wenn Prüfung durch höhere Stufe notwendig",
-  "🔔 Toast-Notifications statt Browser-Popups",
-  "✏️ Personal direkt in der Karte editierbar",
-  "📄 ILS-Vorschau bereinigt, Angebot mit Tel/Fax/Mobil",
-  "📐 Einheitliche 12mm Seitenränder bei allen Dokumenten",
+const APP_VERSION="v7.1";
+const LATEST_RELEASE={v:"v7.1",d:"02.03.2026",c:[
+  "📑 Angebotsmappe: Professionelles Deckblatt mit Logo, KV, Bereitschaft und Inhaltsverzeichnis",
+  "🔒 Angebot versendet: Checklist-Lock mit BRK-Modal statt Browser-Confirm",
+  "✅ Checklist bleibt editierbar auch bei gesperrtem Formular",
+  "🖨️ PDF-Performance: Persistenter Chromium-Pool + Single-Render Mappe (5x schneller)",
+  "📄 Vertrag: Ansprechpartner, logische Seitenumbrüche, Unterschriften auf gleicher Höhe",
+  "📋 Fußzeilen: Dokumentenzugehörigkeit + Auftragsnr auf allen PDFs",
+  "🔐 Keycloak Session-Validierung: Token-Expiry + automatischer Refresh",
 ]};
 
 export default function App(){
@@ -1806,6 +1806,25 @@ export default function App(){
               <div><div style={{fontWeight:700,fontSize:16}}>SanWD Changelog</div><div style={{fontSize:11,opacity:0.85}}>Versionshistorie und Änderungen</div></div>
             </div>
             {[
+              {v:"v7.1",d:"02.03.2026",c:[
+                "Angebotsmappe: Professionelles Deckblatt mit Logo, Kreisverband, Bereitschaft, Veranstaltungsinfo und Inhaltsverzeichnis",
+                "Angebotsmappe: Neue Reihenfolge – Deckblatt → Angebot → Vertrag → AAB → Gefahrenanalyse",
+                "Angebotsmappe: Single-Render Architektur – alle Dokumente in einem PDF-Durchlauf (5x schneller)",
+                "Angebot versendet: BRK-Design Bestätigungsmodal statt nativer Browser-Confirm",
+                "Angebot versendet: Checklist bleibt vollständig editierbar bei gesperrtem Formular",
+                "Angebot versendet: Race-Condition beim Lock-Save behoben (direkter API-Call statt Closure)",
+                "Angebot PDF: Beauftragung mit Bezug-Zeile wenn auf Folgeseite (Auftragsnr + Veranstaltung)",
+                "Vertrag: Ansprechpartner des Veranstalters wird angezeigt",
+                "Vertrag: §4 erzwungener Seitenumbruch entfernt – natürlicher Textfluss",
+                "Vertrag: Unterschriftenfelder auf gleicher Höhe, Veranstalter mit 2 Feldern (Unterschrift + Name)",
+                "Vertrag: Fußzeile mit Name, KV und Adresse sichtbar gestaltet",
+                "Alle PDFs: Kopfzeilen auf Folgeseiten mit Dokumenttyp + Auftragsnr",
+                "Alle PDFs: Fußzeilen mit Dokumentenzugehörigkeit, Anlagen-Referenzen und Auftragsnr",
+                "AAB: Leere zweite Seite durch redundanten Inline-Footer behoben",
+                "PDF-Engine: Persistenter Chromium Browser-Pool – einmaliger Start statt 9x pro Request",
+                "Entsperren: Setzt sowohl angebotVersendet als auch abgeschlossen zurück + Status auf Entwurf",
+                "Sicherheit: Keycloak Token-Validierung – Session wird bei BRK.id Abmeldung ungültig",
+              ]},
               {v:"v7.0",d:"27.02.2026",c:[
                 "🎉 Major Release: Vollständiges Responsive Design für Smartphone und Tablet",
                 "Hamburger-Menü: Slide-Drawer Navigation auf Mobile mit allen Tabs",
@@ -2063,7 +2082,7 @@ export default function App(){
           <button onClick={()=>window.location.href="/auth/logout"} style={{width:"100%",padding:"8px 12px",background:C.hellgrau,border:"none",borderRadius:4,fontSize:12,cursor:"pointer",fontFamily:FONT.sans,color:C.dunkelgrau}}>⏻ Abmelden</button>
         </div>
       </div>
-      <footer className="mob-hide" style={{padding:"12px 20px",borderTop:`1px solid ${C.mittelgrau}40`,textAlign:"center",fontSize:10,color:C.dunkelgrau,background:C.weiss}}>BRK Sanitätswachdienst v7.0 · {bereitschaft.name} · {stammdaten.kvName} · {year}</footer>
+      <footer className="mob-hide" style={{padding:"12px 20px",borderTop:`1px solid ${C.mittelgrau}40`,textAlign:"center",fontSize:10,color:C.dunkelgrau,background:C.weiss}}>BRK Sanitätswachdienst v7.1 · {bereitschaft.name} · {stammdaten.kvName} · {year}</footer>
       <FeedbackButton user={user} currentView={tab} toast={toast}/>
       <ToastContainer toasts={toasts} onDismiss={dismissToast}/>
       <ConfirmDialog open={!!confirmDlg} title={confirmDlg?.title} message={confirmDlg?.message} confirmLabel={confirmDlg?.confirmLabel} cancelLabel={confirmDlg?.cancelLabel} variant={confirmDlg?.variant} onConfirm={handleConfirm} onCancel={handleCancel}/>

@@ -554,7 +554,7 @@ function buildVertragHTML(vorgang, stamm, user) {
     .sig-line { border-top: 1px solid #000; padding-top: 4px; font-size: 8pt; margin-top: 4px; }
 
     /* ── Footer-Zeile ── */
-    .doc-footer-line { margin-top: 24px; font-size: 7pt; color: #aaa; text-align: center; border-top: 1px solid #eee; padding-top: 6px; }
+    .doc-footer-line { margin-top: 18px; font-size: 7pt; color: #999; text-align: center; border-top: 1px solid #ccc; padding-top: 6px; }
   </style></head><body>
 
   <!-- Header mit Logo und Auftragsnr -->
@@ -682,12 +682,14 @@ function buildVertragHTML(vorgang, stamm, user) {
       <td style="width:10%"></td>
       <td class="sig-cell" style="vertical-align:bottom">
         <div style="height:49px"></div>
-        <div class="sig-line" style="color:${DUNKELGRAU}">Name, Veranstalter</div>
+        <div class="sig-line" style="color:${DUNKELGRAU}">Unterschrift Veranstalter</div>
+        <div style="height:30px"></div>
+        <div class="sig-line" style="color:${DUNKELGRAU}">Name in Druckbuchstaben</div>
       </td>
     </tr>
   </table>
 
-  <div class="doc-footer-line">${unterzeichner} · BRK ${kvName} · ${kvAdresse}, ${kvPlzOrt}</div>
+  <div class="doc-footer-line" style="margin-top:14px;border-top:1px solid #ccc;padding-top:5px;font-size:7.5pt;color:#999">${unterzeichner} · BRK ${kvName} · ${kvAdresse}, ${kvPlzOrt}</div>
   </body></html>`;
 }
 
