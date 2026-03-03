@@ -44,23 +44,33 @@ router.get("/ils/fields", async (req, res) => {
 // ── Vorgang komplett zu Nextcloud synchen ────────────────────────
 router.post("/sync/:vorgangId", requireBL, async (req, res) => {
   try {
+    if (!nextcloud.isConfigured()) return res.status(501).json({ error: "Nextcloud nicht konfiguriert" });
     const bc = getBereitschaftCode(req);
     const row = getDb().prepare(
-      "SELECT data FROM vorgaenge WHERE id = ? AND bereitschaft_code = ?"
+      "SELECT data, bereitschaft_code FROM vorgaenge WHERE id = ? AND bereitschaft_code = ?"
     ).get(req.params.vorgangId, bc);
     if (!row) return res.status(404).json({ error: "Vorgang nicht gefunden" });
 
     const vorgang = JSON.parse(row.data);
-    const event = vorgang.event || {};
-    const remotePath = nextcloud.buildPath(bc, event.year || new Date().getFullYear(), event.auftragsnr, event.name);
+    vorgang.bereitschaft_code = row.bereitschaft_code;
+    const ev = vorgang.event || {};
+    const stamm = getDb().prepare("SELECT * FROM bereitschaften WHERE code=?").get(bc) || {};
 
-    // JSON sichern
-    await nextcloud.uploadFile(`${remotePath}/vorgang.json`, JSON.stringify(vorgang, null, 2), "application/json");
+    // PDFs generieren (falls BrowserPool verfügbar)
+    const pdfs = [];
+    const nr = (ev.auftragsnr || "").replace(/[^a-zA-Z0-9_-]/g, "_");
 
-    // Sync-Status updaten
-    getDb().prepare("UPDATE vorgaenge SET synced_at = datetime('now') WHERE id = ?").run(req.params.vorgangId);
+    // JSON als Backup
+    pdfs.push({ filename: `${nr}_vorgang.json`, data: Buffer.from(JSON.stringify(vorgang, null, 2)) });
 
-    res.json({ success: true, path: remotePath });
+    const result = await nextcloud.syncVorgang(req.session, vorgang, pdfs, stamm);
+
+    if (result.success) {
+      vorgang.nextcloudSync = { syncedAt: result.syncedAt, folder: result.folder, files: result.results.map(r => r.file), syncedBy: req.session.user.name };
+      getDb().prepare("UPDATE vorgaenge SET data = ?, synced_at = datetime('now') WHERE id = ?").run(JSON.stringify(vorgang), req.params.vorgangId);
+    }
+
+    res.json(result);
   } catch (err) {
     console.error("Sync Fehler:", err);
     res.status(500).json({ error: err.message });
