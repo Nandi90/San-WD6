@@ -395,6 +395,8 @@ function ConfirmModal({open,title,message,icon,onConfirm,onCancel,confirmText="B
 }
 function VorgangChecklist({checklist={},onChange,onLockSave,eventDate}){
   const [confirmKey,setConfirmKey]=useState(null);
+  const [showAblehnung,setShowAblehnung]=useState(false);
+  const [ablehnGrund,setAblehnGrund]=useState("");
   const isLocked=!!(checklist.angebotVersendet||checklist.abgeschlossen);
   const toggle=(key)=>{
     if((key==="angebotVersendet"||key==="abgeschlossen")&&checklist[key])return;
@@ -429,6 +431,36 @@ function VorgangChecklist({checklist={},onChange,onLockSave,eventDate}){
       </div>
     </div>);})}
     {allDone&&<div style={{textAlign:"center",padding:"10px",background:"#d4edda",borderRadius:6,marginTop:8,fontSize:13,color:"#155724",fontWeight:600}}>✅ Vorgang vollständig abgeschlossen</div>}
+
+    {/* Angebot abgelehnt Banner */}
+    {checklist.angebotAbgelehnt&&<div style={{marginTop:8,padding:"10px 14px",background:"#ffebee",border:"1px solid #ef9a9a",borderRadius:6,display:"flex",alignItems:"center",gap:10}}>
+      <span style={{fontSize:20}}>🚫</span>
+      <div style={{flex:1}}><div style={{fontSize:13,fontWeight:700,color:"#c62828"}}>Angebot abgelehnt</div>
+        <div style={{fontSize:11,color:"#b71c1c"}}>Grund: {checklist.ablehnungsGrund||"Nicht angegeben"}</div>
+        <div style={{fontSize:10,color:"#999"}}>Am {fTS(checklist.angebotAbgelehnt)}</div>
+      </div>
+      <button onClick={()=>{const newCL={...checklist};delete newCL.angebotAbgelehnt;delete newCL.ablehnungsGrund;onChange(newCL);if(isLocked&&onLockSave)onLockSave(newCL);}} style={{padding:"4px 10px",background:"#fff",border:"1px solid #ccc",borderRadius:4,fontSize:11,cursor:"pointer",fontFamily:FONT.sans}}>Zurücknehmen</button>
+    </div>}
+
+    {/* Ablehnung Button */}
+    {!checklist.angebotAbgelehnt&&!checklist.abgeschlossen&&<button onClick={()=>{setAblehnGrund("");setShowAblehnung(true);}} style={{marginTop:8,width:"100%",padding:"10px",background:"#fff",border:"1px dashed #e53935",borderRadius:6,color:"#c62828",fontSize:12,fontWeight:600,cursor:"pointer",fontFamily:FONT.sans,display:"flex",alignItems:"center",justifyContent:"center",gap:8}}>🚫 Angebot abgelehnt</button>}
+
+    {/* Ablehnung Modal */}
+    {showAblehnung&&<div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.5)",backdropFilter:"blur(3px)",zIndex:9999,display:"flex",alignItems:"center",justifyContent:"center"}} onClick={()=>setShowAblehnung(false)}>
+      <div style={{background:"#fff",borderRadius:10,padding:"24px 28px",maxWidth:400,width:"90%",boxShadow:"0 20px 60px rgba(0,0,0,0.3)"}} onClick={e=>e.stopPropagation()}>
+        <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:16}}><span style={{fontSize:24}}>🚫</span><div><div style={{fontSize:16,fontWeight:700,color:"#c62828"}}>Angebot abgelehnt</div><div style={{fontSize:11,color:C.dunkelgrau}}>Warum wurde das Angebot nicht angenommen?</div></div></div>
+        <div style={{display:"flex",flexDirection:"column",gap:6,marginBottom:12}}>
+          {["Zu teuer","Anderer Anbieter","Veranstaltung abgesagt","Eigene Absanitäter","Sonstiges"].map(g=>(
+            <button key={g} onClick={()=>setAblehnGrund(g)} style={{padding:"8px 14px",background:ablehnGrund===g?"#ffebee":"#f5f5f5",border:`1px solid ${ablehnGrund===g?"#e53935":"#ddd"}`,borderRadius:6,textAlign:"left",fontSize:13,cursor:"pointer",fontWeight:ablehnGrund===g?600:400,color:ablehnGrund===g?"#c62828":C.schwarz,fontFamily:FONT.sans}}>{g}</button>
+          ))}
+        </div>
+        {ablehnGrund==="Sonstiges"&&<input type="text" autoFocus placeholder="Grund eingeben..." onChange={e=>{if(e.target.value)setAblehnGrund(e.target.value);}} style={{width:"100%",padding:"8px 12px",border:"1px solid #ccc",borderRadius:6,fontSize:13,marginBottom:12,fontFamily:FONT.sans}}/>}
+        <div style={{display:"flex",gap:8,justifyContent:"flex-end"}}>
+          <button onClick={()=>setShowAblehnung(false)} style={{padding:"8px 18px",background:C.hellgrau,border:"none",borderRadius:6,fontSize:13,cursor:"pointer",fontFamily:FONT.sans}}>Abbrechen</button>
+          <button disabled={!ablehnGrund} onClick={()=>{const newCL={...checklist,angebotAbgelehnt:Date.now(),ablehnungsGrund:ablehnGrund};onChange(newCL);if(onLockSave)onLockSave(newCL);setShowAblehnung(false);}} style={{padding:"8px 22px",background:"#c62828",color:"#fff",border:"none",borderRadius:6,fontSize:13,fontWeight:700,cursor:"pointer",fontFamily:FONT.sans,opacity:ablehnGrund?1:0.4}}>Ablehnung speichern</button>
+        </div>
+      </div>
+    </div>}
     <ConfirmModal open={!!confirmKey} title={confirmLabels[confirmKey]?.title||""} message={confirmLabels[confirmKey]?.msg||""} icon={confirmLabels[confirmKey]?.icon} accent={confirmLabels[confirmKey]?.accent} confirmText="Ja, sperren" cancelText="Abbrechen" onConfirm={confirmLock} onCancel={()=>setConfirmKey(null)}/>
   </div>);
 }
@@ -1152,7 +1184,7 @@ function VorgaengeListe({bereitschaftCode,user,onLoad,onNew,onCopy,bereitschaft,
   const years=[thisYear+1];for(let y=thisYear;y>=2025;y--)years.push(y);
   const isArchive=viewYear<thisYear;
   const isVorplanung=viewYear>thisYear;
-  const totalBetrag=events.reduce((s,ev)=>{const e=ev.event;if(!e)return s;if(!!e.pauschalAktiv||(e.pauschalangebot&&parseFloat(e.pauschalangebot)>0))return s+parseFloat(e.pauschalangebot||0);const dc=(ev.days||[]).filter(d=>d.active);let t=0;try{dc.forEach(d=>{const c=calcDay(d,DEFAULT_STAMMDATEN.rates,e.verpflegung);t+=c.total;});}catch(e){console.error("Fehler:",e);}return s+t;},0);
+  const totalBetrag=events.reduce((s,ev)=>{const e=ev.event;if(!e)return s;if(e.checklist?.angebotAbgelehnt)return s;if(!!e.pauschalAktiv||(e.pauschalangebot&&parseFloat(e.pauschalangebot)>0))return s+parseFloat(e.pauschalangebot||0);const dc=(ev.days||[]).filter(d=>d.active);let t=0;try{dc.forEach(d=>{const c=calcDay(d,DEFAULT_STAMMDATEN.rates,e.verpflegung);t+=c.total;});}catch(e){console.error("Fehler:",e);}return s+t;},0);
 
   return(<div>
     {/* Year tabs */}
@@ -1177,21 +1209,23 @@ function VorgaengeListe({bereitschaftCode,user,onLoad,onNew,onCopy,bereitschaft,
     {/* ÜBERSICHT TABLE */}
     {(<Card title={`Angebote/Rechnungen ${viewYear}`} accent={C.mittelblau} sub={`Gesamt: ${f2(totalBetrag)} €`}>
       <div style={{overflowX:"auto"}}><table style={{width:"100%",borderCollapse:"collapse",fontSize:11}}>
-        <thead><tr style={{background:C.hellgrau}}>{[{l:"Lfd.Nr."},{l:"Datum"},{l:"Ansprechpartner",hide:true},{l:"Veranstaltung"},{l:"Kunde",hide:true},{l:"AG",hide:true},{l:"RG",hide:true},{l:"Betrag",right:true},{l:"Status"},{l:""}].map((h,hi)=><th key={hi} className={h.hide?"mob-hide":""} style={{padding:"6px 8px",textAlign:h.right?"right":"left",borderBottom:`2px solid ${C.mittelgrau}40`,fontSize:10,color:C.dunkelgrau,whiteSpace:"nowrap"}}>{h.l}</th>)}</tr></thead>
+        <thead><tr style={{background:C.hellgrau}}>{[{l:"Lfd.Nr."},{l:"Datum"},{l:"Ansprechpartner",hide:true},{l:"Veranstaltung"},{l:"Kunde",hide:true},{l:"AG",hide:true},{l:"Akz."},{l:"RG",hide:true},{l:"Betrag",right:true},{l:"Status"},{l:""}].map((h,hi)=><th key={hi} className={h.hide?"mob-hide":""} style={{padding:"6px 8px",textAlign:h.right?"right":"left",borderBottom:`2px solid ${C.mittelgrau}40`,fontSize:10,color:C.dunkelgrau,whiteSpace:"nowrap"}}>{h.l}</th>)}</tr></thead>
         <tbody>{events.filter(ev=>{if(!searchQ)return true;const q=searchQ.toLowerCase();const e=ev.event||{};return(e.name||"").toLowerCase().includes(q)||(e.auftragsnr||"").toLowerCase().includes(q)||(e.veranstalter||"").toLowerCase().includes(q)||(e.rechnungsempfaenger||"").toLowerCase().includes(q)||(e.ansprechpartner||"").toLowerCase().includes(q)||(e.ort||"").toLowerCase().includes(q);}).sort((a,b)=>{const na=a.event?.auftragsnr||"";const nb=b.event?.auftragsnr||"";return nb.localeCompare(na,undefined,{numeric:true});}).map((ev,i)=>{const e=ev.event||{};const cl=e.checklist||{};const dc=(ev.days||[]).filter(d=>d.active);const firstDate=dc[0]?.date;let betrag=0;if(!!e.pauschalAktiv||(e.pauschalangebot&&parseFloat(e.pauschalangebot)>0)){betrag=parseFloat(e.pauschalangebot||0);}else{try{dc.forEach(d=>{betrag+=calcDay(d,DEFAULT_STAMMDATEN.rates,e.verpflegung).total;});}catch(e){console.error("Fehler:",e);}}
-          return(<tr key={i} style={{borderBottom:`1px solid ${C.hellgrau}`,cursor:"pointer"}} onClick={()=>isArchive?onCopy(ev):onLoad(ev)}>
+          const isAbgelehnt=!!cl.angebotAbgelehnt;const isAkzeptiert=!!cl.angebotSigniertVorliegend;
+          return(<tr key={i} style={{borderBottom:`1px solid ${C.hellgrau}`,cursor:"pointer",opacity:isAbgelehnt?0.5:1,textDecoration:isAbgelehnt?"line-through":"none"}} onClick={()=>isArchive?onCopy(ev):onLoad(ev)}>
             <td style={{padding:"5px 8px",fontWeight:600,color:C.rot,fontFamily:FONT.mono,whiteSpace:"nowrap"}}>{e.auftragsnr||"n/a"}</td>
             <td style={{padding:"5px 8px",whiteSpace:"nowrap"}}>{firstDate?fDate(firstDate):""}</td>
             <td className="mob-hide" style={{padding:"5px 8px"}}>{e.ansprechpartner||""}</td>
             <td style={{padding:"5px 8px",fontWeight:600}}>{e.name||"n/a"}</td>
             <td className="mob-hide" style={{padding:"5px 8px"}}>{e.veranstalter||e.rechnungsempfaenger||""}</td>
             <td className="mob-hide" style={{padding:"5px 8px",textAlign:"center"}}>{cl.angebotVersendet?<span style={{color:"#1a7a3a",fontSize:14}}>✅</span>:<span style={{color:"#e53935",fontSize:14}}>❌</span>}</td>
+            <td style={{padding:"5px 8px",textAlign:"center"}} title={isAbgelehnt?("Abgelehnt: "+(cl.ablehnungsGrund||"")):isAkzeptiert?"Akzeptiert":"Offen"}>{isAbgelehnt?<span style={{color:"#c62828",fontSize:14,fontWeight:700}}>✖</span>:isAkzeptiert?<span style={{color:"#1a7a3a",fontSize:14}}>✔</span>:<span style={{color:"#bbb",fontSize:14}}>❓</span>}</td>
             <td className="mob-hide" style={{padding:"5px 8px",textAlign:"center"}}>{cl.fibuWeitergeleitet?<span style={{color:"#1a7a3a",fontSize:14}}>✅</span>:<span style={{color:"#e53935",fontSize:14}}>❌</span>}</td>
             <td style={{padding:"5px 8px",textAlign:"right",fontFamily:FONT.mono,fontWeight:600}}>{betrag>0?f2(betrag):""}</td>
             <td style={{padding:"5px 8px"}}>{cl.abgeschlossen?<span style={{color:"#1a7a3a",fontSize:10}}>✅ Abgeschl.</span>:<span style={{color:"#d4920a",fontSize:10}}>⏳ Offen</span>}</td>
             <td style={{padding:"5px 4px",textAlign:"center"}}><button onClick={(e)=>{e.stopPropagation();del(ev.id);}} title="Vorgang löschen" style={{background:"none",border:"none",cursor:"pointer",fontSize:14,color:"#ccc",padding:"2px 4px"}} onMouseEnter={e=>e.currentTarget.style.color="#e53935"} onMouseLeave={e=>e.currentTarget.style.color="#ccc"}>🗑️</button></td>
           </tr>);})}</tbody>
-        <tfoot><tr style={{borderTop:`2px solid ${C.rot}`}}><td colSpan={8} style={{padding:"6px 8px",fontWeight:700}}>Summe</td><td style={{padding:"6px 8px",textAlign:"right",fontWeight:800,color:C.rot,fontFamily:FONT.mono}}>{f2(totalBetrag)}</td><td></td></tr></tfoot>
+        <tfoot><tr style={{borderTop:`2px solid ${C.rot}`}}><td colSpan={9} style={{padding:"6px 8px",fontWeight:700}}>Summe</td><td style={{padding:"6px 8px",textAlign:"right",fontWeight:800,color:C.rot,fontFamily:FONT.mono}}>{f2(totalBetrag)}</td><td></td></tr></tfoot>
       </table></div>
     </Card>)}
 
