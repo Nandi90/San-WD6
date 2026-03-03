@@ -79,8 +79,31 @@ const PORT = process.env.PORT || 3000;
 
 // ── Middleware ────────────────────────────────────────────────────
 app.set("trust proxy", 1);
-app.use(helmet({ contentSecurityPolicy: false }));
-app.use(cors({ origin: process.env.APP_URL || "http://localhost:5173", credentials: true }));
+app.use(helmet({
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'self'"],
+      scriptSrc: ["'self'", "https://unpkg.com"],
+      styleSrc: ["'self'", "'unsafe-inline'", "https://unpkg.com", "https://fonts.googleapis.com"],
+      imgSrc: ["'self'", "data:", "blob:", "https://*.tile.openstreetmap.org", "https://unpkg.com", "https://sgx.geodatenzentrum.de", "https://geoservices.bayern.de"],
+      connectSrc: ["'self'", "https://geocode.search.hereapi.com", "https://nominatim.openstreetmap.org", "https://api.what3words.com", "https://sgx.geodatenzentrum.de", "https://geoservices.bayern.de"],
+      fontSrc: ["'self'", "https://unpkg.com", "https://fonts.gstatic.com"],
+      frameSrc: ["'none'"],
+      objectSrc: ["'none'"],
+      baseUri: ["'self'"],
+    }
+  }
+}));
+app.use(cors({
+  origin: (() => {
+    if (!process.env.APP_URL) {
+      console.error("FATAL: APP_URL nicht gesetzt");
+      process.exit(1);
+    }
+    return process.env.APP_URL;
+  })(),
+  credentials: true
+}));
 app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ extended: true }));
 app.use(morgan("short"));
@@ -92,11 +115,17 @@ const sessionDb = new (require("better-sqlite3"))(
 );
 app.use(session({
   store: new SqliteStore({ client: sessionDb, expired: { clear: true, intervalMs: 900000 } }),
-  secret: process.env.SESSION_SECRET || "change-me-in-production",
+  secret: (() => {
+    if (!process.env.SESSION_SECRET || process.env.SESSION_SECRET.length < 32) {
+      console.error("FATAL: SESSION_SECRET nicht gesetzt oder zu kurz (min. 32 Zeichen)");
+      process.exit(1);
+    }
+    return process.env.SESSION_SECRET;
+  })(),
   resave: false,
   saveUninitialized: false,
   cookie: {
-    secure: false,
+    secure: process.env.NODE_ENV === "production",
     httpOnly: true,
     maxAge: 24 * 60 * 60 * 1000,
     sameSite: "lax",

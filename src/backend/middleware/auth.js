@@ -12,7 +12,11 @@ let oidcClient = null;
 async function getClient() {
   if (oidcClient) return oidcClient;
   if (!process.env.OIDC_ISSUER) {
-    console.warn("⚠️  OIDC nicht konfiguriert — Dev-Modus aktiv");
+    if (process.env.NODE_ENV === "production") {
+      console.error("FATAL: OIDC_ISSUER nicht gesetzt bei NODE_ENV=production");
+      process.exit(1);
+    }
+    console.warn("⚠️  OIDC nicht konfiguriert — Dev-Modus aktiv (nur development!)");
     return null;
   }
   const issuer = await Issuer.discover(process.env.OIDC_ISSUER);
@@ -89,7 +93,10 @@ const router = express.Router();
 router.get("/login", async (req, res) => {
   const client = await getClient();
   if (!client) {
-    // Dev-Modus
+    // Dev-Modus – NUR bei explizitem development
+    if (process.env.NODE_ENV === "production") {
+      return res.status(503).send("OIDC nicht verfügbar. Bitte Admin kontaktieren.");
+    }
     req.session.user = {
       sub: "dev-admin",
       name: "Ferdinand Liebl",
