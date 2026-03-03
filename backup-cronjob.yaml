@@ -1,0 +1,41 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: sanwd-db-backup
+  namespace: sanwd
+spec:
+  schedule: "0 2 * * *"  # Täglich um 02:00
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          nodeName: k8s-master-01
+          containers:
+          - name: backup
+            image: alpine:3.19
+            command:
+            - /bin/sh
+            - -c
+            - |
+              apk add --no-cache sqlite
+              TIMESTAMP=$(date +%Y%m%d_%H%M%S)
+              BACKUP_DIR=/data/backups
+              mkdir -p $BACKUP_DIR
+              # SQLite Online-Backup (sicher bei laufender DB)
+              sqlite3 /data/sanwd.db ".backup '$BACKUP_DIR/sanwd_$TIMESTAMP.db'"
+              # Sessions-DB auch sichern
+              sqlite3 /data/sessions.db ".backup '$BACKUP_DIR/sessions_$TIMESTAMP.db'"
+              # Alte Backups löschen (>30 Tage)
+              find $BACKUP_DIR -name "*.db" -mtime +30 -delete
+              echo "✅ Backup OK: sanwd_$TIMESTAMP.db"
+              ls -lh $BACKUP_DIR/
+            volumeMounts:
+            - name: data
+              mountPath: /data
+          restartPolicy: OnFailure
+          volumes:
+          - name: data
+            persistentVolumeClaim:
+              claimName: sanwd-data-v65

@@ -10,6 +10,7 @@ const helmet = require("helmet");
 const cors = require("cors");
 const path = require("path");
 const morgan = require("morgan");
+const rateLimit = require("express-rate-limit");
 
 const db = require("./db");
 const authRouter = require("./middleware/auth");
@@ -107,6 +108,34 @@ app.use(cors({
 app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ extended: true }));
 app.use(morgan("short"));
+
+// ── Rate-Limiting (Security F-010) ───────────────────────────────
+const apiLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 100,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: "Zu viele Anfragen. Bitte warten." }
+});
+const authLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 10,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: "Zu viele Login-Versuche. Bitte 1 Minute warten."
+});
+const pdfLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 10,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: "Zu viele PDF-Anfragen. Bitte warten." }
+});
+app.use("/auth/login", authLimiter);
+app.use("/auth/emergency", authLimiter);
+app.use("/auth/emergency-login", authLimiter);
+app.use("/api/pdf", pdfLimiter);
+app.use("/api/", apiLimiter);
 
 // ── Sessions (persistenter SQLite-Store) ──────────────────────────
 const SqliteStore = require("better-sqlite3-session-store")(session);

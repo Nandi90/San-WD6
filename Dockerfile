@@ -12,7 +12,8 @@ COPY src/backend/package.json src/backend/package-lock.json* ./
 RUN npm ci --production 2>/dev/null || npm install --production
 COPY src/backend/ ./
 COPY --from=frontend-build /build/dist ./public
-RUN mkdir -p /data/pdf
+RUN addgroup -S app && adduser -S app -G app &&     mkdir -p /data/pdf &&     chown -R app:app /app /data
 EXPOSE 3000
+USER app
 ENTRYPOINT ["/sbin/tini", "--"]
 CMD ["node", "server.js"]

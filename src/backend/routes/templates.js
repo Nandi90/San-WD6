@@ -4,7 +4,14 @@ const router = express.Router();
 const { getDb, audit } = require("../db");
 const { requireAuth, requireAdmin } = require("../middleware/rbac");
 
-const upload = multer({ limits: { fileSize: 10 * 1024 * 1024 } }); // 10MB max
+const upload = multer({
+  limits: { fileSize: 10 * 1024 * 1024 },
+  fileFilter: (req, file, cb) => {
+    const allowed = ["application/pdf", "application/vnd.openxmlformats-officedocument.wordprocessingml.document"];
+    if (allowed.includes(file.mimetype)) { cb(null, true); }
+    else { cb(new Error("Nur PDF und DOCX erlaubt"), false); }
+  }
+}); // 10MB max
 
 router.use(requireAuth);
 

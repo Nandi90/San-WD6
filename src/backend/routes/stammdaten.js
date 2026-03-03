@@ -4,7 +4,14 @@ const router = express.Router();
 const { getDb, audit } = require("../db");
 const { requireAuth, requireBL, requireAdmin, getBereitschaftCode } = require("../middleware/rbac");
 
-const upload = multer({ limits: { fileSize: 2 * 1024 * 1024 } });
+const upload = multer({
+  limits: { fileSize: 2 * 1024 * 1024 },
+  fileFilter: (req, file, cb) => {
+    const allowed = ["image/png", "image/jpeg", "image/svg+xml", "image/webp"];
+    if (allowed.includes(file.mimetype)) { cb(null, true); }
+    else { cb(new Error("Nur Bilder erlaubt (PNG, JPEG, SVG, WebP)"), false); }
+  }
+});
 router.use(requireAuth);
 
 // ── Eigene Bereitschaft laden ────────────────────────────────────
