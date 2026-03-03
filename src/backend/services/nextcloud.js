@@ -1,49 +1,52 @@
 /**
  * ═══════════════════════════════════════════════════════════════════
  * Nextcloud WebDAV Service
- * Unterstützt: Bearer Token (User-OIDC) ODER Service-Account (User/PW)
+ * Config aus DB (app_config) + Bearer Auth (User-OIDC)
  * ═══════════════════════════════════════════════════════════════════
  */
 
 const { createClient } = require("webdav");
 
-const NC_URL = () => process.env.NEXTCLOUD_URL || "";
-const NC_USER = () => process.env.NEXTCLOUD_USER || "";
-const NC_PASS = () => process.env.NEXTCLOUD_PASSWORD || "";
-const NC_BASE = () => process.env.NEXTCLOUD_BASE_PATH || "/SanWD";
-
-// Service-Account Client (Fallback)
-let _serviceClient = null;
-function getServiceClient() {
-  if (_serviceClient) return _serviceClient;
-  if (!NC_URL() || !NC_USER()) return null;
-  _serviceClient = createClient(
-    `${NC_URL()}/remote.php/dav/files/${NC_USER()}`,
-    { username: NC_USER(), password: NC_PASS() }
-  );
-  return _serviceClient;
+function cfg(key, fallback) {
+  try {
+    const { getConfig } = require("../db");
+    return getConfig(key, fallback || "");
+  } catch { return process.env[key.toUpperCase().replace(/^nextcloud_/, "NEXTCLOUD_")] || fallback || ""; }
 }
 
-// User-Token Client (bevorzugt)
+// User-Token Client (OIDC Bearer)
 function getUserClient(accessToken, username) {
-  if (!NC_URL() || !accessToken) return null;
-  const uid = username || "user";
+  const url = cfg("nextcloud_url");
+  if (!url || !accessToken) return null;
   return createClient(
-    `${NC_URL()}/remote.php/dav/files/${uid}`,
+    `${url}/remote.php/dav/files/${username}`,
     { headers: { "Authorization": `Bearer ${accessToken}` } }
   );
 }
 
-// Bester verfügbarer Client
-function getClient(session) {
-  // 1. User-Token (OIDC SSO)
-  if (session?.accessToken && session?.user?.sub) {
-    const uid = session.user.ncUser || session.user.email?.split("@")[0] || session.user.sub;
-    return { client: getUserClient(session.accessToken, uid), type: "user", uid };
+// Service-Account Client (Fallback)
+let _serviceClient = null;
+function getServiceClient() {
+  const url = cfg("nextcloud_url");
+  const user = process.env.NEXTCLOUD_USER || "";
+  const pass = process.env.NEXTCLOUD_PASSWORD || "";
+  if (!url || !user) return null;
+  if (!_serviceClient) {
+    _serviceClient = createClient(`${url}/remote.php/dav/files/${user}`, { username: user, password: pass });
   }
-  // 2. Service-Account (Fallback)
+  return _serviceClient;
+}
+
+function getClient(session) {
+  // 1. User-Token (bevorzugt)
+  if (session?.accessToken && session?.user) {
+    const uid = session.user.email?.split("@")[0] || session.user.sub;
+    const wc = getUserClient(session.accessToken, uid);
+    if (wc) return { client: wc, type: "user", uid };
+  }
+  // 2. Service-Account
   const sc = getServiceClient();
-  if (sc) return { client: sc, type: "service", uid: NC_USER() };
+  if (sc) return { client: sc, type: "service", uid: process.env.NEXTCLOUD_USER };
   return { client: null, type: "none", uid: null };
 }
 
@@ -57,7 +60,7 @@ async function ensureDir(wc, dirPath) {
       if (!(await wc.exists(current))) {
         await wc.createDirectory(current);
       }
-    } catch { /* dir exists or parent missing - continue */ }
+    } catch { /* dir exists */ }
   }
 }
 
@@ -70,28 +73,38 @@ async function uploadFile(wc, remotePath, data, contentType = "application/pdf")
 }
 
 /**
- * Vorgang-Ordner:
- * /SanWD/{BC}/{Jahr}/{Auftragsnr} - {Veranstaltung}/
+ * Pfad aus Template bauen
+ * Platzhalter: $bereitschaft, $bc, $jahr, $auftragsnr, $veranstaltung
  */
-function buildPath(bc, year, auftragsnr, eventName) {
+function buildPath(bereitschaftName, bereitschaftCode, year, auftragsnr, eventName) {
   const safe = (s) => (s || "unbekannt").replace(/[/\\:*?"<>|]/g, "_").substring(0, 60);
-  return `${NC_BASE()}/${bc}/${year}/${safe(auftragsnr)} - ${safe(eventName)}`;
+  const basePath = cfg("nextcloud_base_path", "Verwaltung Bereitschaft $bereitschaft/SanWD");
+  const subFolder = cfg("nextcloud_subfolder", "$auftragsnr - $veranstaltung");
+  
+  const replacePlaceholders = (tpl) => tpl
+    .replace(/\$bereitschaft/g, safe(bereitschaftName))
+    .replace(/\$bc/g, safe(bereitschaftCode))
+    .replace(/\$jahr/g, String(year))
+    .replace(/\$auftragsnr/g, safe(auftragsnr))
+    .replace(/\$veranstaltung/g, safe(eventName));
+  
+  const base = replacePlaceholders(basePath);
+  const sub = replacePlaceholders(subFolder);
+  return `/${base}/${sub}`;
 }
 
-/**
- * Alle PDFs eines Vorgangs in Nextcloud hochladen
- */
-async function syncVorgang(session, vorgang, pdfs) {
+async function syncVorgang(session, vorgang, pdfs, stamm) {
   const { client: wc, type, uid } = getClient(session);
   if (!wc) {
-    console.warn("Nextcloud: Kein Client verfügbar (weder Token noch Service-Account)");
-    return { success: false, error: "Nextcloud nicht konfiguriert" };
+    console.warn("Nextcloud: Kein Client verfügbar");
+    return { success: false, error: "Nextcloud nicht verbunden (kein Token/Service-Account)" };
   }
 
   const ev = vorgang.event || {};
   const bc = vorgang.bereitschaft_code || session?.user?.bereitschaftCode || "UNKNOWN";
+  const bcName = stamm?.name || bc;
   const year = new Date().getFullYear().toString();
-  const folder = buildPath(bc, year, ev.auftragsnr, ev.name);
+  const folder = buildPath(bcName, bc, year, ev.auftragsnr, ev.name);
 
   const results = [];
   for (const pdf of pdfs) {
@@ -117,7 +130,7 @@ async function syncVorgang(session, vorgang, pdfs) {
 }
 
 function isConfigured() {
-  return !!(NC_URL());
+  return cfg("nextcloud_enabled", "false") === "true" && !!cfg("nextcloud_url");
 }
 
 module.exports = { getClient, ensureDir, uploadFile, buildPath, syncVorgang, isConfigured };

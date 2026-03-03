@@ -41,6 +41,13 @@ function init() {
       getDb().prepare("ALTER TABLE anfragen ADD COLUMN deleted_at TEXT DEFAULT NULL").run();
     } catch {}
 
+  // Nextcloud Defaults
+  const cfgIns = getDb().prepare("INSERT OR IGNORE INTO app_config (key, value) VALUES (?, ?)");
+  cfgIns.run("nextcloud_url", "https://office.brkndsob.org");
+  cfgIns.run("nextcloud_base_path", "Verwaltung Bereitschaft $bereitschaft/SanWD");
+  cfgIns.run("nextcloud_enabled", "false");
+  cfgIns.run("nextcloud_subfolder", "$auftragsnr - $veranstaltung");
+
   console.log("✅ Datenbank initialisiert:", DB_PATH);
 }
 
@@ -184,6 +191,13 @@ function migrate() {
       created_at TEXT DEFAULT (datetime('now'))
     );
 
+    -- ── App-Konfiguration ─────────────────────────────────────
+    CREATE TABLE IF NOT EXISTS app_config (
+      key TEXT PRIMARY KEY,
+      value TEXT NOT NULL,
+      updated_at TEXT DEFAULT (datetime('now'))
+    );
+
     CREATE TABLE IF NOT EXISTS klauseln (
       id TEXT PRIMARY KEY,
       titel TEXT NOT NULL,
@@ -324,5 +338,19 @@ Soweit eine der Regelungen dieser Vereinbarung unwirksam ist oder wird, berührt
   console.log("Klauseln Seed: " + aabDefaults.length + " Einträge");
 }
 
+function getConfig(key, fallback) {
+  const row = getDb().prepare("SELECT value FROM app_config WHERE key=?").get(key);
+  return row ? row.value : (fallback || "");
+}
+
+function setConfig(key, value) {
+  getDb().prepare("INSERT OR REPLACE INTO app_config (key, value, updated_at) VALUES (?, ?, datetime('now'))").run(key, value);
+}
+
+function getAllConfig(prefix) {
+  if (prefix) return getDb().prepare("SELECT key, value FROM app_config WHERE key LIKE ?").all(prefix + "%");
+  return getDb().prepare("SELECT key, value FROM app_config").all();
+}
+
 module.exports = {
-  seedKlauseln, init, getDb, audit };
+  seedKlauseln, init, getDb, audit, getConfig, setConfig, getAllConfig };

@@ -544,7 +544,7 @@ app.post("/api/pdf/sync/:id", requireAuth, async (req, res) => {
     pdfs.push({ filename: `${nr}_04_AAB.pdf`, data: aabData });
 
     // Upload
-    const result = await nextcloud.syncVorgang(req.session, vorgang, pdfs);
+    const result = await nextcloud.syncVorgang(req.session, vorgang, pdfs, stamm);
 
     // Sync-Status in Vorgang speichern
     if (result.success) {
@@ -562,8 +562,54 @@ app.post("/api/pdf/sync/:id", requireAuth, async (req, res) => {
 
 // Nextcloud Status
 app.get("/api/nextcloud/status", requireAuth, (req, res) => {
-  res.json({ configured: nextcloud.isConfigured(), url: process.env.NEXTCLOUD_URL || null });
+  const { getConfig } = require("./db");
+  const enabled = getConfig("nextcloud_enabled", "false") === "true";
+  const url = getConfig("nextcloud_url", "");
+  res.json({ configured: enabled && !!url, url, enabled });
 });
+// ═══════════════════════════════════════════════════════════════════
+// App Config (Admin)
+// ═══════════════════════════════════════════════════════════════════
+app.get("/api/config/nextcloud", requireAuth, (req, res) => {
+  if (req.session.user.rolle !== "admin") return res.status(403).json({ error: "Nur Admin" });
+  const { getAllConfig } = require("./db");
+  const rows = getAllConfig("nextcloud_");
+  const cfg = {};
+  rows.forEach(r => cfg[r.key] = r.value);
+  res.json(cfg);
+});
+
+app.put("/api/config/nextcloud", requireAuth, (req, res) => {
+  if (req.session.user.rolle !== "admin") return res.status(403).json({ error: "Nur Admin" });
+  const { setConfig, audit } = require("./db");
+  const allowed = ["nextcloud_url", "nextcloud_base_path", "nextcloud_enabled", "nextcloud_subfolder"];
+  for (const [key, val] of Object.entries(req.body)) {
+    if (allowed.includes(key)) setConfig(key, String(val));
+  }
+  audit(req.session.user, "config_update", "nextcloud", null, JSON.stringify(req.body));
+  res.json({ ok: true });
+});
+
+// Nextcloud Test-Verbindung
+app.post("/api/config/nextcloud/test", requireAuth, async (req, res) => {
+  if (req.session.user.rolle !== "admin") return res.status(403).json({ error: "Nur Admin" });
+  try {
+    const { getConfig } = require("./db");
+    const url = getConfig("nextcloud_url");
+    if (!url) return res.json({ ok: false, error: "URL nicht konfiguriert" });
+    
+    const nc = require("./services/nextcloud");
+    const { client, type, uid } = nc.getClient(req.session);
+    if (!client) return res.json({ ok: false, error: "Kein Client verfügbar (Token oder Service-Account)" });
+    
+    const exists = await client.exists("/");
+    res.json({ ok: true, type, uid, message: `Verbindung als ${type}:${uid} erfolgreich` });
+  } catch(e) {
+    res.json({ ok: false, error: e.message });
+  }
+});
+
+
 
 app.post("/api/pdf/vertrag/:id", requireAuth, async (req, res) => {
   // puppeteer via BrowserPool
@@ -988,7 +1034,7 @@ app.post("/api/pdf/mappe/:id", requireAuth, async (req, res) => {
         try {
           const syncResult = await nextcloud.syncVorgang(req.session, vorgang, [
             { filename: `${nr}_Angebotsmappe.pdf`, data: result }
-          ]);
+          ], stamm);
           if (syncResult.success) {
             const freshRow = db.prepare("SELECT data FROM vorgaenge WHERE id=?").get(req.params.id);
             if (freshRow) {

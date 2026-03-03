@@ -222,6 +222,11 @@ const API = {
     return res.blob();
   },
 
+  // Nextcloud Config
+  async getNextcloudConfig() { return this.json("/api/config/nextcloud"); },
+  async saveNextcloudConfig(cfg) { return this.json("/api/config/nextcloud", { method: "PUT", body: JSON.stringify(cfg) }); },
+  async testNextcloud() { return this.json("/api/config/nextcloud/test", { method: "POST" }); },
+  
   submitFeedback: async function(data) {
     return this.json("/api/feedback", { method: "POST", body: JSON.stringify(data) });
   },
