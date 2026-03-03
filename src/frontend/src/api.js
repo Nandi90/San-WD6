@@ -223,6 +223,13 @@ const API = {
   },
 
   // Nextcloud Config
+  // Statistik
+  async getStatistik(year, bc) { return this.json(`/api/statistik/${year}?bc=${bc || "ALL"}`); },
+
+  // Einsatzprotokoll
+  async getProtokoll(id) { return this.json(`/api/protokoll/${id}`); },
+  async saveProtokoll(id, dayIdx, protokoll) { return this.json(`/api/protokoll/${id}`, { method: "PUT", body: JSON.stringify({ dayIdx, protokoll }) }); },
+
   // SMTP / E-Mail Config
   async getSmtpConfig() { return this.json("/api/config/smtp"); },
   async saveSmtpConfig(cfg) { return this.json("/api/config/smtp", { method: "PUT", body: JSON.stringify(cfg) }); },

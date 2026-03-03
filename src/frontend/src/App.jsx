@@ -405,6 +405,119 @@ function ConfirmModal({open,title,message,icon,onConfirm,onCancel,confirmText="B
 // ═══════════════════════════════════════════════════════════════════
 // Einstellungen Tab (Admin) mit Sub-Tabs
 // ═══════════════════════════════════════════════════════════════════
+
+// ═══════════════════════════════════════════════════════════════════
+// Statistik Dashboard
+// ═══════════════════════════════════════════════════════════════════
+function StatistikDashboard({user,year:appYear,toast}){
+  const [year,setYear]=useState(appYear||new Date().getFullYear());
+  const [bc,setBc]=useState("ALL");
+  const [data,setData]=useState(null);
+  const [loading,setLoading]=useState(true);
+
+  useEffect(()=>{setLoading(true);API.getStatistik(year,bc).then(d=>{setData(d);setLoading(false);}).catch(e=>{toast(e.message,"error");setLoading(false);});},[year,bc]);
+
+  const exportCSV=()=>{
+    if(!data||!data.events.length)return;
+    const hdr="Auftragsnr;Name;Ort;Veranstalter;Status;Datum;Tage;Bereitschaft\n";
+    const rows=data.events.map(e=>`${e.auftragsnr};${e.name};${e.ort};${e.veranstalter};${e.status};${e.date};${e.days};${e.bc}`).join("\n");
+    const blob=new Blob(["\uFEFF"+hdr+rows],{type:"text/csv;charset=utf-8;"});
+    const a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download=`SanWD_Statistik_${year}.csv`;a.click();
+  };
+
+  const MONATE=["Jan","Feb","Mär","Apr","Mai","Jun","Jul","Aug","Sep","Okt","Nov","Dez"];
+  const STATUS_COLORS={entwurf:"#bdbdbd",versendet:"#42a5f5",akzeptiert:"#66bb6a",abgeschlossen:"#1b5e20",abgelehnt:"#ef5350"};
+  const STATUS_LABELS={entwurf:"Entwurf",versendet:"Versendet",akzeptiert:"Akzeptiert",abgeschlossen:"Abgeschlossen",abgelehnt:"Abgelehnt"};
+
+  if(loading)return <div style={{textAlign:"center",padding:40,color:C.dunkelgrau}}>Lade Statistik...</div>;
+  if(!data)return <div style={{textAlign:"center",padding:40}}>Keine Daten</div>;
+
+  const maxMonth=Math.max(...data.byMonth.map(m=>m.count),1);
+  const totalByStatus=Object.values(data.byStatus).reduce((a,b)=>a+b,0)||1;
+
+  return(<div>
+    {/* Filter */}
+    <div style={{display:"flex",gap:8,alignItems:"center",marginBottom:16,flexWrap:"wrap"}}>
+      <select value={year} onChange={e=>setYear(+e.target.value)} style={{padding:"7px 12px",border:`1px solid ${C.mittelgrau}`,borderRadius:6,fontSize:13,fontFamily:FONT.sans}}>
+        {[...Array(5)].map((_,i)=>{const y=new Date().getFullYear()-i;return <option key={y} value={y}>{y}</option>;})}
+      </select>
+      {(user?.rolle==="admin"||user?.rolle==="kbl")&&<select value={bc} onChange={e=>setBc(e.target.value)} style={{padding:"7px 12px",border:`1px solid ${C.mittelgrau}`,borderRadius:6,fontSize:13,fontFamily:FONT.sans}}>
+        <option value="ALL">Alle Bereitschaften</option>
+        {(data.bereitschaften||[]).map(b=><option key={b.code} value={b.code}>{b.name||b.code}</option>)}
+      </select>}
+      <button onClick={exportCSV} style={{padding:"7px 14px",background:C.hellgrau,border:`1px solid ${C.mittelgrau}`,borderRadius:6,fontSize:12,cursor:"pointer",fontFamily:FONT.sans}}>📥 CSV Export</button>
+    </div>
+
+    {/* KPI Karten */}
+    <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(160px,1fr))",gap:12,marginBottom:20}}>
+      {[
+        {label:"Einsätze",value:data.totalEinsaetze,icon:"🚑",color:"#1565c0"},
+        {label:"Patienten",value:data.totalPatienten,icon:"🏥",color:"#c62828"},
+        {label:"Bereitschaften",value:data.byBc?.length||0,icon:"🏢",color:"#2e7d32"},
+      ].map((kpi,i)=><div key={i} style={{background:"#fff",border:`1px solid ${C.mittelgrau}40`,borderRadius:10,padding:"16px 20px",borderLeft:`4px solid ${kpi.color}`}}>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+          <div><div style={{fontSize:10,color:C.dunkelgrau,textTransform:"uppercase",fontWeight:600,letterSpacing:0.5}}>{kpi.label}</div>
+          <div style={{fontSize:28,fontWeight:800,color:kpi.color,fontFamily:FONT.sans}}>{kpi.value}</div></div>
+          <span style={{fontSize:28}}>{kpi.icon}</span>
+        </div>
+      </div>)}
+    </div>
+
+    <div style={{display:"grid",gridTemplateColumns:"2fr 1fr",gap:14}}>
+      {/* Einsätze pro Monat */}
+      <Card title="Einsätze pro Monat" accent={C.mittelblau}>
+        <div style={{display:"flex",alignItems:"flex-end",gap:4,height:140,paddingTop:10}}>
+          {data.byMonth.map((m,i)=><div key={i} style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",gap:2}}>
+            <div style={{fontSize:10,fontWeight:700,color:m.count>0?C.mittelblau:C.bgrau}}>{m.count||""}</div>
+            <div style={{width:"100%",background:m.count>0?C.mittelblau:C.hellgrau,borderRadius:"4px 4px 0 0",height:`${Math.max(m.count/maxMonth*100,4)}%`,minHeight:4,transition:"height 0.3s"}}/>
+            <div style={{fontSize:9,color:C.dunkelgrau}}>{MONATE[i]}</div>
+          </div>)}
+        </div>
+      </Card>
+
+      {/* Status Verteilung */}
+      <Card title="Status" accent={C.rot}>
+        {Object.entries(data.byStatus).sort((a,b)=>b[1]-a[1]).map(([st,cnt])=><div key={st} style={{display:"flex",alignItems:"center",gap:8,marginBottom:6}}>
+          <div style={{width:10,height:10,borderRadius:5,background:STATUS_COLORS[st]||"#999",flexShrink:0}}/>
+          <div style={{flex:1,fontSize:12}}>{STATUS_LABELS[st]||st}</div>
+          <div style={{background:STATUS_COLORS[st]||"#999",height:8,borderRadius:4,width:`${cnt/totalByStatus*100}%`,minWidth:8,maxWidth:120,transition:"width 0.3s"}}/>
+          <div style={{fontSize:12,fontWeight:700,minWidth:24,textAlign:"right"}}>{cnt}</div>
+        </div>)}
+      </Card>
+    </div>
+
+    {/* Pro Bereitschaft */}
+    {data.byBc.length>1&&<Card title="Nach Bereitschaft" accent={C.dunkelblau} style={{marginTop:14}}>
+      <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(200px,1fr))",gap:8}}>
+        {data.byBc.sort((a,b)=>b.count-a.count).map(b=><div key={b.code} style={{padding:"10px 14px",background:C.hellgrau,borderRadius:8,border:`1px solid ${C.mittelgrau}40`}}>
+          <div style={{fontSize:13,fontWeight:700}}>{b.name}</div>
+          <div style={{fontSize:11,color:C.dunkelgrau}}>{b.count} Einsätze</div>
+        </div>)}
+      </div>
+    </Card>}
+
+    {/* Alle Vorgänge Tabelle */}
+    <Card title={`Alle Vorgänge ${year}`} accent={C.dunkelgrau} style={{marginTop:14}}>
+      <div style={{overflowX:"auto"}}>
+        <table style={{width:"100%",borderCollapse:"collapse",fontSize:11}}>
+          <thead><tr style={{borderBottom:`2px solid ${C.mittelgrau}`}}>
+            {["Nr","Veranstaltung","Ort","Veranstalter","Status","Datum","Tage"].map(h=><th key={h} style={{padding:"6px 8px",textAlign:"left",fontWeight:700,color:C.dunkelgrau,fontSize:10,textTransform:"uppercase"}}>{h}</th>)}
+          </tr></thead>
+          <tbody>{data.events.sort((a,b)=>(a.date||"").localeCompare(b.date||"")).map(ev=><tr key={ev.id} style={{borderBottom:`1px solid ${C.hellgrau}`}}>
+            <td style={{padding:"5px 8px",fontWeight:600,color:C.mittelblau}}>{ev.auftragsnr}</td>
+            <td style={{padding:"5px 8px"}}>{ev.name}</td>
+            <td style={{padding:"5px 8px",color:C.dunkelgrau}}>{ev.ort}</td>
+            <td style={{padding:"5px 8px",color:C.dunkelgrau}}>{ev.veranstalter}</td>
+            <td style={{padding:"5px 8px"}}><span style={{display:"inline-block",padding:"2px 8px",borderRadius:10,fontSize:10,fontWeight:600,background:(STATUS_COLORS[ev.status]||"#999")+"20",color:STATUS_COLORS[ev.status]||"#999"}}>{STATUS_LABELS[ev.status]||ev.status}</span></td>
+            <td style={{padding:"5px 8px"}}>{ev.date?new Date(ev.date).toLocaleDateString("de-DE"):"-"}</td>
+            <td style={{padding:"5px 8px",textAlign:"center"}}>{ev.days}</td>
+          </tr>)}</tbody>
+        </table>
+      </div>
+    </Card>
+  </div>);
+}
+
 function EinstellungenTab({stammdaten,updateStamm,updateRate,user,toast,klauseln,klauselnEdit,setKlauselnEdit,klauselnSaving,saveKlauseln,bereitschaft}){
   const [sub,setSub]=useState("org");
   const subs=[{id:"org",label:"Organisation",icon:"🏢"},{id:"kosten",label:"Kostensätze",icon:"💰"},{id:"klauseln",label:"Textvorlagen",icon:"📝"},{id:"nextcloud",label:"Nextcloud",icon:"☁️"},{id:"email",label:"E-Mail",icon:"✉️"}];
@@ -459,6 +572,134 @@ function EinstellungenTab({stammdaten,updateStamm,updateRate,user,toast,klauseln
 
     {sub==="nextcloud"&&<NextcloudConfig toast={toast}/>}
     {sub==="email"&&<SmtpConfig toast={toast}/>}
+  </div>);
+}
+
+
+// ═══════════════════════════════════════════════════════════════════
+// Digitales Einsatzprotokoll (Live-Formular)
+// ═══════════════════════════════════════════════════════════════════
+function EinsatzprotokollLive({event:ev,currentEventId,days,user,toast}){
+  const activeDays=(days||[]).filter(d=>d.active!==false);
+  const [dayIdx,setDayIdx]=useState(0);
+  const [proto,setProto]=useState({ankunft:"",ende:"",einsatzleiter:ev.ilsEL||"",kraefteAnzahl:"",kraefteNamen:"",fahrzeuge:"",bemerkungen:ev.bemerkung||"",besonderheiten:"",wetter:"",patienten:[],abschluss:""});
+  const [loading,setLoading]=useState(true);
+  const [saving,setSaving]=useState(false);
+  const [lastSaved,setLastSaved]=useState(null);
+
+  useEffect(()=>{
+    if(!currentEventId)return;
+    setLoading(true);
+    API.getProtokoll(currentEventId).then(r=>{
+      const p=r.protokoll?.[String(dayIdx)];
+      if(p){setProto(prev=>({...prev,...p}));}
+      else{setProto({ankunft:"",ende:"",einsatzleiter:ev.ilsEL||"",kraefteAnzahl:"",kraefteNamen:"",fahrzeuge:"",bemerkungen:ev.bemerkung||"",besonderheiten:"",wetter:"",patienten:[],abschluss:""});}
+      setLoading(false);
+    }).catch(()=>setLoading(false));
+  },[currentEventId,dayIdx]);
+
+  const save=async()=>{
+    if(!currentEventId){toast("Vorgang zuerst speichern","warning");return;}
+    setSaving(true);
+    try{await API.saveProtokoll(currentEventId,dayIdx,proto);setLastSaved(new Date().toLocaleTimeString("de-DE"));toast("Protokoll gespeichert","success");}
+    catch(e){toast(e.message,"error");}
+    finally{setSaving(false);}
+  };
+
+  // Auto-save alle 30 Sekunden
+  useEffect(()=>{
+    if(!currentEventId||loading)return;
+    const t=setTimeout(()=>{API.saveProtokoll(currentEventId,dayIdx,proto).then(()=>setLastSaved(new Date().toLocaleTimeString("de-DE"))).catch(()=>{});},30000);
+    return()=>clearTimeout(t);
+  },[proto,currentEventId,dayIdx,loading]);
+
+  const up=(k,v)=>setProto(p=>({...p,[k]:v}));
+  const addPatient=()=>up("patienten",[...proto.patienten,{nr:proto.patienten.length+1,zeit:"",name:"",alter:"",geschlecht:"",diagnose:"",massnahmen:"",transport:"nein",ziel:""}]);
+  const updatePatient=(i,k,v)=>{const p=[...proto.patienten];p[i]={...p[i],[k]:v};up("patienten",p);};
+  const removePatient=i=>{const p=[...proto.patienten];p.splice(i,1);up("patienten",p.map((x,j)=>({...x,nr:j+1})));};
+
+  const day=activeDays[dayIdx];
+  const dayLabel=day?.date?new Date(day.date).toLocaleDateString("de-DE",{weekday:"long",day:"2-digit",month:"2-digit",year:"numeric"}):`Tag ${(day?.id||dayIdx+1)}`;
+
+  const IS=({label,value,onChange,placeholder,wide,type})=><div style={{marginBottom:8,flex:wide?"1 1 100%":"1 1 45%",minWidth:wide?undefined:180}}>
+    <div style={{fontSize:10,fontWeight:600,color:"#555",marginBottom:2}}>{label}</div>
+    <input type={type||"text"} value={value||""} onChange={e=>onChange(e.target.value)} placeholder={placeholder||""} style={{width:"100%",padding:"6px 10px",border:"1px solid #ccc",borderRadius:5,fontSize:12,fontFamily:FONT.sans}}/>
+  </div>;
+
+  const TA=({label,value,onChange,rows,placeholder})=><div style={{marginBottom:8}}>
+    <div style={{fontSize:10,fontWeight:600,color:"#555",marginBottom:2}}>{label}</div>
+    <textarea value={value||""} onChange={e=>onChange(e.target.value)} rows={rows||3} placeholder={placeholder||""} style={{width:"100%",padding:"6px 10px",border:"1px solid #ccc",borderRadius:5,fontSize:12,fontFamily:FONT.sans,lineHeight:1.4,resize:"vertical"}}/>
+  </div>;
+
+  if(loading)return <div style={{padding:20,textAlign:"center",color:C.dunkelgrau}}>Lade Protokoll...</div>;
+
+  return(<div>
+    {/* Tag-Auswahl */}
+    {activeDays.length>1&&<div style={{display:"flex",gap:4,marginBottom:12,flexWrap:"wrap"}}>
+      {activeDays.map((d,i)=><button key={i} onClick={()=>setDayIdx(i)} style={{padding:"6px 12px",background:dayIdx===i?C.dunkelblau:"#fff",color:dayIdx===i?"#fff":C.dunkelgrau,border:`1px solid ${dayIdx===i?C.dunkelblau:C.mittelgrau}`,borderRadius:6,fontSize:11,fontWeight:dayIdx===i?700:500,cursor:"pointer",fontFamily:FONT.sans}}>
+        {d.date?new Date(d.date).toLocaleDateString("de-DE",{day:"2-digit",month:"2-digit"}):`Tag ${d.id||i+1}`}
+      </button>)}
+    </div>}
+
+    <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}>
+      <div style={{fontSize:15,fontWeight:700,color:C.dunkelblau}}>📋 Einsatzprotokoll – {dayLabel}</div>
+      <div style={{display:"flex",alignItems:"center",gap:8}}>
+        {lastSaved&&<span style={{fontSize:10,color:C.dunkelgrau}}>💾 {lastSaved}</span>}
+        <button onClick={save} disabled={saving} style={{padding:"6px 16px",background:C.dunkelblau,color:"#fff",border:"none",borderRadius:6,fontSize:12,fontWeight:600,cursor:"pointer",fontFamily:FONT.sans}}>{saving?"Speichern...":"💾 Speichern"}</button>
+      </div>
+    </div>
+
+    {/* Einsatz-Info */}
+    <Card title="Einsatzzeiten & Leitung" accent={C.dunkelblau}>
+      <div style={{display:"flex",flexWrap:"wrap",gap:8}}>
+        <IS label="Tatsächliche Ankunftszeit" value={proto.ankunft} onChange={v=>up("ankunft",v)} type="time"/>
+        <IS label="Tatsächliches Ende" value={proto.ende} onChange={v=>up("ende",v)} type="time"/>
+        <IS label="Einsatzleiter/in" value={proto.einsatzleiter} onChange={v=>up("einsatzleiter",v)} wide/>
+      </div>
+    </Card>
+
+    {/* Kräfte & Fahrzeuge */}
+    <Card title="Einsatzkräfte & Fahrzeuge" accent={C.mittelblau}>
+      <div style={{display:"flex",flexWrap:"wrap",gap:8}}>
+        <IS label="Anzahl Einsatzkräfte" value={proto.kraefteAnzahl} onChange={v=>up("kraefteAnzahl",v)} type="number"/>
+        <IS label="Wetter" value={proto.wetter} onChange={v=>up("wetter",v)} placeholder="z.B. sonnig, 22°C"/>
+      </div>
+      <TA label="Namen der Einsatzkräfte" value={proto.kraefteNamen} onChange={v=>up("kraefteNamen",v)} rows={2} placeholder="Namen durch Komma getrennt"/>
+      <TA label="Eingesetzte Fahrzeuge" value={proto.fahrzeuge} onChange={v=>up("fahrzeuge",v)} rows={2} placeholder="z.B. KTW 41/1, RTW 41/2"/>
+    </Card>
+
+    {/* Patienten */}
+    <Card title={`Patienten-Dokumentation (${proto.patienten.length})`} accent={C.rot}>
+      {proto.patienten.map((pat,i)=><div key={i} style={{padding:"10px 14px",background:i%2===0?"#fff":"#fafafa",border:`1px solid ${C.mittelgrau}40`,borderRadius:6,marginBottom:6}}>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:6}}>
+          <span style={{fontSize:12,fontWeight:700,color:C.rot}}>Patient #{pat.nr}</span>
+          <button onClick={()=>removePatient(i)} style={{background:"none",border:"none",cursor:"pointer",fontSize:14,color:"#999"}}>✕</button>
+        </div>
+        <div style={{display:"flex",flexWrap:"wrap",gap:6}}>
+          <div style={{flex:"0 0 70px"}}><div style={{fontSize:9,fontWeight:600,color:"#555"}}>Uhrzeit</div><input type="time" value={pat.zeit||""} onChange={e=>updatePatient(i,"zeit",e.target.value)} style={{width:"100%",padding:"4px 6px",border:"1px solid #ccc",borderRadius:4,fontSize:11}}/></div>
+          <div style={{flex:"1 1 140px"}}><div style={{fontSize:9,fontWeight:600,color:"#555"}}>Name</div><input value={pat.name||""} onChange={e=>updatePatient(i,"name",e.target.value)} style={{width:"100%",padding:"4px 6px",border:"1px solid #ccc",borderRadius:4,fontSize:11}}/></div>
+          <div style={{flex:"0 0 50px"}}><div style={{fontSize:9,fontWeight:600,color:"#555"}}>Alter</div><input value={pat.alter||""} onChange={e=>updatePatient(i,"alter",e.target.value)} style={{width:"100%",padding:"4px 6px",border:"1px solid #ccc",borderRadius:4,fontSize:11}}/></div>
+          <div style={{flex:"0 0 50px"}}><div style={{fontSize:9,fontWeight:600,color:"#555"}}>m/w/d</div><select value={pat.geschlecht||""} onChange={e=>updatePatient(i,"geschlecht",e.target.value)} style={{width:"100%",padding:"4px 6px",border:"1px solid #ccc",borderRadius:4,fontSize:11}}><option value="">-</option><option value="m">m</option><option value="w">w</option><option value="d">d</option></select></div>
+          <div style={{flex:"1 1 100%"}}><div style={{fontSize:9,fontWeight:600,color:"#555"}}>Diagnose / Beschwerden</div><input value={pat.diagnose||""} onChange={e=>updatePatient(i,"diagnose",e.target.value)} style={{width:"100%",padding:"4px 6px",border:"1px solid #ccc",borderRadius:4,fontSize:11}} placeholder="z.B. Schürfwunde, Kreislaufprobleme"/></div>
+          <div style={{flex:"1 1 100%"}}><div style={{fontSize:9,fontWeight:600,color:"#555"}}>Maßnahmen</div><input value={pat.massnahmen||""} onChange={e=>updatePatient(i,"massnahmen",e.target.value)} style={{width:"100%",padding:"4px 6px",border:"1px solid #ccc",borderRadius:4,fontSize:11}} placeholder="z.B. Wundversorgung, Kühlung"/></div>
+          <div style={{flex:"0 0 100px"}}><div style={{fontSize:9,fontWeight:600,color:"#555"}}>Transport</div><select value={pat.transport||"nein"} onChange={e=>updatePatient(i,"transport",e.target.value)} style={{width:"100%",padding:"4px 6px",border:"1px solid #ccc",borderRadius:4,fontSize:11}}><option value="nein">Nein</option><option value="rtw">RTW</option><option value="ktw">KTW</option><option value="selbst">Selbst</option></select></div>
+          {pat.transport!=="nein"&&<div style={{flex:"1 1 140px"}}><div style={{fontSize:9,fontWeight:600,color:"#555"}}>Transportziel</div><input value={pat.ziel||""} onChange={e=>updatePatient(i,"ziel",e.target.value)} style={{width:"100%",padding:"4px 6px",border:"1px solid #ccc",borderRadius:4,fontSize:11}} placeholder="z.B. KH Schrobenhausen"/></div>}
+        </div>
+      </div>)}
+      <button onClick={addPatient} style={{padding:"8px 16px",background:`${C.rot}10`,border:`1px dashed ${C.rot}`,borderRadius:6,color:C.rot,fontSize:12,fontWeight:600,cursor:"pointer",width:"100%",fontFamily:FONT.sans}}>+ Patient hinzufügen</button>
+    </Card>
+
+    {/* Bemerkungen & Abschluss */}
+    <Card title="Bemerkungen & Abschluss" accent={C.dunkelgrau}>
+      <TA label="Besonderheiten / Vorkommnisse" value={proto.besonderheiten} onChange={v=>up("besonderheiten",v)} rows={3} placeholder="z.B. Polizeieinsatz, technische Probleme, besondere Vorkommnisse"/>
+      <TA label="Allgemeine Bemerkungen" value={proto.bemerkungen} onChange={v=>up("bemerkungen",v)} rows={3}/>
+      <TA label="Abschlussvermerk" value={proto.abschluss} onChange={v=>up("abschluss",v)} rows={2} placeholder="z.B. Einsatz ohne besondere Vorkommnisse beendet"/>
+    </Card>
+
+    <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginTop:12}}>
+      <div style={{fontSize:10,color:C.dunkelgrau}}>Auto-Speicherung alle 30 Sekunden{lastSaved?` · Letzte Speicherung: ${lastSaved}`:""}</div>
+      <button onClick={save} disabled={saving} style={{padding:"8px 24px",background:C.dunkelblau,color:"#fff",border:"none",borderRadius:6,fontSize:13,fontWeight:600,cursor:"pointer",fontFamily:FONT.sans}}>{saving?"Speichern...":"💾 Protokoll speichern"}</button>
+    </div>
   </div>);
 }
 
@@ -1596,9 +1837,17 @@ function FeedbackButton({user,currentView,toast}){
 // ═══════════════════════════════════════════════════════════════════════════
 // MAIN APP
 // ═══════════════════════════════════════════════════════════════════════════
-const TABS=[{id:"events",label:"Vorgänge",icon:"📁"},{id:"event",label:"Veranstaltung",icon:"📋"},{id:"days",label:"Tage & Analyse",icon:"📊"},{id:"costs",label:"Kosten",icon:"💰"},{id:"pdf",label:"Dokumente",icon:"🖨️"},{id:"kunden",label:"Kunden",icon:"👥"},{id:"profil",label:"Mein Profil",icon:"👤"},{id:"einstellungen",label:"Einstellungen",icon:"⚙️",admin:true},{id:"releases",label:"Changelog",icon:"🆕"}];
-const APP_VERSION="v7.3";
-const LATEST_RELEASE={v:"v7.3",d:"04.03.2026",c:[
+const TABS=[{id:"events",label:"Vorgänge",icon:"📁"},{id:"event",label:"Veranstaltung",icon:"📋"},{id:"days",label:"Tage & Analyse",icon:"📊"},{id:"costs",label:"Kosten",icon:"💰"},{id:"pdf",label:"Dokumente",icon:"🖨️"},{id:"kunden",label:"Kunden",icon:"👥"},{id:"statistik",label:"Statistik",icon:"📈"},{id:"profil",label:"Mein Profil",icon:"👤"},{id:"einstellungen",label:"Einstellungen",icon:"⚙️",admin:true},{id:"releases",label:"Changelog",icon:"🆕"}];
+const APP_VERSION="v7.4";
+const LATEST_RELEASE={v:"v7.4",d:"04.03.2026",c:[
+"Statistik-Dashboard: Einsätze pro Monat, Status-Verteilung, Bereitschafts-Übersicht",
+"Statistik: CSV-Export aller Vorgänge, Jahres- und Bereitschafts-Filter",
+"Digitales Einsatzprotokoll: Live-Formular für Einsatztage",
+"Einsatzprotokoll: Patienten-Dokumentation (Diagnose, Maßnahmen, Transport)",
+"Einsatzprotokoll: Auto-Speicherung alle 30 Sekunden",
+"Einsatzprotokoll: Wechsel zwischen PDF-Druck und Live-Modus",
+]};
+const RELEASE_V73={v:"v7.3",d:"04.03.2026",c:[
 "Tab-Umstrukturierung: Mein Profil + Einstellungen (Admin) mit Sub-Tabs",
 "Nextcloud: Konfigurierbarer Pfad-Template ($bereitschaft, $auftragsnr, ...)",
 "Nextcloud: Auto-Sync bei jeder PDF-Generierung im Hintergrund",
@@ -1653,6 +1902,7 @@ export default function App(){
   const [ncEnabled,setNcEnabled]=useState(false);
   const [smtpEnabled,setSmtpEnabled]=useState(false);
   const [mailModal,setMailModal]=useState(false);
+  const [epLive,setEpLive]=useState(false);
   useEffect(()=>{
     API.json("/api/nextcloud/status").then(r=>setNcEnabled(!!r.configured)).catch(()=>{});
     API.json("/api/config/smtp").then(r=>setSmtpEnabled(r.smtp_enabled==="true")).catch(()=>{});
@@ -2115,7 +2365,13 @@ export default function App(){
             {pdfView==="vertrag"&&<Card accent={C.dunkelblau}><div style={{display:"flex",alignItems:"center",gap:10,marginBottom:12}}><span style={{fontSize:20}}>📄</span><div><div style={{fontSize:14,fontWeight:700,color:C.dunkelblau}}>Vereinbarung</div><div style={{fontSize:11,color:C.dunkelgrau}}>Serverseitig generiertes PDF mit Seitenzahlen</div></div></div><Btn variant="primary" onClick={async()=>{if(!currentEventId){toast("Bitte zuerst Vorgang speichern","warning");return;}setVertragPending(true);await saveEvent();try{const r=await fetch("/api/pdf/vertrag/"+currentEventId,{method:"POST",credentials:"include"});if(!r.ok){const e=await r.json();toast(e.error||"Fehler","error");return;}const blob=await r.blob();const url=URL.createObjectURL(blob);window.open(url,"_blank");}catch(e){toast(e.message,"error");}finally{setVertragPending(false);}}} disabled={vertragPending}>{vertragPending?"Erstelle PDF...":"Vertrag-PDF generieren und öffnen"}</Btn></Card>}
             {pdfView==="aab"&&<div data-print="aab"><AABPDF stammdaten={stammdaten} bereitschaft={bereitschaft}/></div>}
             {pdfView==="ils"&&<ILSPreview event={event} days={days} stammdaten={stammdaten} user={user} updateEvent={updateEvent} currentEventId={currentEventId} saveEvent={saveEvent} toast={toast}/>}
-            {pdfView==="einsatzprotokoll"&&<Card accent={C.dunkelblau}>
+            {pdfView==="einsatzprotokoll"&&<div>
+              <div style={{display:"flex",gap:6,marginBottom:12}}>
+                <Btn variant={!epLive?"primary":"secondary"} small onClick={()=>setEpLive(false)}>🖨️ PDF Druck</Btn>
+                <Btn variant={epLive?"primary":"secondary"} small onClick={()=>setEpLive(true)}>📋 Live Protokoll</Btn>
+              </div>
+              {epLive?<EinsatzprotokollLive event={event} currentEventId={currentEventId} days={days} user={user} toast={toast}/>
+              :<Card accent={C.dunkelblau}>
               <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:12}}>
                 <span style={{fontSize:20}}>🖨️</span>
                 <div><div style={{fontSize:14,fontWeight:700,color:C.dunkelblau}}>Einsatzprotokoll</div>
@@ -2128,7 +2384,7 @@ export default function App(){
                   </Btn>
                 ))}
               </div>
-            </Card>}
+            </Card>}</div>}
             
           </div>
         </div>)}
@@ -2338,6 +2594,8 @@ export default function App(){
           </div>
         </div>
       )}
+      {tab==="statistik"&&<StatistikDashboard user={user} year={year} toast={toast}/>}
+
       {tab==="profil"&&(<div style={{maxWidth:550}}>
             <Card title="👤 Mein Profil" accent={C.rot} sub="Persönliche Kontaktdaten (nur für Sie)">
               <div className="rg2" style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"0 16px"}}>
@@ -2383,7 +2641,7 @@ export default function App(){
           <button onClick={()=>window.location.href="/auth/logout"} style={{width:"100%",padding:"8px 12px",background:C.hellgrau,border:"none",borderRadius:4,fontSize:12,cursor:"pointer",fontFamily:FONT.sans,color:C.dunkelgrau}}>⏻ Abmelden</button>
         </div>
       </div>
-      <footer className="mob-hide" style={{padding:"12px 20px",borderTop:`1px solid ${C.mittelgrau}40`,textAlign:"center",fontSize:10,color:C.dunkelgrau,background:C.weiss}}>BRK Sanitätswachdienst v7.3 · {bereitschaft.name} · {stammdaten.kvName} · {year}</footer>
+      <footer className="mob-hide" style={{padding:"12px 20px",borderTop:`1px solid ${C.mittelgrau}40`,textAlign:"center",fontSize:10,color:C.dunkelgrau,background:C.weiss}}>BRK Sanitätswachdienst v7.4 · {bereitschaft.name} · {stammdaten.kvName} · {year}</footer>
 
       {/* ── Angebotsmappe Modal ──────────────────────────────── */}
       {mailModal&&<MailComposeModal event={event} currentEventId={currentEventId} user={user} stammdaten={stammdaten} dayCalcs={dayCalcs} totalCosts={totalCosts} activeDays={activeDays} toast={toast} onClose={()=>setMailModal(false)}/>}

@@ -187,6 +187,113 @@ app.use(session({
 console.log("✅ Session-Store: SQLite (" + (process.env.SESSION_DB_PATH || "/data/sessions.db") + ")");
 
 // ── Health Check (kein Auth) ─────────────────────────────────────
+
+// ═══════════════════════════════════════════════════════════════════
+// Statistik API
+// ═══════════════════════════════════════════════════════════════════
+app.get("/api/statistik/:year", requireAuth, (req, res) => {
+  try {
+    const db = require("./db").getDb();
+    const year = parseInt(req.params.year);
+    const bc = req.query.bc || "ALL";
+    
+    let rows;
+    if (bc === "ALL" && (req.session.user.rolle === "admin" || req.session.user.rolle === "kbl")) {
+      rows = db.prepare("SELECT id, bereitschaft_code, data, status, created_at FROM vorgaenge WHERE year=? AND deleted_at IS NULL").all(year);
+    } else {
+      const code = bc !== "ALL" ? bc : req.session.user.bereitschaftCode;
+      rows = db.prepare("SELECT id, bereitschaft_code, data, status, created_at FROM vorgaenge WHERE year=? AND bereitschaft_code=? AND deleted_at IS NULL").all(year, code);
+    }
+
+    const bereitschaften = db.prepare("SELECT code, name, short FROM bereitschaften").all();
+    const bcMap = {};
+    bereitschaften.forEach(b => bcMap[b.code] = b);
+
+    let totalUmsatz = 0, totalEinsaetze = rows.length, totalHelferStd = 0, totalPatienten = 0;
+    const byBc = {}, byMonth = Array(12).fill(null).map(() => ({ count: 0, umsatz: 0 }));
+    const byStatus = {};
+    const events = [];
+
+    for (const row of rows) {
+      const d = JSON.parse(row.data);
+      const ev = d.event || d;
+      const days = d.days || [];
+      const activeDays = days.filter(dy => dy.active !== false);
+
+      // Status
+      const st = ev.checklist?.angebotAbgelehnt ? "abgelehnt" : ev.checklist?.abgeschlossen ? "abgeschlossen" : ev.checklist?.angebotVersendet ? "versendet" : (ev.checklist?.angebotAkzeptiert ? "akzeptiert" : "entwurf");
+      byStatus[st] = (byStatus[st] || 0) + 1;
+
+      // Monat
+      const firstDate = activeDays.find(dy => dy.date)?.date;
+      if (firstDate) {
+        const m = new Date(firstDate).getMonth();
+        if (m >= 0 && m < 12) {
+          byMonth[m].count++;
+        }
+      }
+
+      // BC
+      const bc = row.bereitschaft_code;
+      if (!byBc[bc]) byBc[bc] = { code: bc, name: bcMap[bc]?.name || bc, short: bcMap[bc]?.short || bc, count: 0, umsatz: 0, helferStd: 0 };
+      byBc[bc].count++;
+
+      // Protokoll-Patienten
+      const protokoll = d.protokoll || {};
+      for (const key of Object.keys(protokoll)) {
+        const p = protokoll[key];
+        if (p && p.patienten) totalPatienten += p.patienten.length;
+      }
+
+      events.push({
+        id: row.id, bc, name: ev.name || "", auftragsnr: ev.auftragsnr || "",
+        ort: ev.ort || "", status: st, date: firstDate || "",
+        days: activeDays.length, veranstalter: ev.veranstalter || ""
+      });
+    }
+
+    res.json({
+      year, totalEinsaetze, totalUmsatz, totalHelferStd, totalPatienten,
+      byBc: Object.values(byBc),
+      byMonth,
+      byStatus,
+      events,
+      bereitschaften
+    });
+  } catch(e) {
+    console.error("Statistik:", e);
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// ═══════════════════════════════════════════════════════════════════
+// Einsatzprotokoll: Live-Daten speichern
+// ═══════════════════════════════════════════════════════════════════
+app.get("/api/protokoll/:id", requireAuth, (req, res) => {
+  try {
+    const db = require("./db").getDb();
+    const row = db.prepare("SELECT data FROM vorgaenge WHERE id=?").get(req.params.id);
+    if (!row) return res.status(404).json({ error: "Nicht gefunden" });
+    const d = JSON.parse(row.data);
+    res.json({ protokoll: d.protokoll || {} });
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
+app.put("/api/protokoll/:id", requireAuth, (req, res) => {
+  try {
+    const db = require("./db").getDb();
+    const row = db.prepare("SELECT data FROM vorgaenge WHERE id=?").get(req.params.id);
+    if (!row) return res.status(404).json({ error: "Nicht gefunden" });
+    const d = JSON.parse(row.data);
+    const { dayIdx, protokoll } = req.body;
+    if (!d.protokoll) d.protokoll = {};
+    d.protokoll[String(dayIdx)] = { ...protokoll, updatedAt: new Date().toISOString(), updatedBy: req.session.user.name };
+    db.prepare("UPDATE vorgaenge SET data=?, updated_at=datetime('now') WHERE id=?").run(JSON.stringify(d), req.params.id);
+    require("./db").audit(req.session.user, "protokoll_update", "vorgang", req.params.id, `Tag ${dayIdx}`);
+    res.json({ ok: true });
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
 app.get("/api/health", (req, res) => {
   res.json({ status: "ok", version: "6.0.0", timestamp: new Date().toISOString() });
 });
