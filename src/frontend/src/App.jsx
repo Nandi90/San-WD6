@@ -722,8 +722,8 @@ function AngebotPDF({event,dayCalcs,totalCosts,stammdaten,activeDays,bereitschaf
   const unterEmail=user?.email||stammdaten.email;
   const unterTitel=user?.titel||stammdaten.bereitschaftsleiterTitle||"Bereitschaftsleiter";
   const unterZeichen=(user?.name||stammdaten.bereitschaftsleiter||"").split(" ").map(w=>w[0]).join("")||"BL";
-  const isPauschal=event.pauschalangebot&&event.pauschalangebot>0;
-  const endPreis=isPauschal?parseFloat(event.pauschalangebot):totalCosts;
+  const isPauschal=!!event.pauschalAktiv||(event.pauschalangebot&&event.pauschalangebot>0);
+  const endPreis=isPauschal?parseFloat(event.pauschalangebot||0):totalCosts;
   const tKtw=dayCalcs.reduce((s,d)=>s+d.kc,0);
   const tRtw=dayCalcs.reduce((s,d)=>s+d.rc,0);
   const tAerzt=dayCalcs.reduce((s,d)=>s+(d.ac||0),0);
@@ -1617,13 +1617,14 @@ export default function App(){
                 </div>
                 {!event.verpflegung&&<div style={{padding:"8px 12px",background:"#fff3cd",border:"1px solid #ffc10744",borderRadius:4,fontSize:12,color:"#856404",marginTop:6}}>Verpflegungspauschale: {stammdaten.rates.verpflegung}€/Person/8h wird automatisch berechnet</div>}
                 <Card accent="#ff6f00"><div style={{fontSize:13,fontWeight:700,marginBottom:8,color:"#e65100"}}>✉ Pauschalangebot</div>
-                <div style={{display:"flex",alignItems:"center",gap:8}}>
-                  <input type="checkbox" checked={event.pauschalangebot>0} onChange={e=>updateEvent("pauschalangebot",e.target.checked?Math.round(totalCosts):0)}/>
+                <div style={{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap"}}>
+                  <input type="checkbox" checked={!!event.pauschalAktiv||(event.pauschalangebot>0)} onChange={e=>{if(e.target.checked){updateEvent("pauschalAktiv",true);updateEvent("pauschalangebot",Math.round(totalCosts));}else{updateEvent("pauschalAktiv",false);updateEvent("pauschalangebot",0);}}}/>
                   <span style={{fontSize:12}}>Pauschalpreis im Angebot verwenden</span>
                 </div>
-                {event.pauschalangebot>0&&<div style={{marginTop:8,display:"flex",alignItems:"center",gap:12}}>
-                  <div><div style={{fontSize:11,color:"#666",marginBottom:2}}>Pauschalpreis (€)</div><input type="number" value={event.pauschalangebot} onChange={e=>updateEvent("pauschalangebot",parseFloat(e.target.value)||0)} style={{width:120,padding:"6px 8px",border:"1px solid #ccc",borderRadius:4,fontFamily:FONT.mono,fontSize:14,fontWeight:700}}/></div>
-                  <div style={{fontSize:11,color:"#666",marginTop:14}}>Kalkulation: {f$(totalCosts)}<br/>Differenz: <span style={{color:event.pauschalangebot<totalCosts?"#c62828":"#2e7d32",fontWeight:600}}>{f$(event.pauschalangebot-totalCosts)}</span></div>
+                {(!!event.pauschalAktiv||(event.pauschalangebot>0))&&<div style={{marginTop:8,display:"flex",alignItems:"center",gap:12}}>
+                  <div><div style={{fontSize:11,color:"#666",marginBottom:2}}>Pauschalpreis (€)</div><input type="number" value={event.pauschalangebot||0} onChange={e=>{updateEvent("pauschalangebot",parseFloat(e.target.value)||0);updateEvent("pauschalAktiv",true);}} style={{width:120,padding:"6px 8px",border:"1px solid #ccc",borderRadius:4,fontFamily:FONT.mono,fontSize:14,fontWeight:700}}/></div>
+                  <div style={{fontSize:11,color:"#666",marginTop:14}}>Kalkulation: {f$(totalCosts)}<br/>Differenz: <span style={{color:(event.pauschalangebot||0)<totalCosts?"#c62828":"#2e7d32",fontWeight:600}}>{f$((event.pauschalangebot||0)-totalCosts)}</span></div>
+                  <div style={{marginTop:2}}><button onClick={()=>{updateEvent("pauschalangebot",0);}} style={{padding:"4px 12px",background:"#e65100",color:"#fff",border:"none",borderRadius:4,fontSize:11,fontWeight:700,cursor:"pointer",fontFamily:FONT.sans}}>0 € auf Spendenbasis</button><span style={{fontSize:10,color:"#c62828",fontStyle:"italic",marginLeft:8}}>⚠ Offiziell nicht zulässig – nur in Ausnahmefällen</span></div>
                 </div>}
                 </Card>
               </Card>
@@ -1771,6 +1772,7 @@ export default function App(){
                 {(pdfView==="angebot")&&<Btn onClick={async()=>{if(!currentEventId){toast("Bitte zuerst speichern","warning");return;}setAngebotPending(true);try{const blob=await API.generateAngebotPDF(currentEventId,dayCalcs,totalCosts,activeDays);const url=URL.createObjectURL(blob);const a=document.createElement("a");a.href=url;a.download=(event.auftragsnr||"Angebot").replace(/[^a-zA-Z0-9_-]/g,"_")+"_Angebot.pdf";a.click();}catch(e){toast(e.message,"error");}finally{setAngebotPending(false);}}} icon="⬇️" variant="blue" disabled={angebotPending}>{angebotPending?"Erstelle PDF...":"PDF herunterladen"}</Btn>}
                 {(pdfView==="aab")&&<Btn onClick={async()=>{if(!currentEventId){toast("Bitte zuerst speichern","warning");return;}setAabPending(true);try{const blob=await API.generateAABPDF(currentEventId);const url=URL.createObjectURL(blob);const a=document.createElement("a");a.href=url;a.download=(event.auftragsnr||"AAB").replace(/[^a-zA-Z0-9_-]/g,"_")+"_AAB.pdf";a.click();}catch(e){toast(e.message,"error");}finally{setAabPending(false);}}} icon="⬇️" variant="blue" disabled={aabPending}>{aabPending?"Erstelle PDF...":"AAB herunterladen"}</Btn>}
                 <Btn onClick={async()=>{if(!currentEventId){toast("Bitte zuerst Vorgang speichern","warning");return;}setMappePending(true);await saveEvent();try{const blob=await API.generateMappePDF(currentEventId,dayCalcs,totalCosts,activeDays);const url=URL.createObjectURL(blob);const a=document.createElement("a");const nr=(event.auftragsnr||"").replace(/[^a-zA-Z0-9_-]/g,"_");const name=(event.name||"Veranstaltung").substring(0,30).replace(/ /g,"_");a.href=url;a.download=nr+"_"+name+"_Angebotsmappe.pdf";a.click();}catch(e){toast("Fehler bei Angebotsmappe: "+e.message,"error");}finally{setMappePending(false);}}} icon="📦" variant="success" disabled={mappePending}>{mappePending?"Erstelle PDF...":"Angebotsmappe (PDF)"}</Btn>
+                <Btn onClick={async()=>{if(!currentEventId){toast("Bitte zuerst Vorgang speichern","warning");return;}setMappePending(true);await saveEvent();try{const blob=await API.generateMappePDF(currentEventId,dayCalcs,totalCosts,activeDays,true);const url=URL.createObjectURL(blob);const a=document.createElement("a");const nr=(event.auftragsnr||"").replace(/[^a-zA-Z0-9_-]/g,"_");const name=(event.name||"Veranstaltung").substring(0,30).replace(/ /g,"_");a.href=url;a.download=nr+"_"+name+"_Angebotsmappe_ohne_GA.pdf";a.click();}catch(e){toast("Fehler bei Angebotsmappe: "+e.message,"error");}finally{setMappePending(false);}}} icon="📄" variant="primary" disabled={mappePending}>{mappePending?"Erstelle PDF...":"Mappe ohne Gefahrenanalyse"}</Btn>
               </div>
             </div>
           </Card>

@@ -857,7 +857,8 @@ app.post("/api/pdf/mappe/:id", requireAuth, async (req, res) => {
     const angebotHTML = buildAngebotHTML(vorgang.event || {}, dayCalcs || [], totalCosts || 0, activeDays || [], stamm, {}, user);
     const vertragHTML = buildVertragHTML(vorgang, stamm, user);
     const aabHTML = buildAABHTML(stamm, req.session.user.bereitschaftCode, klauselnAAB, vorgang.event?.auftragsnr||'');
-    const gefahrenHTML = (dayCalcs && dayCalcs.length > 0) ? buildGefahrenHTML(vorgang.event || {}, activeDays || [], dayCalcs, stamm) : null;
+    const skipGefahren = req.query.skipGefahren === "1";
+    const gefahrenHTML = (!skipGefahren && dayCalcs && dayCalcs.length > 0) ? buildGefahrenHTML(vorgang.event || {}, activeDays || [], dayCalcs, stamm) : null;
 
     // Body-Inhalt aus jedem HTML extrahieren
     const extractBody = (html) => {
