@@ -1321,6 +1321,8 @@ const LATEST_RELEASE={v:"v7.2",d:"03.03.2026",c:[
   "📅 Planjahr: Vorgänge für das Folgejahr vorplanen (Dropdown statt Rechnungsnummer)",
   "📋 Vorgänge: Vorplanungs-Tab für nächstes Jahr in der Übersicht",
   "💰 Pauschalangebot: 0 € auf Spendenbasis möglich + korrekte Anzeige in Vorgänge-Liste",
+  "🚫 Angebot abgelehnt: Button mit Grund-Popup (Zu teuer, Anderer Anbieter, etc.)",
+  "📊 Vorgänge-Liste: Akzeptanz-Spalte (❓/✔/✖), Durchstreichung + Summe ohne Abgelehnte",
   "🔄 BRK.id Callback: Automatischer Re-Login bei verlorener Session statt Fehlermeldung",
 ]};
 
@@ -1843,6 +1845,18 @@ export default function App(){
               <div><div style={{fontWeight:700,fontSize:16}}>SanWD Changelog</div><div style={{fontSize:11,opacity:0.85}}>Versionshistorie und Änderungen</div></div>
             </div>
             {[
+              {v:"v7.2",d:"03.03.2026",c:[
+                "Angebotsmappe: Dokument-Auswahl per Modal statt zwei Buttons – Deckblatt, Angebot, Vertrag, AAB und Gefahrenanalyse frei kombinierbar",
+                "Deckblatt Anlagen-Liste dynamisch: zeigt nur die tatsächlich gewählten Dokumente mit korrekter Nummerierung",
+                "Planjahr-Dropdown: Vorgänge für das Folgejahr anlegen mit eigener Auftragsnummer-Serie",
+                "Vorplanungs-Tab in Vorgänge-Übersicht für Folgejahr sichtbar",
+                "Pauschalangebot: 0 € auf Spendenbasis mit Warnhinweis, Button im ausgeklappten Bereich",
+                "Pauschalangebot-Fix Backend: pauschalAktiv-Flag wird korrekt ausgewertet (auch 0 € Pauschale möglich)",
+                "Vorgänge-Liste: Zeigt Pauschalpreis statt berechneten Wert wenn Pauschale aktiv",
+                "Angebot abgelehnt: Checklist-Button mit Grund-Popup (Zu teuer, Anderer Anbieter, etc.)",
+                "Vorgänge-Liste: Akzeptanz-Spalte (❓/✔/✖), Durchstreichung bei Ablehnung, Summe ohne Abgelehnte",
+                "BRK.id Callback: Fehlende Session-State löst automatischen Re-Login aus statt Fehlermeldung",
+              ]},
               {v:"v7.1",d:"02.03.2026",c:[
                 "Angebotsmappe: Professionelles Deckblatt mit Logo, Kreisverband, Bereitschaft, Veranstaltungsinfo und Inhaltsverzeichnis",
                 "Angebotsmappe: Neue Reihenfolge – Deckblatt → Angebot → Vertrag → AAB → Gefahrenanalyse",
@@ -1864,16 +1878,6 @@ export default function App(){
                 "Planjahr: Dropdown im Veranstaltungs-Tab – Vorgänge 1 Jahr im Voraus anlegen mit korrekter Nummerierung",
                 "Vorgänge-Übersicht: Vorplanungs-Tab für Folgejahr sichtbar",
                 "BRK.id Callback: Fehlende Session-State führt zu automatischem Re-Login statt Fehlermeldung",
-              ]},
-              {v:"v7.2",d:"03.03.2026",c:[
-                "Angebotsmappe: Dokument-Auswahl per Modal statt zwei Buttons – Deckblatt, Angebot, Vertrag, AAB und Gefahrenanalyse frei kombinierbar",
-                "Deckblatt Anlagen-Liste dynamisch: zeigt nur die tatsächlich gewählten Dokumente mit korrekter Nummerierung",
-                "Planjahr-Dropdown: Vorgänge für das Folgejahr anlegen mit eigener Auftragsnummer-Serie",
-                "Vorplanungs-Tab in Vorgänge-Übersicht für Folgejahr sichtbar",
-                "Pauschalangebot: 0 € auf Spendenbasis mit Warnhinweis, Button im ausgeklappten Bereich",
-                "Pauschalangebot-Fix Backend: pauschalAktiv-Flag wird korrekt ausgewertet (auch 0 € Pauschale möglich)",
-                "Vorgänge-Liste: Zeigt Pauschalpreis statt berechneten Wert wenn Pauschale aktiv",
-                "BRK.id Callback: Fehlende Session-State löst automatischen Re-Login aus statt Fehlermeldung",
               ]},
               {v:"v7.0",d:"27.02.2026",c:[
                 "🎉 Major Release: Vollständiges Responsive Design für Smartphone und Tablet",
