@@ -1280,17 +1280,13 @@ function FeedbackButton({user,currentView,toast}){
 // MAIN APP
 // ═══════════════════════════════════════════════════════════════════════════
 const TABS=[{id:"events",label:"Vorgänge",icon:"📁"},{id:"event",label:"Veranstaltung",icon:"📋"},{id:"days",label:"Tage & Analyse",icon:"📊"},{id:"costs",label:"Kosten",icon:"💰"},{id:"pdf",label:"Dokumente",icon:"🖨️"},{id:"kunden",label:"Kunden",icon:"👥"},{id:"settings",label:"Stammdaten",icon:"⚙️"},{id:"releases",label:"Changelog",icon:"🆕"}];
-const APP_VERSION="v7.1";
-const LATEST_RELEASE={v:"v7.1",d:"02.03.2026",c:[
-  "📑 Angebotsmappe: Professionelles Deckblatt mit Logo, KV, Bereitschaft und Inhaltsverzeichnis",
-  "🔒 Angebot versendet: Checklist-Lock mit BRK-Modal statt Browser-Confirm",
-  "✅ Checklist bleibt editierbar auch bei gesperrtem Formular",
-  "🖨️ PDF-Performance: Persistenter Chromium-Pool + Single-Render Mappe (5x schneller)",
-  "📄 Vertrag: Ansprechpartner, logische Seitenumbrüche, Unterschriften auf gleicher Höhe",
-  "📋 Fußzeilen: Dokumentenzugehörigkeit + Auftragsnr auf allen PDFs",
-  "🔐 BRK.id Session-Validierung: Token-Expiry + automatischer Refresh",
+const APP_VERSION="v7.2";
+const LATEST_RELEASE={v:"v7.2",d:"03.03.2026",c:[
+  "📦 Angebotsmappe: Dokument-Auswahl per Modal – jede Kombination frei wählbar",
+  "📑 Deckblatt: Anlagen-Liste passt sich dynamisch an gewählte Dokumente an",
   "📅 Planjahr: Vorgänge für das Folgejahr vorplanen (Dropdown statt Rechnungsnummer)",
   "📋 Vorgänge: Vorplanungs-Tab für nächstes Jahr in der Übersicht",
+  "💰 Pauschalangebot: 0 € auf Spendenbasis möglich + korrekte Anzeige in Vorgänge-Liste",
   "🔄 BRK.id Callback: Automatischer Re-Login bei verlorener Session statt Fehlermeldung",
 ]};
 
@@ -1834,6 +1830,16 @@ export default function App(){
                 "Planjahr: Dropdown im Veranstaltungs-Tab – Vorgänge 1 Jahr im Voraus anlegen mit korrekter Nummerierung",
                 "Vorgänge-Übersicht: Vorplanungs-Tab für Folgejahr sichtbar",
                 "BRK.id Callback: Fehlende Session-State führt zu automatischem Re-Login statt Fehlermeldung",
+              ]},
+              {v:"v7.2",d:"03.03.2026",c:[
+                "Angebotsmappe: Dokument-Auswahl per Modal statt zwei Buttons – Deckblatt, Angebot, Vertrag, AAB und Gefahrenanalyse frei kombinierbar",
+                "Deckblatt Anlagen-Liste dynamisch: zeigt nur die tatsächlich gewählten Dokumente mit korrekter Nummerierung",
+                "Planjahr-Dropdown: Vorgänge für das Folgejahr anlegen mit eigener Auftragsnummer-Serie",
+                "Vorplanungs-Tab in Vorgänge-Übersicht für Folgejahr sichtbar",
+                "Pauschalangebot: 0 € auf Spendenbasis mit Warnhinweis, Button im ausgeklappten Bereich",
+                "Pauschalangebot-Fix Backend: pauschalAktiv-Flag wird korrekt ausgewertet (auch 0 € Pauschale möglich)",
+                "Vorgänge-Liste: Zeigt Pauschalpreis statt berechneten Wert wenn Pauschale aktiv",
+                "BRK.id Callback: Fehlende Session-State löst automatischen Re-Login aus statt Fehlermeldung",
               ]},
               {v:"v7.0",d:"27.02.2026",c:[
                 "🎉 Major Release: Vollständiges Responsive Design für Smartphone und Tablet",
