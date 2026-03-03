@@ -397,6 +397,200 @@ function ConfirmModal({open,title,message,icon,onConfirm,onCancel,confirmText="B
 // ═══════════════════════════════════════════════════════════════════
 // Nextcloud Config (Admin)
 // ═══════════════════════════════════════════════════════════════════
+
+// ═══════════════════════════════════════════════════════════════════
+// SMTP / E-Mail Config (Admin)
+// ═══════════════════════════════════════════════════════════════════
+
+// ═══════════════════════════════════════════════════════════════════
+// Einstellungen Tab (Admin) mit Sub-Tabs
+// ═══════════════════════════════════════════════════════════════════
+function EinstellungenTab({stammdaten,updateStamm,updateRate,user,toast,klauseln,klauselnEdit,setKlauselnEdit,klauselnSaving,saveKlauseln,bereitschaft}){
+  const [sub,setSub]=useState("org");
+  const subs=[{id:"org",label:"Organisation",icon:"🏢"},{id:"kosten",label:"Kostensätze",icon:"💰"},{id:"klauseln",label:"Textvorlagen",icon:"📝"},{id:"nextcloud",label:"Nextcloud",icon:"☁️"},{id:"email",label:"E-Mail",icon:"✉️"}];
+  return(<div>
+    <div style={{display:"flex",gap:4,marginBottom:16,flexWrap:"wrap"}}>
+      {subs.map(s=><button key={s.id} onClick={()=>setSub(s.id)} style={{padding:"7px 14px",background:sub===s.id?C.rot:"#fff",color:sub===s.id?"#fff":C.dunkelgrau,border:`1px solid ${sub===s.id?C.rot:C.mittelgrau}`,borderRadius:6,fontSize:12,fontWeight:sub===s.id?700:500,cursor:"pointer",fontFamily:FONT.sans,display:"flex",alignItems:"center",gap:5}}><span style={{fontSize:13}}>{s.icon}</span>{s.label}</button>)}
+    </div>
+
+    {sub==="org"&&<div style={{maxWidth:600}}>
+      <Card title="🏢 Organisation" accent={C.rot}><Inp label="Kreisverband" value={stammdaten.kvName} onChange={v=>updateStamm("kvName",v)}/><Inp label="Kreisgeschäftsführer" value={stammdaten.kgf} onChange={v=>updateStamm("kgf",v)}/><Inp label="Adresse" value={stammdaten.kvAdresse} onChange={v=>updateStamm("kvAdresse",v)}/><Inp label="PLZ Ort" value={stammdaten.kvPlzOrt} onChange={v=>updateStamm("kvPlzOrt",v)}/></Card>
+      <Card title="Logo für Drucksachen" accent={C.dunkelblau} sub="Wird auf allen Dokumenten angezeigt (außer ILS)">
+        <div style={{display:"flex",alignItems:"center",gap:16,marginBottom:10}}>
+          <div style={{width:120,height:60,border:`2px dashed ${C.mittelgrau}60`,borderRadius:6,display:"flex",alignItems:"center",justifyContent:"center",background:C.hellgrau,overflow:"hidden",flexShrink:0}}>
+            {stammdaten.customLogo?<img src={stammdaten.customLogo} alt="Logo" style={{maxWidth:"100%",maxHeight:"100%"}}/>:<span style={{fontSize:10,color:C.bgrau}}>Kein Logo</span>}
+          </div>
+          <div style={{flex:1}}>
+            <input type="file" accept="image/*" id="logoUpload" style={{display:"none"}} onChange={async e=>{const f=e.target.files[0];if(!f)return;const fd=new FormData();fd.append("logo",f);try{const r=await fetch("/api/stammdaten/logo",{method:"POST",body:fd,credentials:"include"});const d=await r.json();if(d.logo){updateStamm("customLogo",d.logo+"?t="+Date.now());}}catch(err){console.error("Logo-Upload fehlgeschlagen:",err);}}}/>
+            <label htmlFor="logoUpload" style={{display:"inline-block",padding:"6px 14px",background:C.mittelblau,color:"#fff",borderRadius:4,fontSize:12,fontWeight:600,cursor:"pointer",fontFamily:FONT.sans}}>📁 Logo hochladen</label>
+            {stammdaten.customLogo&&<button onClick={async()=>{try{await fetch("/api/stammdaten/logo",{method:"DELETE",credentials:"include"});}catch(e){console.error("Fehler:",e);}updateStamm("customLogo",null);}} style={{marginLeft:8,padding:"6px 12px",background:"transparent",border:`1px solid ${C.rot}`,borderRadius:4,fontSize:11,color:C.rot,cursor:"pointer",fontFamily:FONT.sans}}>✕ Entfernen</button>}
+            <div style={{fontSize:10,color:C.bgrau,marginTop:4}}>Empfohlen: PNG/JPG, ca. 300×150px</div>
+          </div>
+        </div>
+      </Card>
+      <Card title="Bereitschaftsleitung" accent={C.mittelblau}><Inp label="Bereitschaftsleiter" value={stammdaten.bereitschaftsleiter} onChange={v=>updateStamm("bereitschaftsleiter",v)}/><Inp label="Telefon" value={stammdaten.telefon} onChange={v=>updateStamm("telefon",v)}/><Inp label="Fax" value={stammdaten.fax} onChange={v=>updateStamm("fax",v)}/><Inp label="Mobil" value={stammdaten.mobil} onChange={v=>updateStamm("mobil",v)}/><Inp label="E-Mail" value={stammdaten.email} onChange={v=>updateStamm("email",v)}/><Inp label="Funkgruppe" value={stammdaten.funkgruppe} onChange={v=>updateStamm("funkgruppe",v)}/></Card>
+    </div>}
+
+    {sub==="kosten"&&<div style={{maxWidth:600}}>
+      <Card title="Kostensätze (EUR)" accent="#d4920a"><div className="rg2" style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"0 10px"}}>{[["Helfer (€/Std)","helfer"],["KTW","ktw"],["RTW","rtw"],["GKTW","gktw"],["EL (€/Std)","einsatzleiter"],["EL-KFZ","einsatzleiterKfz"],["SEG-LKW","segLkw"],["MTW","mtw"],["Zelt","zelt"],["Verpfl. (€/P/8h)","verpflegung"]].map(([l,k])=><Inp key={k} small label={l} type="number" min={0} step={0.5} value={stammdaten.rates[k]} onChange={v=>updateRate(k,v)}/>)}</div></Card>
+      <Card title="km-Sätze" accent={C.mittelblau}><div className="rg3" style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:"0 10px"}}>{[["KTW","kmKtw"],["RTW","kmRtw"],["GKTW","kmGktw"],["EL-KFZ","kmElKfz"],["SEG","kmSegLkw"],["MTW","kmMtw"]].map(([l,k])=><Inp key={k} small label={l} type="number" min={0} step={0.1} value={stammdaten.rates[k]} onChange={v=>updateRate(k,v)}/>)}</div></Card>
+    </div>}
+
+    {sub==="klauseln"&&<Card title="Textvorlagen (AAB & Vertrag)" accent={C.mittelblau} sub="Klauseln können bei Bedarf angepasst werden">
+      <div>
+        <div style={{display:"flex",justifyContent:"flex-end",marginBottom:12,gap:8}}>
+          <Btn small variant="success" onClick={saveKlauseln} disabled={klauselnSaving}>{klauselnSaving?"Speichert...":"Alle Textvorlagen speichern"}</Btn>
+        </div>
+        {["aab","vertrag"].map(dok=>(
+          <div key={dok} style={{marginBottom:16}}>
+            <div style={{fontWeight:700,fontSize:13,color:C.dunkelgrau,marginBottom:8,paddingBottom:4,borderBottom:"2px solid "+(dok==="aab"?C.rot:C.mittelblau)}}>
+              {dok==="aab"?"Allgemeine Auftragsbedingungen (AAB)":"Vereinbarung - Vertragsklauseln"}
+            </div>
+            {klauseln.filter(k=>k.dokument===dok).sort((a,b)=>a.reihenfolge-b.reihenfolge).map(k=>(
+              <div key={k.id} style={{marginBottom:14}}>
+                <div style={{fontWeight:600,fontSize:12,color:C.schwarz,marginBottom:4}}>{k.titel}</div>
+                <textarea value={klauselnEdit[k.id]||""} onChange={e=>setKlauselnEdit(prev=>({...prev,[k.id]:e.target.value}))} style={{width:"100%",minHeight:120,padding:"8px 10px",border:`1px solid ${C.mittelgrau}`,borderRadius:4,fontFamily:"Arial,sans-serif",fontSize:11,lineHeight:1.5,resize:"vertical",background:"#fafafa"}}/>
+              </div>
+            ))}
+          </div>
+        ))}
+      </div>
+    </Card>}
+
+    {sub==="nextcloud"&&<NextcloudConfig toast={toast}/>}
+    {sub==="email"&&<SmtpConfig toast={toast}/>}
+  </div>);
+}
+
+function SmtpConfig({toast}){
+  const [cfg,setCfg]=useState({});const [loading,setLoading]=useState(true);const [test,setTest]=useState(null);const [saving,setSaving]=useState(false);
+  useEffect(()=>{(async()=>{try{const c=await API.getSmtpConfig();setCfg(c);}catch{}finally{setLoading(false);}})();},[]);
+  const save=async()=>{setSaving(true);try{await API.saveSmtpConfig(cfg);toast("E-Mail Einstellungen gespeichert","success");}catch(e){toast(e.message,"error");}finally{setSaving(false);}};
+  const doTest=async()=>{setTest(null);try{const r=await API.testSmtp();setTest(r);}catch(e){setTest({success:false,error:e.message});}};
+  if(loading)return <Card accent={C.mittelblau}><div style={{textAlign:"center",padding:20}}>Lade...</div></Card>;
+  return(<div style={{maxWidth:700}}>
+    <Card title="✉️ E-Mail / SMTP Konfiguration" accent="#e65100">
+      <div style={{marginBottom:16}}>
+        <label style={{display:"flex",alignItems:"center",gap:10,cursor:"pointer",marginBottom:16}}>
+          <div style={{width:42,height:24,borderRadius:12,background:cfg.smtp_enabled==="true"?"#e65100":"#ccc",position:"relative",transition:"0.2s",cursor:"pointer"}} onClick={()=>setCfg(p=>({...p,smtp_enabled:p.smtp_enabled==="true"?"false":"true"}))}>
+            <div style={{width:20,height:20,borderRadius:10,background:"#fff",position:"absolute",top:2,left:cfg.smtp_enabled==="true"?20:2,transition:"0.2s",boxShadow:"0 1px 3px rgba(0,0,0,0.3)"}}/>
+          </div>
+          <span style={{fontSize:14,fontWeight:600}}>E-Mail Versand {cfg.smtp_enabled==="true"?"aktiv":"deaktiviert"}</span>
+        </label>
+
+        <div style={{display:"flex",gap:8,marginBottom:12}}>
+          {[{v:"smtp",l:"Standard SMTP"},{v:"365",l:"Microsoft 365"},{v:"exchange",l:"Exchange"}].map(m=>(
+            <button key={m.v} onClick={()=>setCfg(p=>({...p,smtp_mode:m.v}))} style={{flex:1,padding:"8px 12px",background:(cfg.smtp_mode||"smtp")===m.v?"#e65100":"#fff",color:(cfg.smtp_mode||"smtp")===m.v?"#fff":"#333",border:`1px solid ${(cfg.smtp_mode||"smtp")===m.v?"#e65100":"#ccc"}`,borderRadius:6,fontSize:12,fontWeight:600,cursor:"pointer",fontFamily:FONT.sans}}>{m.l}</button>
+          ))}
+        </div>
+
+        {(cfg.smtp_mode||"smtp")!=="365"&&<div style={{display:"grid",gridTemplateColumns:"3fr 1fr",gap:8,marginBottom:8}}>
+          <div><div style={{fontSize:11,fontWeight:600,color:"#555",marginBottom:3}}>SMTP Host</div>
+            <input value={cfg.smtp_host||""} onChange={e=>setCfg(p=>({...p,smtp_host:e.target.value}))} placeholder="mail.example.com" style={{width:"100%",padding:"7px 10px",border:"1px solid #ccc",borderRadius:5,fontSize:12,fontFamily:FONT.sans}}/></div>
+          <div><div style={{fontSize:11,fontWeight:600,color:"#555",marginBottom:3}}>Port</div>
+            <input value={cfg.smtp_port||"587"} onChange={e=>setCfg(p=>({...p,smtp_port:e.target.value}))} style={{width:"100%",padding:"7px 10px",border:"1px solid #ccc",borderRadius:5,fontSize:12,fontFamily:FONT.sans}}/></div>
+        </div>}
+
+        {(cfg.smtp_mode||"smtp")==="365"&&<div style={{fontSize:11,color:"#666",padding:"8px 12px",background:"#fff3e0",borderRadius:6,marginBottom:8}}>Microsoft 365: Verwendet automatisch smtp.office365.com:587</div>}
+
+        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:8}}>
+          <div><div style={{fontSize:11,fontWeight:600,color:"#555",marginBottom:3}}>Benutzer / E-Mail</div>
+            <input value={cfg.smtp_user||""} onChange={e=>setCfg(p=>({...p,smtp_user:e.target.value}))} placeholder="user@brk.de" style={{width:"100%",padding:"7px 10px",border:"1px solid #ccc",borderRadius:5,fontSize:12,fontFamily:FONT.sans}}/></div>
+          <div><div style={{fontSize:11,fontWeight:600,color:"#555",marginBottom:3}}>Passwort</div>
+            <input type="password" value={cfg.smtp_password||""} onChange={e=>setCfg(p=>({...p,smtp_password:e.target.value}))} style={{width:"100%",padding:"7px 10px",border:"1px solid #ccc",borderRadius:5,fontSize:12,fontFamily:FONT.sans}}/></div>
+        </div>
+
+        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:12}}>
+          <div><div style={{fontSize:11,fontWeight:600,color:"#555",marginBottom:3}}>Absender E-Mail</div>
+            <input value={cfg.smtp_from_email||""} onChange={e=>setCfg(p=>({...p,smtp_from_email:e.target.value}))} placeholder="sanwd@brk-sob.de" style={{width:"100%",padding:"7px 10px",border:"1px solid #ccc",borderRadius:5,fontSize:12,fontFamily:FONT.sans}}/></div>
+          <div><div style={{fontSize:11,fontWeight:600,color:"#555",marginBottom:3}}>Absender Name</div>
+            <input value={cfg.smtp_from_name||""} onChange={e=>setCfg(p=>({...p,smtp_from_name:e.target.value}))} placeholder="BRK Sanitätswachdienst" style={{width:"100%",padding:"7px 10px",border:"1px solid #ccc",borderRadius:5,fontSize:12,fontFamily:FONT.sans}}/></div>
+        </div>
+
+        <div style={{background:"#f5f5f5",borderRadius:6,padding:"10px 14px",marginBottom:12}}>
+          <div style={{fontSize:11,fontWeight:600,color:"#555",marginBottom:6}}>Optionen</div>
+          <label style={{display:"flex",alignItems:"center",gap:8,fontSize:12,cursor:"pointer",marginBottom:6}}>
+            <input type="checkbox" checked={cfg.smtp_on_behalf==="true"} onChange={e=>setCfg(p=>({...p,smtp_on_behalf:e.target.checked?"true":"false"}))} style={{accentColor:"#e65100"}}/>
+            Im Auftrag von: Bearbeitende Person als Reply-To setzen
+          </label>
+          <label style={{display:"flex",alignItems:"center",gap:8,fontSize:12,cursor:"pointer"}}>
+            <input type="checkbox" checked={cfg.smtp_cc_bereitschaft==="true"} onChange={e=>setCfg(p=>({...p,smtp_cc_bereitschaft:e.target.checked?"true":"false"}))} style={{accentColor:"#e65100"}}/>
+            CC: Bereitschafts-E-Mail bei jedem Versand in Kopie
+          </label>
+        </div>
+
+        <div style={{display:"flex",gap:8}}>
+          <button onClick={save} disabled={saving} style={{padding:"8px 20px",background:"#e65100",color:"#fff",border:"none",borderRadius:6,fontSize:13,fontWeight:600,cursor:"pointer",fontFamily:FONT.sans}}>{saving?"Speichern...":"Speichern"}</button>
+          <button onClick={doTest} style={{padding:"8px 20px",background:C.hellgrau,border:"1px solid #ccc",borderRadius:6,fontSize:13,cursor:"pointer",fontFamily:FONT.sans}}>Verbindung testen</button>
+        </div>
+
+        {test&&<div style={{marginTop:12,padding:"10px 14px",background:test.success?"#e8f5e9":"#ffebee",border:`1px solid ${test.success?"#a5d6a7":"#ef9a9a"}`,borderRadius:6,fontSize:12,color:test.success?"#2e7d32":"#c62828"}}>
+          {test.success?"✅ "+test.message:"❌ "+test.error}
+        </div>}
+      </div>
+    </Card>
+  </div>);
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// Mail Compose Modal
+// ═══════════════════════════════════════════════════════════════════
+function MailComposeModal({event:ev, currentEventId, user, stammdaten, dayCalcs, totalCosts, activeDays, toast, onClose}){
+  const [to,setTo]=useState(ev?.kundenEmail||"");
+  const [subject,setSubject]=useState(`Angebot Sanitätswachdienst - ${ev?.name||""} ${ev?.auftragsnr||""}`);
+  const [body,setBody]=useState(`<p>Sehr geehrte Damen und Herren,</p><p>anbei erhalten Sie unser Angebot für die sanitätsdienstliche Absicherung Ihrer Veranstaltung <strong>${ev?.name||""}</strong>.</p><p>Bei Fragen stehen wir Ihnen gerne zur Verfügung.</p><p>Mit freundlichen Grüßen<br/>${user?.name||""}<br/>${stammdaten?.kvName||"BRK"}</p>`);
+  const [attachPdf,setAttachPdf]=useState("mappe");
+  const [sending,setSending]=useState(false);
+  const send=async()=>{
+    if(!to){toast("Empfänger fehlt","warning");return;}
+    setSending(true);
+    try{
+      const r=await API.sendMail(currentEventId,{to,subject,body,attachPdf,dayCalcs,totalCosts,activeDays});
+      if(r.success){toast("✉️ E-Mail gesendet an "+to,"success");onClose();}
+      else toast("Fehler: "+(r.error||""),"error");
+    }catch(e){toast("E-Mail: "+e.message,"error");}
+    finally{setSending(false);}
+  };
+  return(<div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.5)",backdropFilter:"blur(3px)",zIndex:9999,display:"flex",alignItems:"center",justifyContent:"center"}} onClick={onClose}>
+    <div style={{background:"#fff",borderRadius:10,padding:"24px 28px",maxWidth:560,width:"92%",maxHeight:"85vh",overflowY:"auto",boxShadow:"0 20px 60px rgba(0,0,0,0.3)"}} onClick={e=>e.stopPropagation()}>
+      <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:16}}>
+        <div style={{display:"flex",alignItems:"center",gap:10}}><span style={{fontSize:24}}>✉️</span><div><div style={{fontSize:16,fontWeight:700}}>Angebot per E-Mail senden</div><div style={{fontSize:11,color:C.dunkelgrau}}>{ev?.name} · {ev?.auftragsnr}</div></div></div>
+        <button onClick={onClose} style={{background:"none",border:"none",fontSize:20,cursor:"pointer",color:"#999"}}>✕</button>
+      </div>
+
+      <div style={{marginBottom:10}}>
+        <div style={{fontSize:11,fontWeight:600,color:"#555",marginBottom:3}}>An</div>
+        <input value={to} onChange={e=>setTo(e.target.value)} placeholder="veranstalter@example.com" style={{width:"100%",padding:"8px 10px",border:"1px solid #ccc",borderRadius:5,fontSize:13,fontFamily:FONT.sans}}/>
+      </div>
+
+      <div style={{marginBottom:10}}>
+        <div style={{fontSize:11,fontWeight:600,color:"#555",marginBottom:3}}>Betreff</div>
+        <input value={subject} onChange={e=>setSubject(e.target.value)} style={{width:"100%",padding:"8px 10px",border:"1px solid #ccc",borderRadius:5,fontSize:13,fontFamily:FONT.sans}}/>
+      </div>
+
+      <div style={{marginBottom:10}}>
+        <div style={{fontSize:11,fontWeight:600,color:"#555",marginBottom:3}}>PDF-Anhang</div>
+        <div style={{display:"flex",gap:6}}>
+          {[{v:"mappe",l:"📦 Angebotsmappe"},{v:"angebot",l:"📄 Nur Angebot"},{v:"none",l:"Kein Anhang"}].map(o=>(
+            <button key={o.v} onClick={()=>setAttachPdf(o.v)} style={{flex:1,padding:"6px 10px",background:attachPdf===o.v?"#e65100":"#fff",color:attachPdf===o.v?"#fff":"#333",border:`1px solid ${attachPdf===o.v?"#e65100":"#ccc"}`,borderRadius:5,fontSize:11,fontWeight:600,cursor:"pointer",fontFamily:FONT.sans}}>{o.l}</button>
+          ))}
+        </div>
+      </div>
+
+      <div style={{marginBottom:14}}>
+        <div style={{fontSize:11,fontWeight:600,color:"#555",marginBottom:3}}>Nachricht</div>
+        <textarea value={body.replace(/<[^>]+>/g," ").replace(/\s+/g," ").trim()} onChange={e=>setBody(e.target.value)} rows={6} style={{width:"100%",padding:"8px 10px",border:"1px solid #ccc",borderRadius:5,fontSize:12,fontFamily:FONT.sans,lineHeight:1.5,resize:"vertical"}}/>
+        <div style={{fontSize:10,color:"#888",marginTop:2}}>Reply-To: {user?.email||"nicht gesetzt"} · CC: {stammdaten?.email||"keine"}</div>
+      </div>
+
+      <div style={{display:"flex",gap:8,justifyContent:"flex-end"}}>
+        <button onClick={onClose} style={{padding:"8px 20px",background:C.hellgrau,border:"1px solid #ccc",borderRadius:6,fontSize:13,cursor:"pointer",fontFamily:FONT.sans}}>Abbrechen</button>
+        <button onClick={send} disabled={sending} style={{padding:"8px 24px",background:"#e65100",color:"#fff",border:"none",borderRadius:6,fontSize:13,fontWeight:600,cursor:"pointer",fontFamily:FONT.sans}}>{sending?"Sende...":"✉️ Senden"}</button>
+      </div>
+    </div>
+  </div>);
+}
+
 function NextcloudConfig({toast}){
   const [ncCfg,setNcCfg]=useState({});const [ncLoading,setNcLoading]=useState(true);const [ncTest,setNcTest]=useState(null);const [ncSaving,setNcSaving]=useState(false);
   useEffect(()=>{(async()=>{try{const c=await API.getNextcloudConfig();setNcCfg(c);}catch{}finally{setNcLoading(false);}})();},[]);
@@ -1402,9 +1596,19 @@ function FeedbackButton({user,currentView,toast}){
 // ═══════════════════════════════════════════════════════════════════════════
 // MAIN APP
 // ═══════════════════════════════════════════════════════════════════════════
-const TABS=[{id:"events",label:"Vorgänge",icon:"📁"},{id:"event",label:"Veranstaltung",icon:"📋"},{id:"days",label:"Tage & Analyse",icon:"📊"},{id:"costs",label:"Kosten",icon:"💰"},{id:"pdf",label:"Dokumente",icon:"🖨️"},{id:"kunden",label:"Kunden",icon:"👥"},{id:"settings",label:"Stammdaten",icon:"⚙️"},{id:"nextcloud",label:"Nextcloud",icon:"☁️",admin:true},{id:"releases",label:"Changelog",icon:"🆕"}];
-const APP_VERSION="v7.2";
-const LATEST_RELEASE={v:"v7.2",d:"03.03.2026",c:[
+const TABS=[{id:"events",label:"Vorgänge",icon:"📁"},{id:"event",label:"Veranstaltung",icon:"📋"},{id:"days",label:"Tage & Analyse",icon:"📊"},{id:"costs",label:"Kosten",icon:"💰"},{id:"pdf",label:"Dokumente",icon:"🖨️"},{id:"kunden",label:"Kunden",icon:"👥"},{id:"profil",label:"Mein Profil",icon:"👤"},{id:"einstellungen",label:"Einstellungen",icon:"⚙️",admin:true},{id:"releases",label:"Changelog",icon:"🆕"}];
+const APP_VERSION="v7.3";
+const LATEST_RELEASE={v:"v7.3",d:"04.03.2026",c:[
+"Tab-Umstrukturierung: Mein Profil + Einstellungen (Admin) mit Sub-Tabs",
+"Nextcloud: Konfigurierbarer Pfad-Template ($bereitschaft, $auftragsnr, ...)",
+"Nextcloud: Auto-Sync bei jeder PDF-Generierung im Hintergrund",
+"Nextcloud: Service-Account (App-Passwort) oder Bearer Token Authentifizierung",
+"E-Mail/SMTP: Konfiguration für SMTP, Microsoft 365, Exchange",
+"E-Mail: Angebot/Mappe als PDF-Anhang direkt aus SanWD versenden",
+"E-Mail: Im Auftrag von Bearbeiter + CC an Bereitschaft",
+"Einzel-PDF-Download-Buttons entfernt (Angebotsmappe deckt alles ab)",
+]};
+const RELEASE_V72={v:"v7.2",d:"03.03.2026",c:[
   "📦 Angebotsmappe: Dokument-Auswahl per Modal – jede Kombination frei wählbar",
   "📑 Deckblatt: Anlagen-Liste passt sich dynamisch an gewählte Dokumente an",
   "📅 Planjahr: Vorgänge für das Folgejahr vorplanen (Dropdown statt Rechnungsnummer)",
@@ -1447,7 +1651,12 @@ export default function App(){
   const [mappePending,setMappePending]=useState(false);
   const [mappeModal,setMappeModal]=useState(false);
   const [ncEnabled,setNcEnabled]=useState(false);
-  useEffect(()=>{API.json("/api/nextcloud/status").then(r=>setNcEnabled(!!r.configured)).catch(()=>{});},[]);
+  const [smtpEnabled,setSmtpEnabled]=useState(false);
+  const [mailModal,setMailModal]=useState(false);
+  useEffect(()=>{
+    API.json("/api/nextcloud/status").then(r=>setNcEnabled(!!r.configured)).catch(()=>{});
+    API.json("/api/config/smtp").then(r=>setSmtpEnabled(r.smtp_enabled==="true")).catch(()=>{});
+  },[]);
   const [mappeDocs,setMappeDocs]=useState({deckblatt:true,angebot:true,vertrag:true,aab:true,gefahren:true});
   const [gefahrenPending,setGefahrenPending]=useState(false);
   const [angebotPending,setAngebotPending]=useState(false);
@@ -1696,7 +1905,7 @@ export default function App(){
             <span style={{fontWeight:600,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{event.name||"Unbenannte Veranstaltung"}</span>
             {event.auftragsnr&&<span style={{color:C.rot,fontWeight:700,whiteSpace:"nowrap"}}>&nbsp;·&nbsp;{event.auftragsnr}</span>}
           </span>}
-          <div onClick={()=>setTab("settings")} style={{display:"flex",alignItems:"center",gap:mob?4:8,cursor:"pointer"}} title="Mein Profil"><div style={{width:30,height:30,borderRadius:15,background:C.rot,display:"flex",alignItems:"center",justifyContent:"center",fontSize:13,fontWeight:700,color:"#fff"}}>{user.name.charAt(0)}</div>{!mob&&<div className="r-user-name"><div style={{fontSize:12,fontWeight:600}}>{user.name}</div><div style={{fontSize:10,color:C.dunkelgrau}}>{user.bereitschaft}{user.rolle==="admin"?" (Admin)":user.rolle==="bl"?" (BL)":""}</div></div>}</div>
+          <div onClick={()=>setTab("profil")} style={{display:"flex",alignItems:"center",gap:mob?4:8,cursor:"pointer"}} title="Mein Profil"><div style={{width:30,height:30,borderRadius:15,background:C.rot,display:"flex",alignItems:"center",justifyContent:"center",fontSize:13,fontWeight:700,color:"#fff"}}>{user.name.charAt(0)}</div>{!mob&&<div className="r-user-name"><div style={{fontSize:12,fontWeight:600}}>{user.name}</div><div style={{fontSize:10,color:C.dunkelgrau}}>{user.bereitschaft}{user.rolle==="admin"?" (Admin)":user.rolle==="bl"?" (BL)":""}</div></div>}</div>
           <Btn className="r-abmelden" small variant="ghost" onClick={()=>window.location.href="/auth/logout"}>{mob?"⏻":"Abmelden"}</Btn>
         </div>
       </header>
@@ -1895,6 +2104,7 @@ export default function App(){
               <div style={{display:"flex",gap:6,flexWrap:"wrap",alignItems:"center"}}>
                 <Btn onClick={()=>{if(!currentEventId){toast("Bitte zuerst Vorgang speichern","warning");return;}setMappeDocs({deckblatt:true,angebot:true,vertrag:true,aab:true,gefahren:true});setMappeModal(true);}} icon="📦" variant="success" disabled={mappePending}>{mappePending?"Erstelle PDF...":"Angebotsmappe erstellen"}</Btn>
                 {ncEnabled&&<button title="Alle Dokumente in Nextcloud synchronisieren" onClick={async()=>{if(!currentEventId){toast("Bitte zuerst Vorgang speichern","warning");return;}await saveEvent();try{const r=await API.syncToNextcloud(currentEventId,{dayCalcs,totalCosts,activeDays});if(r.success){toast("☁️ "+r.results.length+" Dateien synchronisiert","success");setEvent(p=>({...p,nextcloudSync:{syncedAt:r.syncedAt,folder:r.folder,files:r.results.map(f=>f.file),syncedBy:user?.name}}));}else{toast("Sync: "+(r.error||"Fehler"),"error");}}catch(e){toast("Nextcloud: "+e.message,"error");}}} disabled={mappePending} style={{width:36,height:36,borderRadius:8,border:"1px solid #90caf9",background:event.nextcloudSync?"#e3f2fd":"#fff",display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",fontSize:18,transition:"all 0.2s",position:"relative"}} onMouseEnter={e=>e.currentTarget.style.background="#bbdefb"} onMouseLeave={e=>e.currentTarget.style.background=event.nextcloudSync?"#e3f2fd":"#fff"}>🔄☁️</button>}
+                {smtpEnabled&&<button title="Angebot per E-Mail senden" onClick={()=>{if(!currentEventId){toast("Bitte zuerst Vorgang speichern","warning");return;}setMailModal(true);}} style={{width:36,height:36,borderRadius:8,border:"1px solid #ef9a9a",background:"#fff",display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",fontSize:18,transition:"all 0.2s"}} onMouseEnter={e=>e.currentTarget.style.background="#ffebee"} onMouseLeave={e=>e.currentTarget.style.background="#fff"}>✉️</button>}
                 {ncEnabled&&event.nextcloudSync&&<span style={{fontSize:10,color:"#1565c0"}} title={event.nextcloudSync.folder}>✓ {event.nextcloudSync.syncedAt?.substring(0,10)}</span>}
               </div>
             </div>
@@ -1927,7 +2137,6 @@ export default function App(){
         {tab==="kunden"&&<KundenManager kunden={kunden} setKunden={setKunden} user={user} toast={toast} showConfirm={showConfirm}/>}
 
         {/* STAMMDATEN */}
-        {tab==="nextcloud"&&user?.rolle==="admin"&&<NextcloudConfig toast={toast}/>}
 
 
                 {tab==="releases"&&(
@@ -2129,10 +2338,8 @@ export default function App(){
           </div>
         </div>
       )}
-      {tab==="settings"&&(<div><div className="rg2" style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:14}}>
-          <div>
-            {(user?.rolle==="admin"||user?.rolle==="kbl")&&<Card title="Organisation" accent={C.rot}><Inp label="Kreisverband" value={stammdaten.kvName} onChange={v=>updateStamm("kvName",v)}/><Inp label="Kreisgeschäftsführer" value={stammdaten.kgf} onChange={v=>updateStamm("kgf",v)}/><Inp label="Adresse" value={stammdaten.kvAdresse} onChange={v=>updateStamm("kvAdresse",v)}/><Inp label="PLZ Ort" value={stammdaten.kvPlzOrt} onChange={v=>updateStamm("kvPlzOrt",v)}/></Card>}
-            <Card title="Mein Profil" accent={C.rot} sub="Persönliche Kontaktdaten (nur für Sie)">
+      {tab==="profil"&&(<div style={{maxWidth:550}}>
+            <Card title="👤 Mein Profil" accent={C.rot} sub="Persönliche Kontaktdaten (nur für Sie)">
               <div className="rg2" style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"0 16px"}}>
               <Inp label="Titel / Funktion" value={user.titel||""} onChange={v=>setUser(p=>({...p,titel:v}))}/>
               <Inp label="Ort (für Datum-Zeile)" value={user.ort||""} onChange={v=>setUser(p=>({...p,ort:v}))} placeholder="z.B. Schrobenhausen"/>
@@ -2151,61 +2358,9 @@ export default function App(){
               <Btn small variant="success" onClick={async()=>{try{const r=await API.saveProfile({telefon:user.telefon||"",mobil:user.mobil||"",titel:user.titel||"",email:user.email||"",ort:user.ort||"",signatur:user.signatur||""});if(r&&r.success){toast("Profil gespeichert","success");}else{toast("Fehler beim Speichern","error");}}catch(e){toast(e.message,"error");}}}>Profil speichern</Btn>
               <div style={{fontSize:10,color:C.bgrau,marginTop:4}}>Diese Daten erscheinen als Unterzeichner im Angebot</div>
             </Card>
-            {(user?.rolle==="admin"||user?.rolle==="kbl")&&<Card title="Logo für Drucksachen" accent={C.dunkelblau} sub="Wird auf allen Dokumenten und der Website angezeigt (außer ILS)">
-              <div style={{display:"flex",alignItems:"center",gap:16,marginBottom:10}}>
-                <div style={{width:120,height:60,border:`2px dashed ${C.mittelgrau}60`,borderRadius:6,display:"flex",alignItems:"center",justifyContent:"center",background:C.hellgrau,overflow:"hidden",flexShrink:0}}>
-                  {stammdaten.customLogo?<img src={stammdaten.customLogo} alt="Logo" style={{maxWidth:"100%",maxHeight:"100%"}}/>:<span style={{fontSize:10,color:C.bgrau}}>Kein Logo</span>}
-                </div>
-                <div style={{flex:1}}>
-                  <input type="file" accept="image/*" id="logoUpload" style={{display:"none"}} onChange={async e=>{const f=e.target.files[0];if(!f)return;const fd=new FormData();fd.append("logo",f);try{const r=await fetch("/api/stammdaten/logo",{method:"POST",body:fd,credentials:"include"});const d=await r.json();if(d.logo){updateStamm("customLogo",d.logo+"?t="+Date.now());}}catch(err){console.error("Logo-Upload fehlgeschlagen:",err);}}}/>
-                  <label htmlFor="logoUpload" style={{display:"inline-block",padding:"6px 14px",background:C.mittelblau,color:"#fff",borderRadius:4,fontSize:12,fontWeight:600,cursor:"pointer",fontFamily:FONT.sans}}>📁 Logo hochladen</label>
-                  {stammdaten.customLogo&&<button onClick={async()=>{try{await fetch("/api/stammdaten/logo",{method:"DELETE",credentials:"include"});}catch(e){console.error("Fehler:",e);}updateStamm("customLogo",null);}} style={{marginLeft:8,padding:"6px 12px",background:"transparent",border:`1px solid ${C.rot}`,borderRadius:4,fontSize:11,color:C.rot,cursor:"pointer",fontFamily:FONT.sans}}>✕ Entfernen</button>}
-                  <div style={{fontSize:10,color:C.bgrau,marginTop:4}}>Empfohlen: PNG/JPG, ca. 300×150px</div>
-                </div>
-              </div>
-            </Card>}
-            <Card title="Bereitschaftsleitung" accent={C.mittelblau}><Inp label="Bereitschaftsleiter" value={stammdaten.bereitschaftsleiter} onChange={v=>updateStamm("bereitschaftsleiter",v)}/><Inp label="Telefon" value={stammdaten.telefon} onChange={v=>updateStamm("telefon",v)}/><Inp label="Fax" value={stammdaten.fax} onChange={v=>updateStamm("fax",v)}/><Inp label="Mobil" value={stammdaten.mobil} onChange={v=>updateStamm("mobil",v)}/><Inp label="E-Mail" value={stammdaten.email} onChange={v=>updateStamm("email",v)}/><Inp label="Funkgruppe" value={stammdaten.funkgruppe} onChange={v=>updateStamm("funkgruppe",v)}/></Card>
-          </div>
-          <div>
-            <Card title="Kostensätze (EUR)" sub={user?.rolle!=="admin"?"Nur Admin kann diese Daten ändern – Ansicht nur lesend":undefined} accent="#d4920a"><div className="rg2" style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"0 10px"}}>{[["Helfer (€/Std)","helfer"],["KTW","ktw"],["RTW","rtw"],["GKTW","gktw"],["EL (€/Std)","einsatzleiter"],["EL-KFZ","einsatzleiterKfz"],["SEG-LKW","segLkw"],["MTW","mtw"],["Zelt","zelt"],["Verpfl. (€/P/8h)","verpflegung"]].map(([l,k])=><Inp key={k} small label={l} type="number" min={0} step={0.5} value={stammdaten.rates[k]} onChange={v=>updateRate(k,v)} disabled={user?.rolle!=="admin"}/>)}</div></Card>
-            <Card title="km-Saetze" accent={C.mittelblau}><div className="rg3" style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:"0 10px"}}>{[["KTW","kmKtw"],["RTW","kmRtw"],["GKTW","kmGktw"],["EL-KFZ","kmElKfz"],["SEG","kmSegLkw"],["MTW","kmMtw"]].map(([l,k])=><Inp key={k} small label={l} type="number" min={0} step={0.1} value={stammdaten.rates[k]} onChange={v=>updateRate(k,v)} disabled={user?.rolle!=="admin"}/>)}</div></Card>
-          </div>
-        </div>
+        </div>)}
 
-        {/* KLAUSEL EDITOR */}
-        <Card title="Textvorlagen (AAB & Vertrag)" accent={C.mittelblau} sub="Klauseln koennen bei Bedarf angepasst werden - nur Admin">
-          {user?.rolle==="admin"?(
-            <div>
-              <div style={{display:"flex",justifyContent:"flex-end",marginBottom:12,gap:8}}>
-                <Btn small variant="success" onClick={saveKlauseln} disabled={klauselnSaving}>
-                  {klauselnSaving?"Speichert...":"Alle Textvorlagen speichern"}
-                </Btn>
-              </div>
-              {["aab","vertrag"].map(dok=>(
-                <div key={dok} style={{marginBottom:16}}>
-                  <div style={{fontWeight:700,fontSize:13,color:C.dunkelgrau,marginBottom:8,paddingBottom:4,borderBottom:"2px solid "+(dok==="aab"?C.rot:C.mittelblau)}}>
-                    {dok==="aab"?"Allgemeine Auftragsbedingungen (AAB)":"Vereinbarung - Vertragsklauseln"}
-                  </div>
-                  {klauseln.filter(k=>k.dokument===dok).sort((a,b)=>a.reihenfolge-b.reihenfolge).map(k=>(
-                    <div key={k.id} style={{marginBottom:14}}>
-                      <div style={{fontWeight:600,fontSize:12,color:C.schwarz,marginBottom:4}}>{k.titel}</div>
-                      <textarea
-                        value={klauselnEdit[k.id]||""}
-                        onChange={e=>setKlauselnEdit(prev=>({...prev,[k.id]:e.target.value}))}
-                        style={{width:"100%",minHeight:120,padding:"8px 10px",border:`1px solid ${C.mittelgrau}`,borderRadius:4,fontFamily:"Arial,sans-serif",fontSize:11,lineHeight:1.5,resize:"vertical",background:"#fafafa"}}
-                      />
-                    </div>
-                  ))}
-                </div>
-              ))}
-            </div>
-          ):(
-            <div style={{padding:16,background:"#f5f5f5",borderRadius:4,color:C.dunkelgrau,fontSize:12}}>
-              Nur Administratoren koennen Textvorlagen bearbeiten.
-            </div>
-          )}
-        </Card>
-
+      {tab==="einstellungen"&&user?.rolle==="admin"&&<EinstellungenTab stammdaten={stammdaten} updateStamm={updateStamm} updateRate={updateRate} user={user} toast={toast} klauseln={klauseln} klauselnEdit={klauselnEdit} setKlauselnEdit={setKlauselnEdit} klauselnSaving={klauselnSaving} saveKlauseln={saveKlauseln} bereitschaft={bereitschaft}/>}
         </div>)}
       </main>
       {/* HAMBURGER DRAWER (mobile) */}
@@ -2229,9 +2384,11 @@ export default function App(){
           <button onClick={()=>window.location.href="/auth/logout"} style={{width:"100%",padding:"8px 12px",background:C.hellgrau,border:"none",borderRadius:4,fontSize:12,cursor:"pointer",fontFamily:FONT.sans,color:C.dunkelgrau}}>⏻ Abmelden</button>
         </div>
       </div>
-      <footer className="mob-hide" style={{padding:"12px 20px",borderTop:`1px solid ${C.mittelgrau}40`,textAlign:"center",fontSize:10,color:C.dunkelgrau,background:C.weiss}}>BRK Sanitätswachdienst v7.2 · {bereitschaft.name} · {stammdaten.kvName} · {year}</footer>
+      <footer className="mob-hide" style={{padding:"12px 20px",borderTop:`1px solid ${C.mittelgrau}40`,textAlign:"center",fontSize:10,color:C.dunkelgrau,background:C.weiss}}>BRK Sanitätswachdienst v7.3 · {bereitschaft.name} · {stammdaten.kvName} · {year}</footer>
 
       {/* ── Angebotsmappe Modal ──────────────────────────────── */}
+      {mailModal&&<MailComposeModal event={event} currentEventId={currentEventId} user={user} stammdaten={stammdaten} dayCalcs={dayCalcs} totalCosts={totalCosts} activeDays={activeDays} toast={toast} onClose={()=>setMailModal(false)}/>}
+
       {mappeModal&&<div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.5)",backdropFilter:"blur(3px)",zIndex:9999,display:"flex",alignItems:"center",justifyContent:"center"}} onClick={()=>setMappeModal(false)}>
         <div style={{background:"#fff",borderRadius:10,padding:"24px 28px",maxWidth:420,width:"90%",boxShadow:"0 20px 60px rgba(0,0,0,0.3)"}} onClick={e=>e.stopPropagation()}>
           <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:16}}><span style={{fontSize:24}}>📦</span><div><div style={{fontSize:16,fontWeight:700}}>Angebotsmappe erstellen</div><div style={{fontSize:11,color:C.dunkelgrau}}>Dokumente für die Mappe auswählen</div></div></div>

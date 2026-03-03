@@ -47,6 +47,17 @@ function init() {
   cfgIns.run("nextcloud_base_path", "Verwaltung Bereitschaft $bereitschaft/SanWD");
   cfgIns.run("nextcloud_enabled", "false");
   cfgIns.run("nextcloud_subfolder", "$auftragsnr - $veranstaltung");
+  cfgIns.run("smtp_enabled", "false");
+  cfgIns.run("smtp_mode", "smtp");
+  cfgIns.run("smtp_host", "");
+  cfgIns.run("smtp_port", "587");
+  cfgIns.run("smtp_secure", "false");
+  cfgIns.run("smtp_user", "");
+  cfgIns.run("smtp_password", "");
+  cfgIns.run("smtp_from_email", "");
+  cfgIns.run("smtp_from_name", "BRK Sanitätswachdienst");
+  cfgIns.run("smtp_cc_bereitschaft", "true");
+  cfgIns.run("smtp_on_behalf", "true");
   cfgIns.run("nextcloud_auth_mode", "service");
   cfgIns.run("nextcloud_service_user", "");
   cfgIns.run("nextcloud_service_password", "");

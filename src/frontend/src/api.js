@@ -223,6 +223,12 @@ const API = {
   },
 
   // Nextcloud Config
+  // SMTP / E-Mail Config
+  async getSmtpConfig() { return this.json("/api/config/smtp"); },
+  async saveSmtpConfig(cfg) { return this.json("/api/config/smtp", { method: "PUT", body: JSON.stringify(cfg) }); },
+  async testSmtp() { return this.json("/api/config/smtp/test", { method: "POST" }); },
+  async sendMail(vorgangId, data) { return this.json(`/api/mail/send/${vorgangId}`, { method: "POST", body: JSON.stringify(data) }); },
+
   async getNextcloudConfig() { return this.json("/api/config/nextcloud"); },
   async saveNextcloudConfig(cfg) { return this.json("/api/config/nextcloud", { method: "PUT", body: JSON.stringify(cfg) }); },
   async testNextcloud() { return this.json("/api/config/nextcloud/test", { method: "POST" }); },

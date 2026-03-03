@@ -81,6 +81,7 @@ const PORT = process.env.PORT || 3000;
 // ── Middleware ────────────────────────────────────────────────────
 app.set("trust proxy", 1);
 const nextcloud = require("./services/nextcloud");
+const smtp = require("./services/smtp");
 
 // Non-blocking Nextcloud Auto-Upload nach PDF-Generierung
 function ncAutoUpload(req, vorgangId, filename, pdfBuffer, stamm) {
@@ -615,6 +616,122 @@ app.put("/api/config/nextcloud", requireAuth, (req, res) => {
   }
   audit(req.session.user, "config_update", "nextcloud", null, JSON.stringify(req.body));
   res.json({ ok: true });
+});
+
+
+// ═══════════════════════════════════════════════════════════════════
+// SMTP Config (Admin)
+// ═══════════════════════════════════════════════════════════════════
+app.get("/api/config/smtp", requireAuth, (req, res) => {
+  if (req.session.user.rolle !== "admin") return res.status(403).json({ error: "Nur Admin" });
+  const { getAllConfig } = require("./db");
+  const rows = getAllConfig("smtp_");
+  const cfg = {};
+  rows.forEach(r => { cfg[r.key] = r.key === "smtp_password" ? (r.value ? "***" : "") : r.value; });
+  res.json(cfg);
+});
+
+app.put("/api/config/smtp", requireAuth, (req, res) => {
+  if (req.session.user.rolle !== "admin") return res.status(403).json({ error: "Nur Admin" });
+  const { setConfig, audit } = require("./db");
+  const allowed = ["smtp_enabled","smtp_mode","smtp_host","smtp_port","smtp_secure","smtp_user","smtp_password","smtp_from_email","smtp_from_name","smtp_cc_bereitschaft","smtp_on_behalf"];
+  for (const [key, val] of Object.entries(req.body)) {
+    if (allowed.includes(key)) {
+      if (key === "smtp_password" && val === "***") continue;
+      setConfig(key, String(val));
+    }
+  }
+  audit(req.session.user, "config_update", "smtp", null, JSON.stringify({...req.body, smtp_password: "***"}));
+  res.json({ ok: true });
+});
+
+app.post("/api/config/smtp/test", requireAuth, async (req, res) => {
+  if (req.session.user.rolle !== "admin") return res.status(403).json({ error: "Nur Admin" });
+  try {
+    const result = await smtp.testConnection();
+    res.json(result);
+  } catch(e) {
+    res.json({ success: false, error: e.message });
+  }
+});
+
+// ═══════════════════════════════════════════════════════════════════
+// Mail senden (Angebot/Mappe)
+// ═══════════════════════════════════════════════════════════════════
+app.post("/api/mail/send/:id", requireAuth, async (req, res) => {
+  try {
+    if (!smtp.isConfigured()) return res.status(501).json({ error: "E-Mail nicht konfiguriert" });
+    const db = require("./db").getDb();
+    const row = db.prepare("SELECT data, bereitschaft_code FROM vorgaenge WHERE id=?").get(req.params.id);
+    if (!row) return res.status(404).json({ error: "Vorgang nicht gefunden" });
+    
+    const vorgang = JSON.parse(row.data);
+    const ev = vorgang.event || {};
+    const stamm = db.prepare("SELECT * FROM bereitschaften WHERE code=?").get(row.bereitschaft_code) || {};
+    const { to, subject, body, attachPdf } = req.body;
+    
+    if (!to) return res.status(400).json({ error: "Empfänger fehlt" });
+
+    const attachments = [];
+    
+    // PDF generieren und anhängen
+    if (attachPdf === "mappe" || attachPdf === "angebot") {
+      try {
+        const user = db.prepare("SELECT name, titel, ort, email, telefon, mobil, unterschrift FROM users WHERE sub=?").get(req.session.user.sub) || {};
+        const klauselnAAB = db.prepare("SELECT id, titel, inhalt, reihenfolge FROM klauseln WHERE dokument='aab' ORDER BY reihenfolge").all();
+        const kosten = db.prepare("SELECT * FROM kostensaetze WHERE bereitschaft_code=?").get(row.bereitschaft_code) || {};
+        const nr = (ev.auftragsnr || "").replace(/[^a-zA-Z0-9_-]/g, "_");
+        
+        if (attachPdf === "angebot") {
+          const html = buildAngebotHTML(ev, req.body.dayCalcs || [], req.body.totalCosts || 0, req.body.activeDays || vorgang.days || [], stamm, kosten, user);
+          const pdf = await BrowserPool.renderPDF(html, { marginTop: "20mm", marginLeft: "12mm" });
+          attachments.push({ filename: `${nr}_Angebot.pdf`, content: pdf, contentType: "application/pdf" });
+        }
+        
+        if (attachPdf === "mappe") {
+          // Alle Dokumente generieren
+          const docs = [];
+          try { docs.push(await BrowserPool.renderPDF(buildGefahrenHTML(ev, vorgang.days || [], req.body.dayCalcs || [], stamm))); } catch {}
+          docs.push(await BrowserPool.renderPDF(buildAngebotHTML(ev, req.body.dayCalcs || [], req.body.totalCosts || 0, req.body.activeDays || vorgang.days || [], stamm, kosten, user), { marginTop: "20mm", marginLeft: "12mm" }));
+          try { docs.push(await BrowserPool.renderPDF(buildVertragHTML(vorgang, stamm, user))); } catch {}
+          try { docs.push(await BrowserPool.renderPDF(buildAABHTML(stamm, row.bereitschaft_code, klauselnAAB, ev.auftragsnr || ""))); } catch {}
+          
+          // Merge mit pdf-lib
+          const { PDFDocument } = require("pdf-lib");
+          const merged = await PDFDocument.create();
+          for (const buf of docs) {
+            try {
+              const src = await PDFDocument.load(buf);
+              const pages = await merged.copyPages(src, src.getPageIndices());
+              pages.forEach(p => merged.addPage(p));
+            } catch {}
+          }
+          const mergedBuf = Buffer.from(await merged.save());
+          attachments.push({ filename: `${nr}_Angebotsmappe.pdf`, content: mergedBuf, contentType: "application/pdf" });
+        }
+      } catch(e) {
+        console.error("PDF für Mail:", e);
+        return res.status(500).json({ error: "PDF-Generierung fehlgeschlagen: " + e.message });
+      }
+    }
+
+    const result = await smtp.sendMail({
+      to,
+      subject: subject || `Angebot Sanitätswachdienst - ${ev.name || ""}`,
+      html: body || "",
+      attachments,
+      onBehalf: req.session.user.email ? `"${req.session.user.name}" <${req.session.user.email}>` : null,
+      ccBereitschaft: stamm.email || null
+    });
+
+    // Log
+    require("./db").audit(req.session.user, "mail_sent", "vorgang", req.params.id, JSON.stringify({ to, subject, attachPdf, attachments: attachments.length }));
+    
+    res.json(result);
+  } catch(e) {
+    console.error("Mail senden:", e);
+    res.status(500).json({ error: e.message });
+  }
 });
 
 // Nextcloud Test-Verbindung
