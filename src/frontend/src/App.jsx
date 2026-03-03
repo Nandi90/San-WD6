@@ -2098,7 +2098,7 @@ export default function App(){
           <button onClick={()=>window.location.href="/auth/logout"} style={{width:"100%",padding:"8px 12px",background:C.hellgrau,border:"none",borderRadius:4,fontSize:12,cursor:"pointer",fontFamily:FONT.sans,color:C.dunkelgrau}}>⏻ Abmelden</button>
         </div>
       </div>
-      <footer className="mob-hide" style={{padding:"12px 20px",borderTop:`1px solid ${C.mittelgrau}40`,textAlign:"center",fontSize:10,color:C.dunkelgrau,background:C.weiss}}>BRK Sanitätswachdienst v7.1 · {bereitschaft.name} · {stammdaten.kvName} · {year}</footer>
+      <footer className="mob-hide" style={{padding:"12px 20px",borderTop:`1px solid ${C.mittelgrau}40`,textAlign:"center",fontSize:10,color:C.dunkelgrau,background:C.weiss}}>BRK Sanitätswachdienst v7.2 · {bereitschaft.name} · {stammdaten.kvName} · {year}</footer>
 
       {/* ── Angebotsmappe Modal ──────────────────────────────── */}
       {mappeModal&&<div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.5)",backdropFilter:"blur(3px)",zIndex:9999,display:"flex",alignItems:"center",justifyContent:"center"}} onClick={()=>setMappeModal(false)}>
