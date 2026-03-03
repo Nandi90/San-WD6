@@ -91,7 +91,7 @@ async function uploadFile(wc, remotePath, data, contentType = "application/pdf")
  * Platzhalter: $bereitschaft, $bc, $jahr, $auftragsnr, $veranstaltung
  */
 function buildPath(bereitschaftName, bereitschaftCode, year, auftragsnr, eventName) {
-  const safe = (s) => (s || "unbekannt").replace(/[/\\:*?"<>|]/g, "_").substring(0, 60);
+  const safe = (s) => String(s || "unbekannt").replace(/[/\\:*?"<>|]/g, "_").substring(0, 60);
   const basePath = cfg("nextcloud_base_path", "Verwaltung Bereitschaft $bereitschaft/SanWD");
   const subFolder = cfg("nextcloud_subfolder", "$auftragsnr - $veranstaltung");
   
