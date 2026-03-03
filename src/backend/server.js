@@ -853,7 +853,7 @@ app.post("/api/pdf/mappe/:id", requireAuth, async (req, res) => {
     };
 
     // Alle HTML-Teile vorbereiten und zu einem Dokument kombinieren
-    const deckblattHTML = buildDeckblattHTML(vorgang.event || {}, activeDays || [], stamm, user);
+    const deckblattHTML = buildDeckblattHTML(vorgang.event || {}, activeDays || [], stamm, user, include);
     const angebotHTML = buildAngebotHTML(vorgang.event || {}, dayCalcs || [], totalCosts || 0, activeDays || [], stamm, {}, user);
     const vertragHTML = buildVertragHTML(vorgang, stamm, user);
     const aabHTML = buildAABHTML(stamm, req.session.user.bereitschaftCode, klauselnAAB, vorgang.event?.auftragsnr||'');
@@ -1133,11 +1133,18 @@ app.post("/api/pdf/mappe/:id", requireAuth, async (req, res) => {
     };
 
     // Alle HTML-Teile vorbereiten und zu einem Dokument kombinieren
-    const deckblattHTML = buildDeckblattHTML(vorgang.event || {}, activeDays || [], stamm, user);
+    const deckblattHTML = buildDeckblattHTML(vorgang.event || {}, activeDays || [], stamm, user, include);
     const angebotHTML = buildAngebotHTML(vorgang.event || {}, dayCalcs || [], totalCosts || 0, activeDays || [], stamm, {}, user);
     const vertragHTML = buildVertragHTML(vorgang, stamm, user);
     const aabHTML = buildAABHTML(stamm, req.session.user.bereitschaftCode, klauselnAAB, vorgang.event?.auftragsnr||'');
-    const gefahrenHTML = (dayCalcs && dayCalcs.length > 0) ? buildGefahrenHTML(vorgang.event || {}, activeDays || [], dayCalcs, stamm) : null;
+    const include = {
+      deckblatt: req.query.skipDeckblatt !== "1",
+      angebot: req.query.skipAngebot !== "1",
+      vertrag: req.query.skipVertrag !== "1",
+      aab: req.query.skipAAB !== "1",
+      gefahren: req.query.skipGefahren !== "1",
+    };
+    const gefahrenHTML = (include.gefahren && dayCalcs && dayCalcs.length > 0) ? buildGefahrenHTML(vorgang.event || {}, activeDays || [], dayCalcs, stamm) : null;
 
     // Body-Inhalt aus jedem HTML extrahieren
     const extractBody = (html) => {
@@ -1173,10 +1180,10 @@ app.post("/api/pdf/mappe/:id", requireAuth, async (req, res) => {
       .sig-cell{width:45%;text-align:center;vertical-align:bottom;padding:0 8px}
       .sig-line{border-top:1px solid #000;padding-top:4px;font-size:8pt;margin-top:4px}
     </style></head><body>
-      <div class="mappe-section">${extractBody(deckblattHTML)}</div>
-      <div class="mappe-section page-break">${extractBody(angebotHTML)}</div>
-      <div class="mappe-section page-break">${extractBody(vertragHTML)}</div>
-      <div class="mappe-section page-break">${extractBody(aabHTML)}</div>
+      ${include.deckblatt ? '<div class="mappe-section">' + extractBody(deckblattHTML) + '</div>' : ''}
+      ${include.angebot ? '<div class="mappe-section' + (include.deckblatt ? ' page-break' : '') + '">' + extractBody(angebotHTML) + '</div>' : ''}
+      ${include.vertrag ? '<div class="mappe-section page-break">' + extractBody(vertragHTML) + '</div>' : ''}
+      ${include.aab ? '<div class="mappe-section page-break">' + extractBody(aabHTML) + '</div>' : ''}
       ${gefahrenHTML ? '<div class="mappe-section page-break">' + extractBody(gefahrenHTML) + '</div>' : ''}
     </body></html>`;
 
@@ -1286,7 +1293,7 @@ function buildGefahrenHTML(ev, activeDays, dayCalcs, stamm) {
 // ═══════════════════════════════════════════════════════════════════
 // HTML Builder: Deckblatt Angebotsmappe
 // ═══════════════════════════════════════════════════════════════════
-function buildDeckblattHTML(ev, activeDays, stamm, user) {
+function buildDeckblattHTML(ev, activeDays, stamm, user, includeDocs) {
   const esc = s => (s||"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
   const fDate = s => s ? new Date(s).toLocaleDateString("de-DE") : "";
   const ROT = "#c0392b";
@@ -1345,10 +1352,7 @@ function buildDeckblattHTML(ev, activeDays, stamm, user) {
     <div style="width:60%;text-align:left;margin-top:10px">
       <div style="font-size:8pt;color:#888;text-transform:uppercase;letter-spacing:1px;margin-bottom:8px;border-bottom:1px solid #ddd;padding-bottom:4px">Inhalt dieser Mappe</div>
       <div style="font-size:9pt;color:#555;line-height:2">
-        <div style="display:flex;justify-content:space-between"><span>1. Kostenaufstellung (Angebot)</span><span style="color:#bbb">mit Beauftragung</span></div>
-        <div style="display:flex;justify-content:space-between"><span>2. Vereinbarung Sanitätswachdienst</span><span style="color:#bbb">Vertrag</span></div>
-        <div style="display:flex;justify-content:space-between"><span>3. Allgemeine Auftragsbedingungen</span><span style="color:#bbb">AAB</span></div>
-        <div style="display:flex;justify-content:space-between"><span>4. Gefahrenanalyse</span><span style="color:#bbb">Anlage 1</span></div>
+        ${(()=>{const inc=includeDocs||{angebot:true,vertrag:true,aab:true,gefahren:true};const items=[];let n=1;if(inc.angebot)items.push('<div style="display:flex;justify-content:space-between"><span>'+(n++)+'. Kostenaufstellung (Angebot)</span><span style="color:#bbb">mit Beauftragung</span></div>');if(inc.vertrag)items.push('<div style="display:flex;justify-content:space-between"><span>'+(n++)+'. Vereinbarung Sanitätswachdienst</span><span style="color:#bbb">Vertrag</span></div>');if(inc.aab)items.push('<div style="display:flex;justify-content:space-between"><span>'+(n++)+'. Allgemeine Auftragsbedingungen</span><span style="color:#bbb">AAB</span></div>');if(inc.gefahren)items.push('<div style="display:flex;justify-content:space-between"><span>'+(n++)+'. Gefahrenanalyse</span><span style="color:#bbb">Risikobeurteilung</span></div>');return items.join("");})()}
       </div>
     </div>
 
