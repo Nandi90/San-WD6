@@ -1,76 +1,52 @@
 /**
- * ═══════════════════════════════════════════════════════════════════
  * Nextcloud WebDAV Service
- * Config aus DB (app_config) + Bearer Auth (User-OIDC)
- * ═══════════════════════════════════════════════════════════════════
+ * Config aus DB (app_config) + Service-Account oder Bearer Auth
  */
 
-const webdavModule = require("webdav");
-const createClient = webdavModule.createClient || (webdavModule.default && webdavModule.default.createClient) || webdavModule;
-
-function makeClient(url, opts) {
-  const c = createClient(url, opts);
-  if (c && typeof c.putFileContents === "function") return c;
-  // Fallback: some versions wrap it differently
-  if (c && c.default && typeof c.default.putFileContents === "function") return c.default;
-  console.error("Nextcloud WebDAV: Client hat keine putFileContents Methode!", Object.keys(c || {}));
-  return c;
-}
+const { createClient } = require("webdav");
 
 function cfg(key, fallback) {
   try {
     const { getConfig } = require("../db");
     return getConfig(key, fallback || "");
-  } catch { return process.env[key.toUpperCase().replace(/^nextcloud_/, "NEXTCLOUD_")] || fallback || ""; }
-}
-
-// User-Token Client (OIDC Bearer)
-function getUserClient(accessToken, username) {
-  const url = cfg("nextcloud_url");
-  if (!url || !accessToken) return null;
-  return makeClient(
-    `${url}/remote.php/dav/files/${username}`,
-    { headers: { "Authorization": `Bearer ${accessToken}` } }
-  );
-}
-
-// Service-Account Client (Fallback)
-let _serviceClient = null;
-function getServiceClient() {
-  const url = cfg("nextcloud_url");
-  const user = process.env.NEXTCLOUD_USER || "";
-  const pass = process.env.NEXTCLOUD_PASSWORD || "";
-  if (!url || !user) return null;
-  if (!_serviceClient) {
-    _serviceClient = makeClient(`${url}/remote.php/dav/files/${user}`, { username: user, password: pass });
+  } catch(e) {
+    console.warn("Nextcloud cfg() Fehler:", e.message);
+    return fallback || "";
   }
-  return _serviceClient;
 }
 
 function getClient(session) {
   const authMode = cfg("nextcloud_auth_mode", "service");
+  const url = cfg("nextcloud_url", "");
   
-  // Service-Account (aus DB-Config oder ENV)
-  if (authMode === "service") {
-    const user = cfg("nextcloud_service_user") || process.env.NEXTCLOUD_USER || "";
-    const pass = cfg("nextcloud_service_password") || process.env.NEXTCLOUD_PASSWORD || "";
-    const url = cfg("nextcloud_url");
-    if (url && user && pass) {
-      const wc = makeClient(`${url}/remote.php/dav/files/${user}`, { username: user, password: pass });
-      return { client: wc, type: "service", uid: user };
-    }
-  }
+  console.log(`Nextcloud getClient: mode=${authMode}, url=${url ? url.substring(0, 30) + "..." : "LEER"}`);
   
-  // Bearer Token (OIDC)
-  if (authMode === "bearer" && session?.accessToken && session?.user) {
-    const uid = session.user.email?.split("@")[0] || session.user.sub;
-    const wc = getUserClient(session.accessToken, uid);
-    if (wc) return { client: wc, type: "bearer", uid };
+  if (!url) {
+    console.warn("Nextcloud: Keine URL konfiguriert");
+    return { client: null, type: "none", uid: null };
   }
 
-  // Fallback: Service-Account aus ENV
-  const sc = getServiceClient();
-  if (sc) return { client: sc, type: "service", uid: process.env.NEXTCLOUD_USER };
+  if (authMode === "service") {
+    const user = cfg("nextcloud_service_user", "");
+    const pass = cfg("nextcloud_service_password", "");
+    console.log(`Nextcloud Service: user=${user || "LEER"}, pass=${pass ? "***" : "LEER"}`);
+    
+    if (user && pass) {
+      const davUrl = `${url}/remote.php/dav/files/${user}`;
+      const wc = createClient(davUrl, { username: user, password: pass });
+      console.log(`Nextcloud Client OK: putFileContents=${typeof wc.putFileContents}`);
+      return { client: wc, type: "service", uid: user };
+    }
+    console.warn("Nextcloud: Service-Account unvollständig");
+  }
+
+  if (authMode === "bearer" && session?.accessToken && session?.user) {
+    const uid = session.user.email?.split("@")[0] || session.user.sub;
+    const davUrl = `${url}/remote.php/dav/files/${uid}`;
+    const wc = createClient(davUrl, { headers: { "Authorization": `Bearer ${session.accessToken}` } });
+    return { client: wc, type: "bearer", uid };
+  }
+
   return { client: null, type: "none", uid: null };
 }
 
@@ -96,13 +72,9 @@ async function uploadFile(wc, remotePath, data, contentType = "application/pdf")
   return true;
 }
 
-/**
- * Pfad aus Template bauen
- * Platzhalter: $bereitschaft, $bc, $jahr, $auftragsnr, $veranstaltung
- */
 function buildPath(bereitschaftName, bereitschaftCode, year, auftragsnr, eventName) {
   const safe = (s) => String(s || "unbekannt").replace(/[/\\:*?"<>|]/g, "_").substring(0, 60);
-  const basePath = cfg("nextcloud_base_path", "Verwaltung Bereitschaft $bereitschaft/SanWD");
+  const basePath = cfg("nextcloud_base_path", "SanWD");
   const subFolder = cfg("nextcloud_subfolder", "$auftragsnr - $veranstaltung");
   
   const replacePlaceholders = (tpl) => tpl
@@ -112,20 +84,17 @@ function buildPath(bereitschaftName, bereitschaftCode, year, auftragsnr, eventNa
     .replace(/\$auftragsnr/g, safe(auftragsnr))
     .replace(/\$veranstaltung/g, safe(eventName));
   
-  const base = replacePlaceholders(basePath);
-  const sub = replacePlaceholders(subFolder);
-  return `/${base}/${sub}`;
+  return `/${replacePlaceholders(basePath)}/${replacePlaceholders(subFolder)}`;
 }
 
 async function syncVorgang(session, vorgang, pdfs, stamm) {
   const { client: wc, type, uid } = getClient(session);
   if (!wc) {
-    console.warn("Nextcloud: Kein Client verfügbar");
-    return { success: false, error: "Nextcloud nicht verbunden (kein Token/Service-Account)" };
+    return { success: false, error: "Nextcloud nicht verbunden (prüfe Einstellungen im Nextcloud-Tab)" };
   }
   if (typeof wc.putFileContents !== "function") {
-    console.error("Nextcloud: Client-Objekt ungültig, Methods:", Object.keys(wc).join(", "));
-    return { success: false, error: "WebDAV Client fehlerhaft - prüfe webdav Paket-Version" };
+    console.error("Nextcloud Client defekt! Keys:", Object.keys(wc).join(", "));
+    return { success: false, error: "WebDAV Client fehlerhaft" };
   }
 
   const ev = vorgang.event || {};
@@ -134,25 +103,24 @@ async function syncVorgang(session, vorgang, pdfs, stamm) {
   const year = new Date().getFullYear().toString();
   const folder = buildPath(bcName, bc, year, ev.auftragsnr, ev.name);
 
+  console.log(`Nextcloud Sync: ${pdfs.length} PDFs -> ${folder} [${type}:${uid}]`);
+
   const results = [];
   for (const pdf of pdfs) {
     try {
       const remotePath = `${folder}/${pdf.filename}`;
       await uploadFile(wc, remotePath, pdf.data);
       results.push({ file: pdf.filename, ok: true });
-      console.log(`Nextcloud [${type}:${uid}]: ${remotePath} ✅`);
+      console.log(`  OK ${pdf.filename}`);
     } catch(e) {
       results.push({ file: pdf.filename, ok: false, error: e.message });
-      console.error(`Nextcloud [${type}:${uid}]: ${pdf.filename} ❌`, e.message);
+      console.error(`  FAIL ${pdf.filename}: ${e.message}`);
     }
   }
 
   return {
     success: results.every(r => r.ok),
-    folder,
-    results,
-    type,
-    uid,
+    folder, results, type, uid,
     syncedAt: new Date().toISOString()
   };
 }
