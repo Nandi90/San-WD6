@@ -852,11 +852,6 @@ app.post("/api/pdf/mappe/:id", requireAuth, async (req, res) => {
       return pdf;
     };
 
-    // Alle HTML-Teile vorbereiten und zu einem Dokument kombinieren
-    const deckblattHTML = buildDeckblattHTML(vorgang.event || {}, activeDays || [], stamm, user, include);
-    const angebotHTML = buildAngebotHTML(vorgang.event || {}, dayCalcs || [], totalCosts || 0, activeDays || [], stamm, {}, user);
-    const vertragHTML = buildVertragHTML(vorgang, stamm, user);
-    const aabHTML = buildAABHTML(stamm, req.session.user.bereitschaftCode, klauselnAAB, vorgang.event?.auftragsnr||'');
     // Dokument-Auswahl per Query-Parameter
     const include = {
       deckblatt: req.query.skipDeckblatt !== "1",
@@ -865,6 +860,12 @@ app.post("/api/pdf/mappe/:id", requireAuth, async (req, res) => {
       aab: req.query.skipAAB !== "1",
       gefahren: req.query.skipGefahren !== "1",
     };
+
+    // Alle HTML-Teile vorbereiten und zu einem Dokument kombinieren
+    const deckblattHTML = buildDeckblattHTML(vorgang.event || {}, activeDays || [], stamm, user, include);
+    const angebotHTML = buildAngebotHTML(vorgang.event || {}, dayCalcs || [], totalCosts || 0, activeDays || [], stamm, {}, user);
+    const vertragHTML = buildVertragHTML(vorgang, stamm, user);
+    const aabHTML = buildAABHTML(stamm, req.session.user.bereitschaftCode, klauselnAAB, vorgang.event?.auftragsnr||'');
     const gefahrenHTML = (include.gefahren && dayCalcs && dayCalcs.length > 0) ? buildGefahrenHTML(vorgang.event || {}, activeDays || [], dayCalcs, stamm) : null;
 
     // Body-Inhalt aus jedem HTML extrahieren
@@ -1132,11 +1133,7 @@ app.post("/api/pdf/mappe/:id", requireAuth, async (req, res) => {
       return pdf;
     };
 
-    // Alle HTML-Teile vorbereiten und zu einem Dokument kombinieren
-    const deckblattHTML = buildDeckblattHTML(vorgang.event || {}, activeDays || [], stamm, user, include);
-    const angebotHTML = buildAngebotHTML(vorgang.event || {}, dayCalcs || [], totalCosts || 0, activeDays || [], stamm, {}, user);
-    const vertragHTML = buildVertragHTML(vorgang, stamm, user);
-    const aabHTML = buildAABHTML(stamm, req.session.user.bereitschaftCode, klauselnAAB, vorgang.event?.auftragsnr||'');
+    // Dokument-Auswahl per Query-Parameter
     const include = {
       deckblatt: req.query.skipDeckblatt !== "1",
       angebot: req.query.skipAngebot !== "1",
@@ -1144,6 +1141,12 @@ app.post("/api/pdf/mappe/:id", requireAuth, async (req, res) => {
       aab: req.query.skipAAB !== "1",
       gefahren: req.query.skipGefahren !== "1",
     };
+
+    // Alle HTML-Teile vorbereiten und zu einem Dokument kombinieren
+    const deckblattHTML = buildDeckblattHTML(vorgang.event || {}, activeDays || [], stamm, user, include);
+    const angebotHTML = buildAngebotHTML(vorgang.event || {}, dayCalcs || [], totalCosts || 0, activeDays || [], stamm, {}, user);
+    const vertragHTML = buildVertragHTML(vorgang, stamm, user);
+    const aabHTML = buildAABHTML(stamm, req.session.user.bereitschaftCode, klauselnAAB, vorgang.event?.auftragsnr||'');
     const gefahrenHTML = (include.gefahren && dayCalcs && dayCalcs.length > 0) ? buildGefahrenHTML(vorgang.event || {}, activeDays || [], dayCalcs, stamm) : null;
 
     // Body-Inhalt aus jedem HTML extrahieren
