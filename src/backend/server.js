@@ -209,7 +209,7 @@ app.get("/api/statistik/:year", requireAuth, (req, res) => {
     const bcMap = {};
     bereitschaften.forEach(b => bcMap[b.code] = b);
 
-    let totalUmsatz = 0, totalEinsaetze = rows.length, totalHelferStd = 0, totalPatienten = 0;
+    let totalUmsatz = 0, totalEinsaetze = rows.length, totalHelferStd = 0, totalPatienten = 0, totalTransporte = 0;
     const byBc = {}, byMonth = Array(12).fill(null).map(() => ({ count: 0, umsatz: 0 }));
     const byStatus = {};
     const events = [];
@@ -238,11 +238,14 @@ app.get("/api/statistik/:year", requireAuth, (req, res) => {
       if (!byBc[bc]) byBc[bc] = { code: bc, name: bcMap[bc]?.name || bc, short: bcMap[bc]?.short || bc, count: 0, umsatz: 0, helferStd: 0 };
       byBc[bc].count++;
 
-      // Protokoll-Patienten
+      // Protokoll-Zahlen
       const protokoll = d.protokoll || {};
       for (const key of Object.keys(protokoll)) {
         const p = protokoll[key];
-        if (p && p.patienten) totalPatienten += p.patienten.length;
+        if (p) {
+          totalPatienten += (p.behandelteGesamt || 0);
+          totalTransporte += (p.transporte || 0);
+        }
       }
 
       events.push({
@@ -253,7 +256,7 @@ app.get("/api/statistik/:year", requireAuth, (req, res) => {
     }
 
     res.json({
-      year, totalEinsaetze, totalUmsatz, totalHelferStd, totalPatienten,
+      year, totalEinsaetze, totalUmsatz, totalHelferStd, totalPatienten, totalTransporte,
       byBc: Object.values(byBc),
       byMonth,
       byStatus,
@@ -1311,6 +1314,7 @@ function buildEinsatzprotokollHTML(vorgang, stamm, dayIdx) {
   const ev = vorgang.event || vorgang;
   const allDays = (vorgang.days || []).filter(d => d.active !== false);
   const day = dayIdx !== undefined ? allDays[dayIdx] : allDays[0];
+  const proto = (vorgang.protokoll || {})[String(dayIdx !== undefined ? dayIdx : 0)] || {};
   const esc = s => String(s||"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
 
   const fDate = d => {
@@ -1392,14 +1396,40 @@ function buildEinsatzprotokollHTML(vorgang, stamm, dayIdx) {
 <p><strong>tatsächliche Ankunftszeit Einsatzort:</strong> ____________</p>
 <p><strong>tatsächliches Ende der Veranstaltung:</strong> ____________</p>
 <p><strong>Einsatzleiter/in:</strong> ${esc(ev.ilsEL||"")}</p>
-<p><strong>Einsatzkräfte:</strong> __________________________________________________</p>
+<p><strong>Einsatzkräfte:</strong> ${esc(proto.helfer || "_________________________________________")}</p>
+<p><strong>Fahrzeuge:</strong> ${esc(proto.fahrzeuge || "_________________________________________")}</p>
 <hr/>
 
-<p><strong>Fahrzeuge:</strong></p>
-<div class="freitext-box"></div>
+<table class="info-table" style="margin-top:8px;">
+<tr>
+  <td style="width:50%;"><strong>Ankunft geplant:</strong> ${esc(proto.ankunftPlan || "____")}</td>
+  <td style="width:50%;"><strong>Ankunft tatsächlich:</strong> ${esc(proto.ankunftReal || "____")}</td>
+</tr>
+<tr>
+  <td><strong>Abfahrt geplant:</strong> ${esc(proto.abfahrtPlan || "____")}</td>
+  <td><strong>Abfahrt tatsächlich:</strong> ${esc(proto.abfahrtReal || "____")}</td>
+</tr>
+</table>
 
-<p style="margin-top:12px;"><strong>Bemerkungen zum Einsatz:</strong></p>
-<div class="bemerkung-box">${esc(ev.bemerkung||"")}</div>
+<hr/>
+<table class="info-table" style="margin-top:8px;">
+<tr>
+  <td style="width:33%;text-align:center;"><strong>Behandelte Personen</strong><br/><span style="font-size:24px;font-weight:bold">${proto.behandelteGesamt||0}</span></td>
+  <td style="width:33%;text-align:center;"><strong>davon Bagatelle</strong><br/><span style="font-size:24px;font-weight:bold">${proto.behandelteBagatelle||0}</span></td>
+  <td style="width:33%;text-align:center;"><strong>Transporte</strong><br/><span style="font-size:24px;font-weight:bold">${proto.transporte||0}</span></td>
+</tr>
+</table>
+
+${(proto.tagebuch && proto.tagebuch.length > 0) ? `
+<hr/>
+<p><strong>Einsatztagebuch:</strong></p>
+<table style="width:100%;border-collapse:collapse;font-size:12px;">
+<tr style="background:#eee;"><th style="padding:4px 8px;text-align:left;border:1px solid #999;">Zeit</th><th style="padding:4px 8px;text-align:left;border:1px solid #999;">Eintrag</th><th style="padding:4px 8px;text-align:left;border:1px solid #999;">Autor</th></tr>
+${proto.tagebuch.map(e => `<tr><td style="padding:4px 8px;border:1px solid #ccc;white-space:nowrap;">${esc(e.zeit)}</td><td style="padding:4px 8px;border:1px solid #ccc;">${esc(e.text)}</td><td style="padding:4px 8px;border:1px solid #ccc;font-size:10px;">${esc(e.autor)}</td></tr>`).join("")}
+</table>` : ""}
+
+<p style="margin-top:12px;"><strong>Besonderheiten:</strong></p>
+<div class="bemerkung-box">${esc(proto.besonderheiten || ev.bemerkung || "")}</div>
 
 </body>
 </html>`;

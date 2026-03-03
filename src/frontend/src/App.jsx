@@ -452,7 +452,8 @@ function StatistikDashboard({user,year:appYear,toast}){
     <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(160px,1fr))",gap:12,marginBottom:20}}>
       {[
         {label:"Einsätze",value:data.totalEinsaetze,icon:"🚑",color:"#1565c0"},
-        {label:"Patienten",value:data.totalPatienten,icon:"🏥",color:"#c62828"},
+        {label:"Behandelte",value:data.totalPatienten,icon:"🏥",color:"#c62828"},
+        {label:"Transporte",value:data.totalTransporte||0,icon:"🚑",color:"#e65100"},
         {label:"Bereitschaften",value:data.byBc?.length||0,icon:"🏢",color:"#2e7d32"},
       ].map((kpi,i)=><div key={i} style={{background:"#fff",border:`1px solid ${C.mittelgrau}40`,borderRadius:10,padding:"16px 20px",borderLeft:`4px solid ${kpi.color}`}}>
         <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
@@ -582,18 +583,20 @@ function EinstellungenTab({stammdaten,updateStamm,updateRate,user,toast,klauseln
 function EinsatzprotokollLive({event:ev,currentEventId,days,user,toast}){
   const activeDays=(days||[]).filter(d=>d.active!==false);
   const [dayIdx,setDayIdx]=useState(0);
-  const [proto,setProto]=useState({ankunft:"",ende:"",einsatzleiter:ev.ilsEL||"",kraefteAnzahl:"",kraefteNamen:"",fahrzeuge:"",bemerkungen:ev.bemerkung||"",besonderheiten:"",wetter:"",patienten:[],abschluss:""});
+  const [proto,setProto]=useState({helfer:"",fahrzeuge:"",ankunftPlan:"",ankunftReal:"",abfahrtPlan:"",abfahrtReal:"",behandelteGesamt:0,behandelteBagatelle:0,transporte:0,besonderheiten:"",tagebuch:[]});
   const [loading,setLoading]=useState(true);
   const [saving,setSaving]=useState(false);
   const [lastSaved,setLastSaved]=useState(null);
+  const [tbText,setTbText]=useState("");
 
   useEffect(()=>{
     if(!currentEventId)return;
     setLoading(true);
     API.getProtokoll(currentEventId).then(r=>{
       const p=r.protokoll?.[String(dayIdx)];
-      if(p){setProto(prev=>({...prev,...p}));}
-      else{setProto({ankunft:"",ende:"",einsatzleiter:ev.ilsEL||"",kraefteAnzahl:"",kraefteNamen:"",fahrzeuge:"",bemerkungen:ev.bemerkung||"",besonderheiten:"",wetter:"",patienten:[],abschluss:""});}
+      const day=activeDays[dayIdx];
+      if(p){setProto({helfer:"",fahrzeuge:"",ankunftPlan:day?.startTime||"",ankunftReal:"",abfahrtPlan:day?.endTime||"",abfahrtReal:"",behandelteGesamt:0,behandelteBagatelle:0,transporte:0,besonderheiten:"",tagebuch:[],...p});}
+      else{setProto({helfer:"",fahrzeuge:"",ankunftPlan:day?.startTime||"",ankunftReal:"",abfahrtPlan:day?.endTime||"",abfahrtReal:"",behandelteGesamt:0,behandelteBagatelle:0,transporte:0,besonderheiten:"",tagebuch:[]});}
       setLoading(false);
     }).catch(()=>setLoading(false));
   },[currentEventId,dayIdx]);
@@ -606,7 +609,6 @@ function EinsatzprotokollLive({event:ev,currentEventId,days,user,toast}){
     finally{setSaving(false);}
   };
 
-  // Auto-save alle 30 Sekunden
   useEffect(()=>{
     if(!currentEventId||loading)return;
     const t=setTimeout(()=>{API.saveProtokoll(currentEventId,dayIdx,proto).then(()=>setLastSaved(new Date().toLocaleTimeString("de-DE"))).catch(()=>{});},30000);
@@ -614,27 +616,27 @@ function EinsatzprotokollLive({event:ev,currentEventId,days,user,toast}){
   },[proto,currentEventId,dayIdx,loading]);
 
   const up=(k,v)=>setProto(p=>({...p,[k]:v}));
-  const addPatient=()=>up("patienten",[...proto.patienten,{nr:proto.patienten.length+1,zeit:"",name:"",alter:"",geschlecht:"",diagnose:"",massnahmen:"",transport:"nein",ziel:""}]);
-  const updatePatient=(i,k,v)=>{const p=[...proto.patienten];p[i]={...p[i],[k]:v};up("patienten",p);};
-  const removePatient=i=>{const p=[...proto.patienten];p.splice(i,1);up("patienten",p.map((x,j)=>({...x,nr:j+1})));};
+
+  const addTbEntry=()=>{
+    if(!tbText.trim())return;
+    const entry={zeit:new Date().toLocaleTimeString("de-DE",{hour:"2-digit",minute:"2-digit"}),text:tbText.trim(),autor:user?.name||""};
+    up("tagebuch",[...proto.tagebuch,entry]);
+    setTbText("");
+  };
+
+  const removeTbEntry=(i)=>{const t=[...proto.tagebuch];t.splice(i,1);up("tagebuch",t);};
 
   const day=activeDays[dayIdx];
   const dayLabel=day?.date?new Date(day.date).toLocaleDateString("de-DE",{weekday:"long",day:"2-digit",month:"2-digit",year:"numeric"}):`Tag ${(day?.id||dayIdx+1)}`;
 
-  const IS=({label,value,onChange,placeholder,wide,type})=><div style={{marginBottom:8,flex:wide?"1 1 100%":"1 1 45%",minWidth:wide?undefined:180}}>
+  const F=({label,value,onChange,placeholder,type,wide,half})=><div style={{flex:wide?"1 1 100%":half?"1 1 45%":"1 1 200px",minWidth:half?140:undefined,marginBottom:8}}>
     <div style={{fontSize:10,fontWeight:600,color:"#555",marginBottom:2}}>{label}</div>
-    <input type={type||"text"} value={value||""} onChange={e=>onChange(e.target.value)} placeholder={placeholder||""} style={{width:"100%",padding:"6px 10px",border:"1px solid #ccc",borderRadius:5,fontSize:12,fontFamily:FONT.sans}}/>
-  </div>;
-
-  const TA=({label,value,onChange,rows,placeholder})=><div style={{marginBottom:8}}>
-    <div style={{fontSize:10,fontWeight:600,color:"#555",marginBottom:2}}>{label}</div>
-    <textarea value={value||""} onChange={e=>onChange(e.target.value)} rows={rows||3} placeholder={placeholder||""} style={{width:"100%",padding:"6px 10px",border:"1px solid #ccc",borderRadius:5,fontSize:12,fontFamily:FONT.sans,lineHeight:1.4,resize:"vertical"}}/>
+    <input type={type||"text"} value={value??""} onChange={e=>onChange(type==="number"?+e.target.value:e.target.value)} placeholder={placeholder||""} style={{width:"100%",padding:"6px 10px",border:"1px solid #ccc",borderRadius:5,fontSize:12,fontFamily:FONT.sans}} min={type==="number"?0:undefined}/>
   </div>;
 
   if(loading)return <div style={{padding:20,textAlign:"center",color:C.dunkelgrau}}>Lade Protokoll...</div>;
 
   return(<div>
-    {/* Tag-Auswahl */}
     {activeDays.length>1&&<div style={{display:"flex",gap:4,marginBottom:12,flexWrap:"wrap"}}>
       {activeDays.map((d,i)=><button key={i} onClick={()=>setDayIdx(i)} style={{padding:"6px 12px",background:dayIdx===i?C.dunkelblau:"#fff",color:dayIdx===i?"#fff":C.dunkelgrau,border:`1px solid ${dayIdx===i?C.dunkelblau:C.mittelgrau}`,borderRadius:6,fontSize:11,fontWeight:dayIdx===i?700:500,cursor:"pointer",fontFamily:FONT.sans}}>
         {d.date?new Date(d.date).toLocaleDateString("de-DE",{day:"2-digit",month:"2-digit"}):`Tag ${d.id||i+1}`}
@@ -649,55 +651,81 @@ function EinsatzprotokollLive({event:ev,currentEventId,days,user,toast}){
       </div>
     </div>
 
-    {/* Einsatz-Info */}
-    <Card title="Einsatzzeiten & Leitung" accent={C.dunkelblau}>
-      <div style={{display:"flex",flexWrap:"wrap",gap:8}}>
-        <IS label="Tatsächliche Ankunftszeit" value={proto.ankunft} onChange={v=>up("ankunft",v)} type="time"/>
-        <IS label="Tatsächliches Ende" value={proto.ende} onChange={v=>up("ende",v)} type="time"/>
-        <IS label="Einsatzleiter/in" value={proto.einsatzleiter} onChange={v=>up("einsatzleiter",v)} wide/>
+    {/* Helfer & Fahrzeuge */}
+    <Card title="Einsatzkräfte & Fahrzeuge" accent={C.dunkelblau}>
+      <div style={{marginBottom:8}}>
+        <div style={{fontSize:10,fontWeight:600,color:"#555",marginBottom:2}}>Eingesetzte Helfer (Namen)</div>
+        <textarea value={proto.helfer||""} onChange={e=>up("helfer",e.target.value)} rows={3} placeholder={"Name 1, Name 2, Name 3\noder je Zeile ein Name"} style={{width:"100%",padding:"6px 10px",border:"1px solid #ccc",borderRadius:5,fontSize:12,fontFamily:FONT.sans,lineHeight:1.4,resize:"vertical"}}/>
+      </div>
+      <div>
+        <div style={{fontSize:10,fontWeight:600,color:"#555",marginBottom:2}}>Eingesetzte Fahrzeuge</div>
+        <textarea value={proto.fahrzeuge||""} onChange={e=>up("fahrzeuge",e.target.value)} rows={2} placeholder="z.B. KTW 41/1, RTW 41/2, ELW 41/1" style={{width:"100%",padding:"6px 10px",border:"1px solid #ccc",borderRadius:5,fontSize:12,fontFamily:FONT.sans,lineHeight:1.4,resize:"vertical"}}/>
       </div>
     </Card>
 
-    {/* Kräfte & Fahrzeuge */}
-    <Card title="Einsatzkräfte & Fahrzeuge" accent={C.mittelblau}>
-      <div style={{display:"flex",flexWrap:"wrap",gap:8}}>
-        <IS label="Anzahl Einsatzkräfte" value={proto.kraefteAnzahl} onChange={v=>up("kraefteAnzahl",v)} type="number"/>
-        <IS label="Wetter" value={proto.wetter} onChange={v=>up("wetter",v)} placeholder="z.B. sonnig, 22°C"/>
+    {/* Zeiten */}
+    <Card title="Einsatzzeiten" accent={C.mittelblau}>
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}}>
+        <div style={{padding:"10px 14px",background:"#f5f5f5",borderRadius:8}}>
+          <div style={{fontSize:11,fontWeight:700,color:C.dunkelgrau,marginBottom:8}}>Ankunft</div>
+          <div style={{display:"flex",gap:8}}>
+            <F label="Geplant" value={proto.ankunftPlan} onChange={v=>up("ankunftPlan",v)} type="time" half/>
+            <F label="Tatsächlich" value={proto.ankunftReal} onChange={v=>up("ankunftReal",v)} type="time" half/>
+          </div>
+        </div>
+        <div style={{padding:"10px 14px",background:"#f5f5f5",borderRadius:8}}>
+          <div style={{fontSize:11,fontWeight:700,color:C.dunkelgrau,marginBottom:8}}>Abfahrt</div>
+          <div style={{display:"flex",gap:8}}>
+            <F label="Geplant" value={proto.abfahrtPlan} onChange={v=>up("abfahrtPlan",v)} type="time" half/>
+            <F label="Tatsächlich" value={proto.abfahrtReal} onChange={v=>up("abfahrtReal",v)} type="time" half/>
+          </div>
+        </div>
       </div>
-      <TA label="Namen der Einsatzkräfte" value={proto.kraefteNamen} onChange={v=>up("kraefteNamen",v)} rows={2} placeholder="Namen durch Komma getrennt"/>
-      <TA label="Eingesetzte Fahrzeuge" value={proto.fahrzeuge} onChange={v=>up("fahrzeuge",v)} rows={2} placeholder="z.B. KTW 41/1, RTW 41/2"/>
     </Card>
 
-    {/* Patienten */}
-    <Card title={`Patienten-Dokumentation (${proto.patienten.length})`} accent={C.rot}>
-      {proto.patienten.map((pat,i)=><div key={i} style={{padding:"10px 14px",background:i%2===0?"#fff":"#fafafa",border:`1px solid ${C.mittelgrau}40`,borderRadius:6,marginBottom:6}}>
-        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:6}}>
-          <span style={{fontSize:12,fontWeight:700,color:C.rot}}>Patient #{pat.nr}</span>
-          <button onClick={()=>removePatient(i)} style={{background:"none",border:"none",cursor:"pointer",fontSize:14,color:"#999"}}>✕</button>
+    {/* Einsatzzahlen */}
+    <Card title="Einsatzzahlen" accent={C.rot}>
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:12}}>
+        <div style={{textAlign:"center",padding:"14px 10px",background:`${C.rot}08`,borderRadius:8,border:`1px solid ${C.rot}30`}}>
+          <div style={{fontSize:10,fontWeight:600,color:C.dunkelgrau,marginBottom:4}}>Behandelte Personen gesamt</div>
+          <input type="number" min={0} value={proto.behandelteGesamt||0} onChange={e=>up("behandelteGesamt",+e.target.value)} style={{width:80,padding:"8px",border:`2px solid ${C.rot}`,borderRadius:8,fontSize:22,fontWeight:800,textAlign:"center",color:C.rot,fontFamily:FONT.sans}}/>
+          <div style={{fontSize:9,color:"#888",marginTop:2}}>ohne Datenerfassung</div>
         </div>
-        <div style={{display:"flex",flexWrap:"wrap",gap:6}}>
-          <div style={{flex:"0 0 70px"}}><div style={{fontSize:9,fontWeight:600,color:"#555"}}>Uhrzeit</div><input type="time" value={pat.zeit||""} onChange={e=>updatePatient(i,"zeit",e.target.value)} style={{width:"100%",padding:"4px 6px",border:"1px solid #ccc",borderRadius:4,fontSize:11}}/></div>
-          <div style={{flex:"1 1 140px"}}><div style={{fontSize:9,fontWeight:600,color:"#555"}}>Name</div><input value={pat.name||""} onChange={e=>updatePatient(i,"name",e.target.value)} style={{width:"100%",padding:"4px 6px",border:"1px solid #ccc",borderRadius:4,fontSize:11}}/></div>
-          <div style={{flex:"0 0 50px"}}><div style={{fontSize:9,fontWeight:600,color:"#555"}}>Alter</div><input value={pat.alter||""} onChange={e=>updatePatient(i,"alter",e.target.value)} style={{width:"100%",padding:"4px 6px",border:"1px solid #ccc",borderRadius:4,fontSize:11}}/></div>
-          <div style={{flex:"0 0 50px"}}><div style={{fontSize:9,fontWeight:600,color:"#555"}}>m/w/d</div><select value={pat.geschlecht||""} onChange={e=>updatePatient(i,"geschlecht",e.target.value)} style={{width:"100%",padding:"4px 6px",border:"1px solid #ccc",borderRadius:4,fontSize:11}}><option value="">-</option><option value="m">m</option><option value="w">w</option><option value="d">d</option></select></div>
-          <div style={{flex:"1 1 100%"}}><div style={{fontSize:9,fontWeight:600,color:"#555"}}>Diagnose / Beschwerden</div><input value={pat.diagnose||""} onChange={e=>updatePatient(i,"diagnose",e.target.value)} style={{width:"100%",padding:"4px 6px",border:"1px solid #ccc",borderRadius:4,fontSize:11}} placeholder="z.B. Schürfwunde, Kreislaufprobleme"/></div>
-          <div style={{flex:"1 1 100%"}}><div style={{fontSize:9,fontWeight:600,color:"#555"}}>Maßnahmen</div><input value={pat.massnahmen||""} onChange={e=>updatePatient(i,"massnahmen",e.target.value)} style={{width:"100%",padding:"4px 6px",border:"1px solid #ccc",borderRadius:4,fontSize:11}} placeholder="z.B. Wundversorgung, Kühlung"/></div>
-          <div style={{flex:"0 0 100px"}}><div style={{fontSize:9,fontWeight:600,color:"#555"}}>Transport</div><select value={pat.transport||"nein"} onChange={e=>updatePatient(i,"transport",e.target.value)} style={{width:"100%",padding:"4px 6px",border:"1px solid #ccc",borderRadius:4,fontSize:11}}><option value="nein">Nein</option><option value="rtw">RTW</option><option value="ktw">KTW</option><option value="selbst">Selbst</option></select></div>
-          {pat.transport!=="nein"&&<div style={{flex:"1 1 140px"}}><div style={{fontSize:9,fontWeight:600,color:"#555"}}>Transportziel</div><input value={pat.ziel||""} onChange={e=>updatePatient(i,"ziel",e.target.value)} style={{width:"100%",padding:"4px 6px",border:"1px solid #ccc",borderRadius:4,fontSize:11}} placeholder="z.B. KH Schrobenhausen"/></div>}
+        <div style={{textAlign:"center",padding:"14px 10px",background:"#fff8e1",borderRadius:8,border:"1px solid #ffcc80"}}>
+          <div style={{fontSize:10,fontWeight:600,color:C.dunkelgrau,marginBottom:4}}>davon Bagatelle</div>
+          <input type="number" min={0} value={proto.behandelteBagatelle||0} onChange={e=>up("behandelteBagatelle",+e.target.value)} style={{width:80,padding:"8px",border:"2px solid #f9a825",borderRadius:8,fontSize:22,fontWeight:800,textAlign:"center",color:"#f9a825",fontFamily:FONT.sans}}/>
         </div>
-      </div>)}
-      <button onClick={addPatient} style={{padding:"8px 16px",background:`${C.rot}10`,border:`1px dashed ${C.rot}`,borderRadius:6,color:C.rot,fontSize:12,fontWeight:600,cursor:"pointer",width:"100%",fontFamily:FONT.sans}}>+ Patient hinzufügen</button>
+        <div style={{textAlign:"center",padding:"14px 10px",background:"#e3f2fd",borderRadius:8,border:"1px solid #90caf9"}}>
+          <div style={{fontSize:10,fontWeight:600,color:C.dunkelgrau,marginBottom:4}}>Transporte</div>
+          <input type="number" min={0} value={proto.transporte||0} onChange={e=>up("transporte",+e.target.value)} style={{width:80,padding:"8px",border:"2px solid #1565c0",borderRadius:8,fontSize:22,fontWeight:800,textAlign:"center",color:"#1565c0",fontFamily:FONT.sans}}/>
+        </div>
+      </div>
     </Card>
 
-    {/* Bemerkungen & Abschluss */}
-    <Card title="Bemerkungen & Abschluss" accent={C.dunkelgrau}>
-      <TA label="Besonderheiten / Vorkommnisse" value={proto.besonderheiten} onChange={v=>up("besonderheiten",v)} rows={3} placeholder="z.B. Polizeieinsatz, technische Probleme, besondere Vorkommnisse"/>
-      <TA label="Allgemeine Bemerkungen" value={proto.bemerkungen} onChange={v=>up("bemerkungen",v)} rows={3}/>
-      <TA label="Abschlussvermerk" value={proto.abschluss} onChange={v=>up("abschluss",v)} rows={2} placeholder="z.B. Einsatz ohne besondere Vorkommnisse beendet"/>
+    {/* Tagebuch */}
+    <Card title={`Einsatztagebuch (${proto.tagebuch.length} Einträge)`} accent="#5c6bc0">
+      <div style={{marginBottom:10}}>
+        {proto.tagebuch.map((e,i)=><div key={i} style={{display:"flex",gap:8,alignItems:"flex-start",padding:"6px 10px",background:i%2===0?"#fafafe":"#fff",borderRadius:4,marginBottom:2,border:"1px solid #e8eaf6"}}>
+          <span style={{fontSize:11,fontWeight:700,color:"#5c6bc0",whiteSpace:"nowrap",minWidth:42}}>{e.zeit}</span>
+          <span style={{fontSize:12,flex:1,lineHeight:1.4}}>{e.text}</span>
+          <span style={{fontSize:9,color:"#999",whiteSpace:"nowrap"}}>{e.autor}</span>
+          <button onClick={()=>removeTbEntry(i)} style={{background:"none",border:"none",cursor:"pointer",fontSize:12,color:"#ccc",padding:"0 2px"}} title="Entfernen">✕</button>
+        </div>)}
+        {proto.tagebuch.length===0&&<div style={{padding:"16px",textAlign:"center",color:C.bgrau,fontSize:12,background:"#f5f5f5",borderRadius:6}}>Noch keine Einträge – Dokumentiere den Einsatzverlauf chronologisch</div>}
+      </div>
+      <div style={{display:"flex",gap:6}}>
+        <input value={tbText} onChange={e=>setTbText(e.target.value)} onKeyDown={e=>{if(e.key==="Enter"&&!e.shiftKey){e.preventDefault();addTbEntry();}}} placeholder="Was passiert? z.B. Einsatzkräfte vor Ort, Veranstaltung eröffnet, Patient versorgt..." style={{flex:1,padding:"8px 12px",border:"1px solid #c5cae9",borderRadius:6,fontSize:12,fontFamily:FONT.sans}}/>
+        <button onClick={addTbEntry} disabled={!tbText.trim()} style={{padding:"8px 16px",background:"#5c6bc0",color:"#fff",border:"none",borderRadius:6,fontSize:12,fontWeight:600,cursor:"pointer",fontFamily:FONT.sans,whiteSpace:"nowrap"}}>+ Eintrag</button>
+      </div>
+    </Card>
+
+    {/* Besonderheiten */}
+    <Card title="Besonderheiten" accent={C.dunkelgrau}>
+      <textarea value={proto.besonderheiten||""} onChange={e=>up("besonderheiten",e.target.value)} rows={4} placeholder="Besondere Vorkommnisse, Polizeieinsatz, technische Probleme, Wetter, etc." style={{width:"100%",padding:"8px 10px",border:"1px solid #ccc",borderRadius:5,fontSize:12,fontFamily:FONT.sans,lineHeight:1.4,resize:"vertical"}}/>
     </Card>
 
     <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginTop:12}}>
-      <div style={{fontSize:10,color:C.dunkelgrau}}>Auto-Speicherung alle 30 Sekunden{lastSaved?` · Letzte Speicherung: ${lastSaved}`:""}</div>
+      <div style={{fontSize:10,color:C.dunkelgrau}}>Auto-Speicherung alle 30s{lastSaved?` · Zuletzt: ${lastSaved}`:""}</div>
       <button onClick={save} disabled={saving} style={{padding:"8px 24px",background:C.dunkelblau,color:"#fff",border:"none",borderRadius:6,fontSize:13,fontWeight:600,cursor:"pointer",fontFamily:FONT.sans}}>{saving?"Speichern...":"💾 Protokoll speichern"}</button>
     </div>
   </div>);
