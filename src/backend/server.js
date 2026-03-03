@@ -388,6 +388,69 @@ app.use("/api/kunden", kundenRouter);
 app.use("/api/stammdaten", stammdatenRouter);
 app.use("/api/templates", templatesRouter);
 app.use("/api/admin", adminRouter);
+// ═══════════════════════════════════════════════════════════════════
+// Nextcloud Sync (muss VOR pdfRouter registriert werden!)
+// ═══════════════════════════════════════════════════════════════════
+app.post("/api/pdf/sync/:id", requireAuth, async (req, res) => {
+  try {
+    if (!nextcloud.isConfigured()) return res.status(501).json({ error: "Nextcloud nicht konfiguriert" });
+    const db = require("./db").getDb();
+    const row = db.prepare("SELECT data, bereitschaft_code FROM vorgaenge WHERE id=?").get(req.params.id);
+    if (!row) return res.status(404).json({ error: "Vorgang nicht gefunden" });
+    const vorgang = JSON.parse(row.data);
+    vorgang.bereitschaft_code = row.bereitschaft_code;
+    const ev = vorgang.event || {};
+    const stamm = db.prepare("SELECT * FROM bereitschaften WHERE code=?").get(row.bereitschaft_code || req.session.user.bereitschaftCode) || {};
+    const user = db.prepare("SELECT name, titel, ort, email, telefon, mobil, unterschrift FROM users WHERE sub=?").get(req.session.user.sub) || {};
+    const klauselnAAB = db.prepare("SELECT id, titel, inhalt, reihenfolge FROM klauseln WHERE dokument='aab' ORDER BY reihenfolge").all();
+
+    const pdfs = [];
+    const nr = (ev.auftragsnr || "").replace(/[^a-zA-Z0-9_-]/g, "_");
+
+    // Gefahrenanalyse
+    try {
+      const gHtml = buildGefahrenHTML(ev, vorgang.days || [], [], stamm);
+      const gData = await BrowserPool.renderPDF(gHtml);
+      pdfs.push({ filename: `${nr}_01_Gefahrenanalyse.pdf`, data: gData });
+    } catch(e) { console.warn("Sync: Gefahrenanalyse übersprungen:", e.message); }
+
+    // Angebot
+    try {
+      const aHtml = buildAngebotHTML(ev, [], 0, vorgang.days || [], stamm, {}, user);
+      const aData = await BrowserPool.renderPDF(aHtml, { marginTop: "20mm", marginLeft: "12mm" });
+      pdfs.push({ filename: `${nr}_02_Angebot.pdf`, data: aData });
+    } catch(e) { console.warn("Sync: Angebot übersprungen:", e.message); }
+
+    // Vertrag
+    try {
+      const vHtml = buildVertragHTML(vorgang, stamm, user);
+      const vData = await BrowserPool.renderPDF(vHtml);
+      pdfs.push({ filename: `${nr}_03_Vertrag.pdf`, data: vData });
+    } catch(e) { console.warn("Sync: Vertrag übersprungen:", e.message); }
+
+    // AAB
+    try {
+      const bHtml = buildAABHTML(stamm, row.bereitschaft_code || req.session.user.bereitschaftCode, klauselnAAB, ev.auftragsnr || "");
+      const bData = await BrowserPool.renderPDF(bHtml);
+      pdfs.push({ filename: `${nr}_04_AAB.pdf`, data: bData });
+    } catch(e) { console.warn("Sync: AAB übersprungen:", e.message); }
+
+    if (pdfs.length === 0) return res.status(500).json({ error: "Keine PDFs generiert" });
+
+    const result = await nextcloud.syncVorgang(req.session, vorgang, pdfs, stamm);
+
+    if (result.success) {
+      vorgang.nextcloudSync = { syncedAt: result.syncedAt, folder: result.folder, files: result.results.map(r => r.file), syncedBy: req.session.user.name };
+      db.prepare("UPDATE vorgaenge SET data = ? WHERE id = ?").run(JSON.stringify(vorgang), req.params.id);
+    }
+
+    res.json(result);
+  } catch(e) {
+    console.error("Nextcloud Sync Fehler:", e);
+    res.status(500).json({ error: e.message });
+  }
+});
+
 app.use("/api/pdf", pdfRouter);
 app.use("/api/ils", ilsRouter);
 app.use("/api/klauseln", klauselnRouter);
