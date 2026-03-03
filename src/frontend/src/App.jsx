@@ -2361,7 +2361,6 @@ export default function App(){
         </div>)}
 
       {tab==="einstellungen"&&user?.rolle==="admin"&&<EinstellungenTab stammdaten={stammdaten} updateStamm={updateStamm} updateRate={updateRate} user={user} toast={toast} klauseln={klauseln} klauselnEdit={klauselnEdit} setKlauselnEdit={setKlauselnEdit} klauselnSaving={klauselnSaving} saveKlauseln={saveKlauseln} bereitschaft={bereitschaft}/>}
-        </div>)}
       </main>
       {/* HAMBURGER DRAWER (mobile) */}
       {menuOpen&&<div className="drawer-overlay open" onClick={()=>setMenuOpen(false)}/>}
