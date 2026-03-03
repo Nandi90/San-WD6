@@ -582,7 +582,7 @@ app.get("/api/config/nextcloud", requireAuth, (req, res) => {
 app.put("/api/config/nextcloud", requireAuth, (req, res) => {
   if (req.session.user.rolle !== "admin") return res.status(403).json({ error: "Nur Admin" });
   const { setConfig, audit } = require("./db");
-  const allowed = ["nextcloud_url", "nextcloud_base_path", "nextcloud_enabled", "nextcloud_subfolder"];
+  const allowed = ["nextcloud_url", "nextcloud_base_path", "nextcloud_enabled", "nextcloud_subfolder", "nextcloud_auth_mode", "nextcloud_service_user", "nextcloud_service_password"];
   for (const [key, val] of Object.entries(req.body)) {
     if (allowed.includes(key)) setConfig(key, String(val));
   }

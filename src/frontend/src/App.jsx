@@ -430,6 +430,29 @@ function NextcloudConfig({toast}){
           <div style={{fontSize:10,color:"#888",marginTop:4}}>Platzhalter: <code>$auftragsnr</code>, <code>$veranstaltung</code>, <code>$bereitschaft</code>, <code>$bc</code>, <code>$jahr</code></div>
         </div>
 
+        <div style={{marginBottom:16,padding:"12px 14px",background:"#f0f7ff",border:"1px solid #bbdefb",borderRadius:6}}>
+          <div style={{fontSize:12,fontWeight:600,color:"#1565c0",marginBottom:8}}>Authentifizierung</div>
+          <div style={{display:"flex",gap:8,marginBottom:10}}>
+            {[{v:"service",l:"🔑 Service-Account (App-Passwort)",d:"Empfohlen"},{v:"bearer",l:"🎫 Bearer Token (OIDC)",d:"Nextcloud muss OIDC WebDAV unterstützen"}].map(m=>(
+              <button key={m.v} onClick={()=>setNcCfg(p=>({...p,nextcloud_auth_mode:m.v}))} style={{flex:1,padding:"8px 12px",background:(ncCfg.nextcloud_auth_mode||"service")===m.v?"#1565c0":"#fff",color:(ncCfg.nextcloud_auth_mode||"service")===m.v?"#fff":"#333",border:`1px solid ${(ncCfg.nextcloud_auth_mode||"service")===m.v?"#1565c0":"#ccc"}`,borderRadius:6,fontSize:12,fontWeight:600,cursor:"pointer",fontFamily:FONT.sans,textAlign:"left"}}>
+                <div>{m.l}</div><div style={{fontSize:10,fontWeight:400,opacity:0.8,marginTop:2}}>{m.d}</div>
+              </button>
+            ))}
+          </div>
+          {(ncCfg.nextcloud_auth_mode||"service")==="service"&&<>
+            <div style={{marginBottom:8}}>
+              <div style={{fontSize:11,fontWeight:600,color:"#555",marginBottom:3}}>Nextcloud Benutzer</div>
+              <input value={ncCfg.nextcloud_service_user||""} onChange={e=>setNcCfg(p=>({...p,nextcloud_service_user:e.target.value}))} placeholder="admin oder service-user" style={{width:"100%",padding:"7px 10px",border:"1px solid #ccc",borderRadius:5,fontSize:12,fontFamily:FONT.sans}}/>
+            </div>
+            <div>
+              <div style={{fontSize:11,fontWeight:600,color:"#555",marginBottom:3}}>App-Passwort</div>
+              <input type="password" value={ncCfg.nextcloud_service_password||""} onChange={e=>setNcCfg(p=>({...p,nextcloud_service_password:e.target.value}))} placeholder="Nextcloud → Einstellungen → Sicherheit → App-Passwort" style={{width:"100%",padding:"7px 10px",border:"1px solid #ccc",borderRadius:5,fontSize:12,fontFamily:FONT.sans}}/>
+              <div style={{fontSize:10,color:"#888",marginTop:3}}>Erstelle ein App-Passwort in Nextcloud: Einstellungen → Sicherheit → Neues App-Passwort</div>
+            </div>
+          </>}
+          {(ncCfg.nextcloud_auth_mode||"service")==="bearer"&&<div style={{fontSize:11,color:"#666",padding:"6px 0"}}>Nutzt den BRK.id Token des eingeloggten Users. Nextcloud benötigt die <code>user_oidc</code> App mit aktiviertem Bearer-Token Support für WebDAV.</div>}
+        </div>
+
         <div style={{background:"#f5f5f5",borderRadius:6,padding:"10px 14px",marginBottom:16,fontSize:11,fontFamily:FONT.mono,color:"#555"}}>
           <div style={{fontSize:10,fontWeight:600,color:C.dunkelgrau,marginBottom:4}}>Vorschau Pfad (Bereitschaft Schrobenhausen, BSOB 26/001)</div>
           /{(ncCfg.nextcloud_base_path||"SanWD").replace(/\$bereitschaft/g,"Schrobenhausen").replace(/\$bc/g,"BSOB").replace(/\$jahr/g,"2026")}/{(ncCfg.nextcloud_subfolder||"$auftragsnr").replace(/\$auftragsnr/g,"BSOB_26_001").replace(/\$veranstaltung/g,"Volksfest").replace(/\$bereitschaft/g,"Schrobenhausen").replace(/\$bc/g,"BSOB").replace(/\$jahr/g,"2026")}

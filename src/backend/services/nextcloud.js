@@ -38,13 +38,27 @@ function getServiceClient() {
 }
 
 function getClient(session) {
-  // 1. User-Token (bevorzugt)
-  if (session?.accessToken && session?.user) {
+  const authMode = cfg("nextcloud_auth_mode", "service");
+  
+  // Service-Account (aus DB-Config oder ENV)
+  if (authMode === "service") {
+    const user = cfg("nextcloud_service_user") || process.env.NEXTCLOUD_USER || "";
+    const pass = cfg("nextcloud_service_password") || process.env.NEXTCLOUD_PASSWORD || "";
+    const url = cfg("nextcloud_url");
+    if (url && user && pass) {
+      const wc = createClient(`${url}/remote.php/dav/files/${user}`, { username: user, password: pass });
+      return { client: wc, type: "service", uid: user };
+    }
+  }
+  
+  // Bearer Token (OIDC)
+  if (authMode === "bearer" && session?.accessToken && session?.user) {
     const uid = session.user.email?.split("@")[0] || session.user.sub;
     const wc = getUserClient(session.accessToken, uid);
-    if (wc) return { client: wc, type: "user", uid };
+    if (wc) return { client: wc, type: "bearer", uid };
   }
-  // 2. Service-Account
+
+  // Fallback: Service-Account aus ENV
   const sc = getServiceClient();
   if (sc) return { client: sc, type: "service", uid: process.env.NEXTCLOUD_USER };
   return { client: null, type: "none", uid: null };

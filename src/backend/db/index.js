@@ -47,6 +47,9 @@ function init() {
   cfgIns.run("nextcloud_base_path", "Verwaltung Bereitschaft $bereitschaft/SanWD");
   cfgIns.run("nextcloud_enabled", "false");
   cfgIns.run("nextcloud_subfolder", "$auftragsnr - $veranstaltung");
+  cfgIns.run("nextcloud_auth_mode", "service");
+  cfgIns.run("nextcloud_service_user", "");
+  cfgIns.run("nextcloud_service_password", "");
 
   console.log("✅ Datenbank initialisiert:", DB_PATH);
 }
