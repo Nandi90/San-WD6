@@ -857,8 +857,15 @@ app.post("/api/pdf/mappe/:id", requireAuth, async (req, res) => {
     const angebotHTML = buildAngebotHTML(vorgang.event || {}, dayCalcs || [], totalCosts || 0, activeDays || [], stamm, {}, user);
     const vertragHTML = buildVertragHTML(vorgang, stamm, user);
     const aabHTML = buildAABHTML(stamm, req.session.user.bereitschaftCode, klauselnAAB, vorgang.event?.auftragsnr||'');
-    const skipGefahren = req.query.skipGefahren === "1";
-    const gefahrenHTML = (!skipGefahren && dayCalcs && dayCalcs.length > 0) ? buildGefahrenHTML(vorgang.event || {}, activeDays || [], dayCalcs, stamm) : null;
+    // Dokument-Auswahl per Query-Parameter
+    const include = {
+      deckblatt: req.query.skipDeckblatt !== "1",
+      angebot: req.query.skipAngebot !== "1",
+      vertrag: req.query.skipVertrag !== "1",
+      aab: req.query.skipAAB !== "1",
+      gefahren: req.query.skipGefahren !== "1",
+    };
+    const gefahrenHTML = (include.gefahren && dayCalcs && dayCalcs.length > 0) ? buildGefahrenHTML(vorgang.event || {}, activeDays || [], dayCalcs, stamm) : null;
 
     // Body-Inhalt aus jedem HTML extrahieren
     const extractBody = (html) => {
@@ -894,10 +901,10 @@ app.post("/api/pdf/mappe/:id", requireAuth, async (req, res) => {
       .sig-cell{width:45%;text-align:center;vertical-align:bottom;padding:0 8px}
       .sig-line{border-top:1px solid #000;padding-top:4px;font-size:8pt;margin-top:4px}
     </style></head><body>
-      <div class="mappe-section">${extractBody(deckblattHTML)}</div>
-      <div class="mappe-section page-break">${extractBody(angebotHTML)}</div>
-      <div class="mappe-section page-break">${extractBody(vertragHTML)}</div>
-      <div class="mappe-section page-break">${extractBody(aabHTML)}</div>
+      ${include.deckblatt ? '<div class="mappe-section">' + extractBody(deckblattHTML) + '</div>' : ''}
+      ${include.angebot ? '<div class="mappe-section' + (include.deckblatt ? ' page-break' : '') + '">' + extractBody(angebotHTML) + '</div>' : ''}
+      ${include.vertrag ? '<div class="mappe-section page-break">' + extractBody(vertragHTML) + '</div>' : ''}
+      ${include.aab ? '<div class="mappe-section page-break">' + extractBody(aabHTML) + '</div>' : ''}
       ${gefahrenHTML ? '<div class="mappe-section page-break">' + extractBody(gefahrenHTML) + '</div>' : ''}
     </body></html>`;
 

@@ -206,8 +206,17 @@ const API = {
     const res = await this._fetch(`/api/pdf/aab/${vorgangId}`, { method: "POST" });
     return res.blob();
   },
-  generateMappePDF: async function(vorgangId, dayCalcs, totalCosts, activeDays) {
-    const res = await this._fetch(`/api/pdf/mappe/${vorgangId}`, {
+  generateMappePDF: async function(vorgangId, dayCalcs, totalCosts, activeDays, skipOpts) {
+    const q = [];
+    if (skipOpts) {
+      if (skipOpts.skipDeckblatt) q.push("skipDeckblatt=1");
+      if (skipOpts.skipAngebot) q.push("skipAngebot=1");
+      if (skipOpts.skipVertrag) q.push("skipVertrag=1");
+      if (skipOpts.skipAAB) q.push("skipAAB=1");
+      if (skipOpts.skipGefahren) q.push("skipGefahren=1");
+    }
+    const qs = q.length ? "?" + q.join("&") : "";
+    const res = await this._fetch(`/api/pdf/mappe/${vorgangId}${qs}`, {
       method: "POST", body: JSON.stringify({ dayCalcs, totalCosts, activeDays }),
     });
     return res.blob();

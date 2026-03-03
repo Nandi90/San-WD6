@@ -1324,6 +1324,8 @@ export default function App(){
   const [klauselnEdit,setKlauselnEdit]=useState({});
   const [klauselnSaving,setKlauselnSaving]=useState(false);
   const [mappePending,setMappePending]=useState(false);
+  const [mappeModal,setMappeModal]=useState(false);
+  const [mappeDocs,setMappeDocs]=useState({deckblatt:true,angebot:true,vertrag:true,aab:true,gefahren:true});
   const [gefahrenPending,setGefahrenPending]=useState(false);
   const [angebotPending,setAngebotPending]=useState(false);
   const [aabPending,setAabPending]=useState(false);
@@ -1771,8 +1773,7 @@ export default function App(){
                 {(pdfView==="gefahren")&&<Btn onClick={async()=>{if(!currentEventId){toast("Bitte zuerst speichern","warning");return;}setGefahrenPending(true);try{const blob=await API.generateGefahrenPDF(currentEventId,dayCalcs,activeDays);const url=URL.createObjectURL(blob);const a=document.createElement("a");a.href=url;a.download=(event.auftragsnr||"Gefahren").replace(/[^a-zA-Z0-9_-]/g,"_")+"_Gefahrenanalyse.pdf";a.click();}catch(e){toast(e.message,"error");}finally{setGefahrenPending(false);}}} icon="⬇️" variant="blue" disabled={gefahrenPending}>{gefahrenPending?"Erstelle PDF...":"PDF herunterladen"}</Btn>}
                 {(pdfView==="angebot")&&<Btn onClick={async()=>{if(!currentEventId){toast("Bitte zuerst speichern","warning");return;}setAngebotPending(true);try{const blob=await API.generateAngebotPDF(currentEventId,dayCalcs,totalCosts,activeDays);const url=URL.createObjectURL(blob);const a=document.createElement("a");a.href=url;a.download=(event.auftragsnr||"Angebot").replace(/[^a-zA-Z0-9_-]/g,"_")+"_Angebot.pdf";a.click();}catch(e){toast(e.message,"error");}finally{setAngebotPending(false);}}} icon="⬇️" variant="blue" disabled={angebotPending}>{angebotPending?"Erstelle PDF...":"PDF herunterladen"}</Btn>}
                 {(pdfView==="aab")&&<Btn onClick={async()=>{if(!currentEventId){toast("Bitte zuerst speichern","warning");return;}setAabPending(true);try{const blob=await API.generateAABPDF(currentEventId);const url=URL.createObjectURL(blob);const a=document.createElement("a");a.href=url;a.download=(event.auftragsnr||"AAB").replace(/[^a-zA-Z0-9_-]/g,"_")+"_AAB.pdf";a.click();}catch(e){toast(e.message,"error");}finally{setAabPending(false);}}} icon="⬇️" variant="blue" disabled={aabPending}>{aabPending?"Erstelle PDF...":"AAB herunterladen"}</Btn>}
-                <Btn onClick={async()=>{if(!currentEventId){toast("Bitte zuerst Vorgang speichern","warning");return;}setMappePending(true);await saveEvent();try{const blob=await API.generateMappePDF(currentEventId,dayCalcs,totalCosts,activeDays);const url=URL.createObjectURL(blob);const a=document.createElement("a");const nr=(event.auftragsnr||"").replace(/[^a-zA-Z0-9_-]/g,"_");const name=(event.name||"Veranstaltung").substring(0,30).replace(/ /g,"_");a.href=url;a.download=nr+"_"+name+"_Angebotsmappe.pdf";a.click();}catch(e){toast("Fehler bei Angebotsmappe: "+e.message,"error");}finally{setMappePending(false);}}} icon="📦" variant="success" disabled={mappePending}>{mappePending?"Erstelle PDF...":"Angebotsmappe (PDF)"}</Btn>
-                <Btn onClick={async()=>{if(!currentEventId){toast("Bitte zuerst Vorgang speichern","warning");return;}setMappePending(true);await saveEvent();try{const blob=await API.generateMappePDF(currentEventId,dayCalcs,totalCosts,activeDays,true);const url=URL.createObjectURL(blob);const a=document.createElement("a");const nr=(event.auftragsnr||"").replace(/[^a-zA-Z0-9_-]/g,"_");const name=(event.name||"Veranstaltung").substring(0,30).replace(/ /g,"_");a.href=url;a.download=nr+"_"+name+"_Angebotsmappe_ohne_GA.pdf";a.click();}catch(e){toast("Fehler bei Angebotsmappe: "+e.message,"error");}finally{setMappePending(false);}}} icon="📄" variant="primary" disabled={mappePending}>{mappePending?"Erstelle PDF...":"Mappe ohne Gefahrenanalyse"}</Btn>
+                <Btn onClick={()=>{if(!currentEventId){toast("Bitte zuerst Vorgang speichern","warning");return;}setMappeDocs({deckblatt:true,angebot:true,vertrag:true,aab:true,gefahren:true});setMappeModal(true);}} icon="📦" variant="success" disabled={mappePending}>{mappePending?"Erstelle PDF...":"Angebotsmappe erstellen"}</Btn>
               </div>
             </div>
           </Card>
@@ -2092,6 +2093,23 @@ export default function App(){
         </div>
       </div>
       <footer className="mob-hide" style={{padding:"12px 20px",borderTop:`1px solid ${C.mittelgrau}40`,textAlign:"center",fontSize:10,color:C.dunkelgrau,background:C.weiss}}>BRK Sanitätswachdienst v7.1 · {bereitschaft.name} · {stammdaten.kvName} · {year}</footer>
+
+      {/* ── Angebotsmappe Modal ──────────────────────────────── */}
+      {mappeModal&&<div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.5)",backdropFilter:"blur(3px)",zIndex:9999,display:"flex",alignItems:"center",justifyContent:"center"}} onClick={()=>setMappeModal(false)}>
+        <div style={{background:"#fff",borderRadius:10,padding:"24px 28px",maxWidth:420,width:"90%",boxShadow:"0 20px 60px rgba(0,0,0,0.3)"}} onClick={e=>e.stopPropagation()}>
+          <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:16}}><span style={{fontSize:24}}>📦</span><div><div style={{fontSize:16,fontWeight:700}}>Angebotsmappe erstellen</div><div style={{fontSize:11,color:C.dunkelgrau}}>Dokumente für die Mappe auswählen</div></div></div>
+          {[{k:"deckblatt",l:"Deckblatt",d:"Titelseite mit Logo und Veranstaltungsinfo"},{k:"angebot",l:"Kostenaufstellung (Angebot)",d:"Kalkulation mit Beauftragung"},{k:"vertrag",l:"Vereinbarung (Vertrag)",d:"Vertrag über Sanitätswachdienst"},{k:"aab",l:"Allgemeine Auftragsbedingungen",d:"AAB Anlage"},{k:"gefahren",l:"Gefahrenanalyse",d:"Risikobeurteilung pro Einsatztag"}].map(doc=>(
+            <label key={doc.k} style={{display:"flex",alignItems:"flex-start",gap:10,padding:"8px 10px",borderRadius:6,cursor:"pointer",background:mappeDocs[doc.k]?`${C.rot}08`:"transparent",border:`1px solid ${mappeDocs[doc.k]?C.rot+"40":"transparent"}`,marginBottom:4,transition:"all 0.15s"}}>
+              <input type="checkbox" checked={mappeDocs[doc.k]} onChange={e=>setMappeDocs(p=>({...p,[doc.k]:e.target.checked}))} style={{marginTop:2,accentColor:C.rot}}/>
+              <div><div style={{fontSize:13,fontWeight:600,color:C.schwarz}}>{doc.l}</div><div style={{fontSize:10,color:C.dunkelgrau}}>{doc.d}</div></div>
+            </label>
+          ))}
+          <div style={{display:"flex",gap:8,marginTop:16,justifyContent:"flex-end"}}>
+            <button onClick={()=>setMappeModal(false)} style={{padding:"8px 18px",background:C.hellgrau,border:"none",borderRadius:6,fontSize:13,cursor:"pointer",fontFamily:FONT.sans}}>Abbrechen</button>
+            <button disabled={mappePending||!Object.values(mappeDocs).some(v=>v)} onClick={async()=>{setMappeModal(false);setMappePending(true);await saveEvent();try{const skip={};if(!mappeDocs.deckblatt)skip.skipDeckblatt=true;if(!mappeDocs.angebot)skip.skipAngebot=true;if(!mappeDocs.vertrag)skip.skipVertrag=true;if(!mappeDocs.aab)skip.skipAAB=true;if(!mappeDocs.gefahren)skip.skipGefahren=true;const blob=await API.generateMappePDF(currentEventId,dayCalcs,totalCosts,activeDays,Object.keys(skip).length?skip:undefined);const url=URL.createObjectURL(blob);const a=document.createElement("a");const nr=(event.auftragsnr||"").replace(/[^a-zA-Z0-9_-]/g,"_");const name=(event.name||"Veranstaltung").substring(0,30).replace(/ /g,"_");a.href=url;a.download=nr+"_"+name+"_Angebotsmappe.pdf";a.click();}catch(e){toast("Fehler: "+e.message,"error");}finally{setMappePending(false);}}} style={{padding:"8px 22px",background:C.rot,color:"#fff",border:"none",borderRadius:6,fontSize:13,fontWeight:700,cursor:"pointer",fontFamily:FONT.sans,opacity:mappePending||!Object.values(mappeDocs).some(v=>v)?0.5:1}}>{mappePending?"Erstelle...":"PDF erstellen"}</button>
+          </div>
+        </div>
+      </div>}
       <FeedbackButton user={user} currentView={tab} toast={toast}/>
       <ToastContainer toasts={toasts} onDismiss={dismissToast}/>
       <ConfirmDialog open={!!confirmDlg} title={confirmDlg?.title} message={confirmDlg?.message} confirmLabel={confirmDlg?.confirmLabel} cancelLabel={confirmDlg?.cancelLabel} variant={confirmDlg?.variant} onConfirm={handleConfirm} onCancel={handleCancel}/>
