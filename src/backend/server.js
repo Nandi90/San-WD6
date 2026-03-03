@@ -81,6 +81,28 @@ const PORT = process.env.PORT || 3000;
 // ── Middleware ────────────────────────────────────────────────────
 app.set("trust proxy", 1);
 const nextcloud = require("./services/nextcloud");
+
+// Non-blocking Nextcloud Auto-Upload nach PDF-Generierung
+function ncAutoUpload(req, vorgangId, filename, pdfBuffer, stamm) {
+  if (!nextcloud.isConfigured()) return;
+  setImmediate(async () => {
+    try {
+      const db = require("./db").getDb();
+      const row = db.prepare("SELECT data, bereitschaft_code FROM vorgaenge WHERE id=?").get(vorgangId);
+      if (!row) return;
+      const vorgang = JSON.parse(row.data);
+      vorgang.bereitschaft_code = row.bereitschaft_code;
+      const st = stamm || db.prepare("SELECT * FROM bereitschaften WHERE code=?").get(row.bereitschaft_code) || {};
+      const result = await nextcloud.syncVorgang(req.session, vorgang, [{ filename, data: pdfBuffer }], st);
+      if (result.success) {
+        const d = JSON.parse(row.data);
+        d.nextcloudSync = { syncedAt: result.syncedAt, folder: result.folder, files: result.results.map(r=>r.file), syncedBy: req.session.user?.name };
+        db.prepare("UPDATE vorgaenge SET data = ? WHERE id = ?").run(JSON.stringify(d), vorgangId);
+        console.log(`Nextcloud Auto-Sync: ${filename} OK`);
+      }
+    } catch(e) { console.error("Nextcloud Auto-Sync:", e.message); }
+  });
+}
 app.use(helmet({
   contentSecurityPolicy: {
     directives: {
@@ -642,6 +664,7 @@ app.post("/api/pdf/vertrag/:id", requireAuth, async (req, res) => {
     // browser bleibt im Pool offen (pages werden in renderHTML geschlossen)
     res.set({ "Content-Type":"application/pdf", "Content-Disposition":`inline; filename="Vertrag-${id}.pdf"` });
     res.send(pdf);
+    ncAutoUpload(req, req.params.id, `Vertrag-${id}.pdf`, pdf);
   } catch(e) {
     console.error("Vertrag PDF:", e);
     res.status(500).json({ error: e.message });
@@ -889,6 +912,7 @@ app.post("/api/pdf/gefahren/:id", requireAuth, async (req, res) => {
     const nr = (vorgang.event?.auftragsnr || req.params.id).replace(/[^a-zA-Z0-9_-]/g,"_");
     res.set({ "Content-Type": "application/pdf", "Content-Disposition": `attachment; filename="${nr}_Gefahrenanalyse.pdf"` });
     res.send(pdf);
+    ncAutoUpload(req, req.params.id, `${nr}_Gefahrenanalyse.pdf`, pdf, stamm);
   } catch(e) { console.error("Gefahren PDF:", e); res.status(500).json({ error: e.message }); }
 });
 
@@ -914,6 +938,7 @@ app.post("/api/pdf/angebot/:id", requireAuth, async (req, res) => {
     const nr = (vorgang.event?.auftragsnr || req.params.id).replace(/[^a-zA-Z0-9_-]/g,"_");
     res.set({ "Content-Type": "application/pdf", "Content-Disposition": `attachment; filename="${nr}_Angebot.pdf"` });
     res.send(pdf);
+    ncAutoUpload(req, req.params.id, `${nr}_Angebot.pdf`, pdf, stamm);
   } catch(e) { console.error("Angebot PDF:", e); res.status(500).json({ error: e.message }); }
 });
 
@@ -936,6 +961,7 @@ app.post("/api/pdf/aab/:id", requireAuth, async (req, res) => {
     const nr = (vorgang.event?.auftragsnr || "AAB").replace(/[^a-zA-Z0-9_-]/g,"_");
     res.set({ "Content-Type": "application/pdf", "Content-Disposition": `attachment; filename="${nr}_AAB.pdf"` });
     res.send(pdf);
+    ncAutoUpload(req, req.params.id, `${nr}_AAB.pdf`, pdf, stamm);
   } catch(e) { console.error("AAB PDF:", e); res.status(500).json({ error: e.message }); }
 });
 
