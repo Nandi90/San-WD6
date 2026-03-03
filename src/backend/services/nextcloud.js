@@ -5,7 +5,17 @@
  * ═══════════════════════════════════════════════════════════════════
  */
 
-const { createClient } = require("webdav");
+const webdavModule = require("webdav");
+const createClient = webdavModule.createClient || (webdavModule.default && webdavModule.default.createClient) || webdavModule;
+
+function makeClient(url, opts) {
+  const c = createClient(url, opts);
+  if (c && typeof c.putFileContents === "function") return c;
+  // Fallback: some versions wrap it differently
+  if (c && c.default && typeof c.default.putFileContents === "function") return c.default;
+  console.error("Nextcloud WebDAV: Client hat keine putFileContents Methode!", Object.keys(c || {}));
+  return c;
+}
 
 function cfg(key, fallback) {
   try {
@@ -18,7 +28,7 @@ function cfg(key, fallback) {
 function getUserClient(accessToken, username) {
   const url = cfg("nextcloud_url");
   if (!url || !accessToken) return null;
-  return createClient(
+  return makeClient(
     `${url}/remote.php/dav/files/${username}`,
     { headers: { "Authorization": `Bearer ${accessToken}` } }
   );
@@ -32,7 +42,7 @@ function getServiceClient() {
   const pass = process.env.NEXTCLOUD_PASSWORD || "";
   if (!url || !user) return null;
   if (!_serviceClient) {
-    _serviceClient = createClient(`${url}/remote.php/dav/files/${user}`, { username: user, password: pass });
+    _serviceClient = makeClient(`${url}/remote.php/dav/files/${user}`, { username: user, password: pass });
   }
   return _serviceClient;
 }
@@ -46,7 +56,7 @@ function getClient(session) {
     const pass = cfg("nextcloud_service_password") || process.env.NEXTCLOUD_PASSWORD || "";
     const url = cfg("nextcloud_url");
     if (url && user && pass) {
-      const wc = createClient(`${url}/remote.php/dav/files/${user}`, { username: user, password: pass });
+      const wc = makeClient(`${url}/remote.php/dav/files/${user}`, { username: user, password: pass });
       return { client: wc, type: "service", uid: user };
     }
   }
@@ -112,6 +122,10 @@ async function syncVorgang(session, vorgang, pdfs, stamm) {
   if (!wc) {
     console.warn("Nextcloud: Kein Client verfügbar");
     return { success: false, error: "Nextcloud nicht verbunden (kein Token/Service-Account)" };
+  }
+  if (typeof wc.putFileContents !== "function") {
+    console.error("Nextcloud: Client-Objekt ungültig, Methods:", Object.keys(wc).join(", "));
+    return { success: false, error: "WebDAV Client fehlerhaft - prüfe webdav Paket-Version" };
   }
 
   const ev = vorgang.event || {};
