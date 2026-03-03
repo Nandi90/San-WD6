@@ -393,6 +393,71 @@ function ConfirmModal({open,title,message,icon,onConfirm,onCancel,confirmText="B
     </div>
   </div>);
 }
+
+// ═══════════════════════════════════════════════════════════════════
+// Nextcloud Config (Admin)
+// ═══════════════════════════════════════════════════════════════════
+function NextcloudConfig({toast}){
+  const [ncCfg,setNcCfg]=useState({});const [ncLoading,setNcLoading]=useState(true);const [ncTest,setNcTest]=useState(null);const [ncSaving,setNcSaving]=useState(false);
+  useEffect(()=>{(async()=>{try{const c=await API.getNextcloudConfig();setNcCfg(c);}catch{}finally{setNcLoading(false);}})();},[]);
+  const save=async()=>{setNcSaving(true);try{await API.saveNextcloudConfig(ncCfg);toast("Nextcloud Einstellungen gespeichert","success");}catch(e){toast(e.message,"error");}finally{setNcSaving(false);}};
+  const test=async()=>{setNcTest(null);try{const r=await API.testNextcloud();setNcTest(r);}catch(e){setNcTest({ok:false,error:e.message});}};
+  if(ncLoading)return <Card accent={C.mittelblau}><div style={{textAlign:"center",padding:20}}>Lade...</div></Card>;
+  return(<div style={{maxWidth:700}}>
+    <Card title="☁️ Nextcloud Konfiguration" accent="#0288d1">
+      <div style={{marginBottom:16}}>
+        <label style={{display:"flex",alignItems:"center",gap:10,cursor:"pointer",marginBottom:16}}>
+          <div style={{width:42,height:24,borderRadius:12,background:ncCfg.nextcloud_enabled==="true"?"#0288d1":"#ccc",position:"relative",transition:"0.2s",cursor:"pointer"}} onClick={()=>setNcCfg(p=>({...p,nextcloud_enabled:p.nextcloud_enabled==="true"?"false":"true"}))}>
+            <div style={{width:20,height:20,borderRadius:10,background:"#fff",position:"absolute",top:2,left:ncCfg.nextcloud_enabled==="true"?20:2,transition:"0.2s",boxShadow:"0 1px 3px rgba(0,0,0,0.3)"}}/>
+          </div>
+          <span style={{fontSize:14,fontWeight:600}}>Nextcloud Synchronisierung {ncCfg.nextcloud_enabled==="true"?"aktiv":"deaktiviert"}</span>
+        </label>
+
+        <div style={{marginBottom:12}}>
+          <div style={{fontSize:12,fontWeight:600,color:C.dunkelgrau,marginBottom:4}}>Nextcloud URL</div>
+          <input value={ncCfg.nextcloud_url||""} onChange={e=>setNcCfg(p=>({...p,nextcloud_url:e.target.value}))} placeholder="https://office.brkndsob.org" style={{width:"100%",padding:"8px 12px",border:"1px solid #ccc",borderRadius:6,fontSize:13,fontFamily:FONT.sans}}/>
+        </div>
+
+        <div style={{marginBottom:12}}>
+          <div style={{fontSize:12,fontWeight:600,color:C.dunkelgrau,marginBottom:4}}>Basis-Pfad (Ordner-Template)</div>
+          <input value={ncCfg.nextcloud_base_path||""} onChange={e=>setNcCfg(p=>({...p,nextcloud_base_path:e.target.value}))} placeholder="Verwaltung Bereitschaft $bereitschaft/SanWD" style={{width:"100%",padding:"8px 12px",border:"1px solid #ccc",borderRadius:6,fontSize:13,fontFamily:FONT.mono}}/>
+          <div style={{fontSize:10,color:"#888",marginTop:4}}>Platzhalter: <code>$bereitschaft</code> = Name, <code>$bc</code> = Code, <code>$jahr</code> = Jahr</div>
+        </div>
+
+        <div style={{marginBottom:12}}>
+          <div style={{fontSize:12,fontWeight:600,color:C.dunkelgrau,marginBottom:4}}>Unterordner pro Vorgang</div>
+          <input value={ncCfg.nextcloud_subfolder||""} onChange={e=>setNcCfg(p=>({...p,nextcloud_subfolder:e.target.value}))} placeholder="$auftragsnr - $veranstaltung" style={{width:"100%",padding:"8px 12px",border:"1px solid #ccc",borderRadius:6,fontSize:13,fontFamily:FONT.mono}}/>
+          <div style={{fontSize:10,color:"#888",marginTop:4}}>Platzhalter: <code>$auftragsnr</code>, <code>$veranstaltung</code>, <code>$bereitschaft</code>, <code>$bc</code>, <code>$jahr</code></div>
+        </div>
+
+        <div style={{background:"#f5f5f5",borderRadius:6,padding:"10px 14px",marginBottom:16,fontSize:11,fontFamily:FONT.mono,color:"#555"}}>
+          <div style={{fontSize:10,fontWeight:600,color:C.dunkelgrau,marginBottom:4}}>Vorschau Pfad (Bereitschaft Schrobenhausen, BSOB 26/001)</div>
+          /{(ncCfg.nextcloud_base_path||"SanWD").replace(/\$bereitschaft/g,"Schrobenhausen").replace(/\$bc/g,"BSOB").replace(/\$jahr/g,"2026")}/{(ncCfg.nextcloud_subfolder||"$auftragsnr").replace(/\$auftragsnr/g,"BSOB_26_001").replace(/\$veranstaltung/g,"Volksfest").replace(/\$bereitschaft/g,"Schrobenhausen").replace(/\$bc/g,"BSOB").replace(/\$jahr/g,"2026")}
+        </div>
+
+        <div style={{display:"flex",gap:8}}>
+          <button onClick={save} disabled={ncSaving} style={{padding:"8px 20px",background:"#0288d1",color:"#fff",border:"none",borderRadius:6,fontSize:13,fontWeight:600,cursor:"pointer",fontFamily:FONT.sans}}>{ncSaving?"Speichern...":"Speichern"}</button>
+          <button onClick={test} style={{padding:"8px 20px",background:C.hellgrau,border:"1px solid #ccc",borderRadius:6,fontSize:13,cursor:"pointer",fontFamily:FONT.sans}}>Verbindung testen</button>
+        </div>
+
+        {ncTest&&<div style={{marginTop:12,padding:"10px 14px",background:ncTest.ok?"#e8f5e9":"#ffebee",border:`1px solid ${ncTest.ok?"#a5d6a7":"#ef9a9a"}`,borderRadius:6,fontSize:12,color:ncTest.ok?"#2e7d32":"#c62828"}}>
+          {ncTest.ok?"✅ "+ncTest.message:"❌ "+ncTest.error}
+        </div>}
+      </div>
+    </Card>
+
+    <Card title="ℹ️ Hinweise" accent={C.dunkelgrau} style={{marginTop:14}}>
+      <div style={{fontSize:12,color:C.dunkelgrau,lineHeight:1.8}}>
+        <div>• Die Synchronisierung nutzt den <strong>BRK.id Token</strong> des jeweiligen Benutzers</div>
+        <div>• Dateien werden im Nextcloud-Konto des eingeloggten Users abgelegt</div>
+        <div>• Der Benutzer benötigt Schreibrechte auf den konfigurierten Pfad</div>
+        <div>• Sync erfolgt manuell per Button oder automatisch bei Mappe-Generierung</div>
+        <div>• Bei fehlender Verbindung wird der PDF-Download nicht blockiert</div>
+      </div>
+    </Card>
+  </div>);
+}
+
 function VorgangChecklist({checklist={},onChange,onLockSave,eventDate}){
   const [confirmKey,setConfirmKey]=useState(null);
   const [showAblehnung,setShowAblehnung]=useState(false);
@@ -1843,66 +1908,8 @@ export default function App(){
         {tab==="kunden"&&<KundenManager kunden={kunden} setKunden={setKunden} user={user} toast={toast} showConfirm={showConfirm}/>}
 
         {/* STAMMDATEN */}
-        {tab==="nextcloud"&&user?.rolle==="admin"&&(()=>{
-          const [ncCfg,setNcCfg]=useState({});const [ncLoading,setNcLoading]=useState(true);const [ncTest,setNcTest]=useState(null);const [ncSaving,setNcSaving]=useState(false);
-          useEffect(()=>{(async()=>{try{const c=await API.getNextcloudConfig();setNcCfg(c);}catch{}finally{setNcLoading(false);}})();},[]);
-          const save=async()=>{setNcSaving(true);try{await API.saveNextcloudConfig(ncCfg);toast("Nextcloud Einstellungen gespeichert","success");}catch(e){toast(e.message,"error");}finally{setNcSaving(false);}};
-          const test=async()=>{setNcTest(null);try{const r=await API.testNextcloud();setNcTest(r);}catch(e){setNcTest({ok:false,error:e.message});}};
-          if(ncLoading)return <Card accent={C.mittelblau}><div style={{textAlign:"center",padding:20}}>Lade...</div></Card>;
-          return(<div style={{maxWidth:700}}>
-            <Card title="☁️ Nextcloud Konfiguration" accent="#0288d1">
-              <div style={{marginBottom:16}}>
-                <label style={{display:"flex",alignItems:"center",gap:10,cursor:"pointer",marginBottom:16}}>
-                  <div style={{width:42,height:24,borderRadius:12,background:ncCfg.nextcloud_enabled==="true"?"#0288d1":"#ccc",position:"relative",transition:"0.2s",cursor:"pointer"}} onClick={()=>setNcCfg(p=>({...p,nextcloud_enabled:p.nextcloud_enabled==="true"?"false":"true"}))}>
-                    <div style={{width:20,height:20,borderRadius:10,background:"#fff",position:"absolute",top:2,left:ncCfg.nextcloud_enabled==="true"?20:2,transition:"0.2s",boxShadow:"0 1px 3px rgba(0,0,0,0.3)"}}/>
-                  </div>
-                  <span style={{fontSize:14,fontWeight:600}}>Nextcloud Synchronisierung {ncCfg.nextcloud_enabled==="true"?"aktiv":"deaktiviert"}</span>
-                </label>
+        {tab==="nextcloud"&&user?.rolle==="admin"&&<NextcloudConfig toast={toast}/>}
 
-                <div style={{marginBottom:12}}>
-                  <div style={{fontSize:12,fontWeight:600,color:C.dunkelgrau,marginBottom:4}}>Nextcloud URL</div>
-                  <input value={ncCfg.nextcloud_url||""} onChange={e=>setNcCfg(p=>({...p,nextcloud_url:e.target.value}))} placeholder="https://office.brkndsob.org" style={{width:"100%",padding:"8px 12px",border:"1px solid #ccc",borderRadius:6,fontSize:13,fontFamily:FONT.sans}}/>
-                </div>
-
-                <div style={{marginBottom:12}}>
-                  <div style={{fontSize:12,fontWeight:600,color:C.dunkelgrau,marginBottom:4}}>Basis-Pfad (Ordner-Template)</div>
-                  <input value={ncCfg.nextcloud_base_path||""} onChange={e=>setNcCfg(p=>({...p,nextcloud_base_path:e.target.value}))} placeholder="Verwaltung Bereitschaft $bereitschaft/SanWD" style={{width:"100%",padding:"8px 12px",border:"1px solid #ccc",borderRadius:6,fontSize:13,fontFamily:FONT.mono}}/>
-                  <div style={{fontSize:10,color:"#888",marginTop:4}}>Platzhalter: <code>$bereitschaft</code> = Name, <code>$bc</code> = Code, <code>$jahr</code> = Jahr</div>
-                </div>
-
-                <div style={{marginBottom:12}}>
-                  <div style={{fontSize:12,fontWeight:600,color:C.dunkelgrau,marginBottom:4}}>Unterordner pro Vorgang</div>
-                  <input value={ncCfg.nextcloud_subfolder||""} onChange={e=>setNcCfg(p=>({...p,nextcloud_subfolder:e.target.value}))} placeholder="$auftragsnr - $veranstaltung" style={{width:"100%",padding:"8px 12px",border:"1px solid #ccc",borderRadius:6,fontSize:13,fontFamily:FONT.mono}}/>
-                  <div style={{fontSize:10,color:"#888",marginTop:4}}>Platzhalter: <code>$auftragsnr</code>, <code>$veranstaltung</code>, <code>$bereitschaft</code>, <code>$bc</code>, <code>$jahr</code></div>
-                </div>
-
-                <div style={{background:"#f5f5f5",borderRadius:6,padding:"10px 14px",marginBottom:16,fontSize:11,fontFamily:FONT.mono,color:"#555"}}>
-                  <div style={{fontSize:10,fontWeight:600,color:C.dunkelgrau,marginBottom:4}}>Vorschau Pfad (Bereitschaft Schrobenhausen, BSOB 26/001)</div>
-                  /{(ncCfg.nextcloud_base_path||"SanWD").replace(/\$bereitschaft/g,"Schrobenhausen").replace(/\$bc/g,"BSOB").replace(/\$jahr/g,"2026")}/{(ncCfg.nextcloud_subfolder||"$auftragsnr").replace(/\$auftragsnr/g,"BSOB_26_001").replace(/\$veranstaltung/g,"Volksfest").replace(/\$bereitschaft/g,"Schrobenhausen").replace(/\$bc/g,"BSOB").replace(/\$jahr/g,"2026")}
-                </div>
-
-                <div style={{display:"flex",gap:8}}>
-                  <button onClick={save} disabled={ncSaving} style={{padding:"8px 20px",background:"#0288d1",color:"#fff",border:"none",borderRadius:6,fontSize:13,fontWeight:600,cursor:"pointer",fontFamily:FONT.sans}}>{ncSaving?"Speichern...":"Speichern"}</button>
-                  <button onClick={test} style={{padding:"8px 20px",background:C.hellgrau,border:"1px solid #ccc",borderRadius:6,fontSize:13,cursor:"pointer",fontFamily:FONT.sans}}>Verbindung testen</button>
-                </div>
-
-                {ncTest&&<div style={{marginTop:12,padding:"10px 14px",background:ncTest.ok?"#e8f5e9":"#ffebee",border:`1px solid ${ncTest.ok?"#a5d6a7":"#ef9a9a"}`,borderRadius:6,fontSize:12,color:ncTest.ok?"#2e7d32":"#c62828"}}>
-                  {ncTest.ok?"✅ "+ncTest.message:"❌ "+ncTest.error}
-                </div>}
-              </div>
-            </Card>
-
-            <Card title="ℹ️ Hinweise" accent={C.dunkelgrau} style={{marginTop:14}}>
-              <div style={{fontSize:12,color:C.dunkelgrau,lineHeight:1.8}}>
-                <div>• Die Synchronisierung nutzt den <strong>BRK.id Token</strong> des jeweiligen Benutzers</div>
-                <div>• Dateien werden im Nextcloud-Konto des eingeloggten Users abgelegt</div>
-                <div>• Der Benutzer benötigt Schreibrechte auf den konfigurierten Pfad</div>
-                <div>• Sync erfolgt manuell per Button oder automatisch bei Mappe-Generierung</div>
-                <div>• Bei fehlender Verbindung wird der PDF-Download nicht blockiert</div>
-              </div>
-            </Card>
-          </div>);
-        })()}
 
                 {tab==="releases"&&(
         <div style={{maxWidth:700,margin:"0 auto"}}>
