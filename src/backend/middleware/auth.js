@@ -127,6 +127,11 @@ router.get("/callback", async (req, res) => {
     if (!client) return res.redirect("/");
 
     const params = client.callbackParams(req);
+    // Session verloren? → Neu einloggen statt Fehler
+    if (!req.session.oidcState || !req.session.oidcNonce) {
+      console.warn("OIDC Callback: State/Nonce fehlt in Session – leite zu Login um");
+      return res.redirect("/auth/login");
+    }
     const tokenSet = await client.callback(
       process.env.OIDC_REDIRECT_URI, params,
       { nonce: req.session.oidcNonce, state: req.session.oidcState }

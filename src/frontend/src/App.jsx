@@ -50,7 +50,7 @@ function getRec(risk){const p=PERSONNEL_TABLE.find(r=>risk>=r.min&&risk<r.max)||
 function calcH(s,e){if(!s||!e)return 0;const[sh,sm]=s.split(":").map(Number);const[eh,em]=e.split(":").map(Number);let d=(eh*60+em)-(sh*60+sm);if(d<=0)d+=1440;return Math.ceil(d/15)*0.25;}
 function calcDay(d,rates,verpfVA){const h=calcH(d.startTime,d.endTime);const risk=calcRisk(d);const rec=getRec(risk.total);const hc=d.oHelfer??rec.helfer,kc=d.oKtw??rec.ktw,rc=d.oRtw??rec.rtw,ac=d.oAerzte??0,gc=d.oGktw??rec.gktw,el=d.oEl??rec.el;const ec=d.oElKfz??rec.elKfz,sc=d.oSeg??0,mc=d.oMtw??0,zc=d.oZelt??0;const tp=el==="im Team"?hc+kc*2+rc*2+gc*2+ac:hc+kc*2+rc*2+gc*2+ac+1;const hfc=el==="im Team"?tp-ac:tp-ac-1;const cH=hfc*h*rates.helfer,cK=kc*rates.ktw+(d.kmKtw||0)*kc*rates.kmKtw,cR=rc*rates.rtw+(d.kmRtw||0)*rc*rates.kmRtw,cA=ac*rates.aerzte,cG=gc*rates.gktw+(d.kmGktw||0)*gc*rates.kmGktw,cE=el==="im Team"?0:h*rates.einsatzleiter,cEK=ec*rates.einsatzleiterKfz+(d.kmElKfz||0)*rates.kmElKfz,cS=sc*rates.segLkw+(d.kmSeg||0)*sc*rates.kmSegLkw,cM=mc*rates.mtw+(d.kmMtw||0)*mc*rates.kmMtw,cZ=zc*rates.zelt;const vB=verpfVA?0:Math.ceil(h/8);const cV=verpfVA?0:vB*tp*rates.verpflegung;return{h,risk,rec,hc,kc,rc,ac,gc,el,ec,sc,mc,zc,tp,hfc,cH,cK,cR,cA,cG,cE,cEK,cS,cM,cZ,cV,total:cH+cK+cR+cA+cG+cE+cEK+cS+cM+cZ+cV,vB};}
 const mkDay=(n)=>({id:n,active:n===1,date:"",startTime:"18:00",endTime:"23:00",auflagen:0,geschlossen:false,flaeche:0,geschlossenFlaeche:false,besucher:1000,besucherFlaeche:0,eventTypeId:11,customFactor:0,prominente:0,polizeiRisiko:false,oHelfer:null,oKtw:null,oRtw:null,oAerzte:null,oGktw:null,oEl:null,oElKfz:null,oSeg:null,oMtw:null,oZelt:null,kmKtw:0,kmRtw:0,kmGktw:0,kmElKfz:0,kmSeg:0,kmMtw:0,fahrzeuge:[]});
-const EMPTY_EVENT={auftragsnr:"",rechnungsnr:"",name:"",ort:"",adresse:"",veranstalter:"",ansprechpartner:"",telefon:"",email:"",rechnungsempfaenger:"",reStrasse:"",rePlzOrt:"",anrede:"Sehr geehrte Damen und Herren,",auflagen:"keine",kfzStellplatz:true,sanitaetsraum:false,strom:true,verpflegung:true,pauschalangebot:0,bemerkung:"",coords:null,w3w:"",hausnr:"",checklist:{},ilsEL:"",ilsTelefon:"",ilsFunk:"",ilsAbkoemmlich:"",ilsFzg1:"",ilsFzg2:"",ilsFzg3:"",ilsSonstige:""};
+const EMPTY_EVENT={auftragsnr:"",name:"",ort:"",adresse:"",veranstalter:"",ansprechpartner:"",telefon:"",email:"",rechnungsempfaenger:"",reStrasse:"",rePlzOrt:"",anrede:"Sehr geehrte Damen und Herren,",auflagen:"keine",kfzStellplatz:true,sanitaetsraum:false,strom:true,verpflegung:true,pauschalangebot:0,bemerkung:"",coords:null,w3w:"",hausnr:"",checklist:{},ilsEL:"",ilsTelefon:"",ilsFunk:"",ilsAbkoemmlich:"",ilsFzg1:"",ilsFzg2:"",ilsFzg3:"",ilsSonstige:""};
 const f2=(v)=>new Intl.NumberFormat("de-DE",{minimumFractionDigits:2,maximumFractionDigits:2}).format(v);
 const fDate=(d)=>d?new Date(d).toLocaleDateString("de-DE"):"";
 const buildAddrStr=(addr)=>{
@@ -1149,14 +1149,15 @@ function VorgaengeListe({bereitschaftCode,user,onLoad,onNew,onCopy,bereitschaft,
   useEffect(()=>{loadEvents();},[prefix]);
   const loadEvents=async(bcFilter)=>{setLoading(true);try{const bc=bcFilter!==undefined?bcFilter:filterBereitschaft;const data=await API.getVorgaenge(viewYear,bc);setEvents(data.map(v=>({...v,id:v.id})));}catch{setEvents([]);}setLoading(false);};
   const del=async(id)=>{if(!await showConfirm({title:"In Papierkorb verschieben",message:"Vorgang in den Papierkorb verschieben? Er kann innerhalb von 60 Tagen wiederhergestellt werden.",confirmLabel:"In Papierkorb",variant:"danger"}))return;try{await API.deleteVorgang(id);loadEvents();}catch(e){toast("Fehler beim Löschen: "+e.message,"error");}};
-  const years=[];for(let y=thisYear;y>=2025;y--)years.push(y);
+  const years=[thisYear+1];for(let y=thisYear;y>=2025;y--)years.push(y);
   const isArchive=viewYear<thisYear;
+  const isVorplanung=viewYear>thisYear;
   const totalBetrag=events.reduce((s,ev)=>{const e=ev.event;if(!e)return s;const dc=(ev.days||[]).filter(d=>d.active);let t=0;try{dc.forEach(d=>{const c=calcDay(d,DEFAULT_STAMMDATEN.rates,e.verpflegung);t+=c.total;});}catch(e){console.error("Fehler:",e);}return s+t;},0);
 
   return(<div>
     {/* Year tabs */}
     <div style={{display:"flex",gap:4,marginBottom:12,flexWrap:"wrap",alignItems:"center"}}>
-      {years.map(y=>(<button key={y} onClick={()=>setViewYear(y)} style={{padding:"5px 12px",borderRadius:4,border:`1px solid ${y===viewYear?C.rot:C.mittelgrau+"60"}`,background:y===viewYear?`${C.rot}11`:C.weiss,color:y===viewYear?C.rot:y<thisYear?C.bgrau:C.schwarz,cursor:"pointer",fontSize:12,fontWeight:y===viewYear?700:400,fontFamily:FONT.sans}}>{y}{y===thisYear?" ●":""}</button>))}
+      {years.map(y=>(<button key={y} onClick={()=>setViewYear(y)} style={{padding:"5px 12px",borderRadius:4,border:`1px solid ${y===viewYear?C.rot:C.mittelgrau+"60"}`,background:y===viewYear?`${C.rot}11`:C.weiss,color:y===viewYear?C.rot:y<thisYear?C.bgrau:C.schwarz,cursor:"pointer",fontSize:12,fontWeight:y===viewYear?700:400,fontFamily:FONT.sans}}>{y}{y===thisYear?" ●":""}{y>thisYear?" Vorplanung":""}</button>))}
     </div>
 
     <div className="r-vorg-bar" style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}>
@@ -1287,7 +1288,10 @@ const LATEST_RELEASE={v:"v7.1",d:"02.03.2026",c:[
   "🖨️ PDF-Performance: Persistenter Chromium-Pool + Single-Render Mappe (5x schneller)",
   "📄 Vertrag: Ansprechpartner, logische Seitenumbrüche, Unterschriften auf gleicher Höhe",
   "📋 Fußzeilen: Dokumentenzugehörigkeit + Auftragsnr auf allen PDFs",
-  "🔐 Keycloak Session-Validierung: Token-Expiry + automatischer Refresh",
+  "🔐 BRK.id Session-Validierung: Token-Expiry + automatischer Refresh",
+  "📅 Planjahr: Vorgänge für das Folgejahr vorplanen (Dropdown statt Rechnungsnummer)",
+  "📋 Vorgänge: Vorplanungs-Tab für nächstes Jahr in der Übersicht",
+  "🔄 BRK.id Callback: Automatischer Re-Login bei verlorener Session statt Fehlermeldung",
 ]};
 
 export default function App(){
@@ -1363,7 +1367,7 @@ export default function App(){
   const [stammdatenLoaded,setStammdatenLoaded]=useState(false);
   const printRef=useRef(null);
 
-  const year=new Date().getFullYear();
+  const [year,setYear]=useState(new Date().getFullYear());
   const storagePrefix=useMemo(()=>`sanwd:${user?.bereitschaftCode||BEREITSCHAFTEN[stammdaten.bereitschaftIdx]?.code||"BSOB"}:${year}`,[stammdaten.bereitschaftIdx,year]);
   const kundenKey=useMemo(()=>`sanwd:${BEREITSCHAFTEN[stammdaten.bereitschaftIdx].code}:kunden`,[stammdaten.bereitschaftIdx]);
 
@@ -1373,7 +1377,7 @@ export default function App(){
 
   const upsertKunde=useCallback((ev)=>{if(!ev.veranstalter&&!ev.rechnungsempfaenger)return;const name=ev.veranstalter||ev.rechnungsempfaenger;const entry={name,ansprechpartner:ev.ansprechpartner||"",telefon:ev.telefon||"",email:ev.email||"",rechnungsempfaenger:ev.rechnungsempfaenger||"",reStrasse:ev.reStrasse||"",rePlzOrt:ev.rePlzOrt||"",anrede:ev.anrede||"Sehr geehrte Damen und Herren,"};API.saveKunde(entry).catch(()=>{});setKunden(prev=>{const idx=prev.findIndex(k=>k.name===name);return idx>=0?prev.map((k,i)=>i===idx?entry:k):[...prev,entry];});},[]);
 
-  useEffect(()=>{if(!user)return;(async()=>{try{const c=await API.getCounter(year);setLaufendeNr(c.nextNr||1);}catch(e){console.error("Fehler:",e);}})();},[user,storagePrefix]);
+  useEffect(()=>{if(!user)return;(async()=>{try{const c=await API.getCounter(year);setLaufendeNr(c.nextNr||1);}catch(e){console.error("Fehler:",e);}})();},[user,year]);
 
   const generateNr=useCallback(()=>{const b=BEREITSCHAFTEN[stammdaten.bereitschaftIdx];const yr=String(year).slice(-2);const nr=String(laufendeNr).padStart(3,"0");setEvent(p=>({...p,auftragsnr:`${b.code} ${yr}/${nr}`}));const next=laufendeNr+1;setLaufendeNr(next);if(user)try{API.incrementCounter(year).catch(()=>{});}catch(e){console.error("Fehler:",e);}},[stammdaten.bereitschaftIdx,laufendeNr,year,user,storagePrefix]);
 
@@ -1492,7 +1496,7 @@ export default function App(){
     // History laden
     try{const h=await API.json("/api/vorgaenge/"+ev.id+"/history");setEditHistory(h||[]);}catch{setEditHistory([]);}
   },[user]);
-  const copyEvent=useCallback((ev)=>{setCurrentEventId(null);const e={...EMPTY_EVENT,...(ev.event||{}),auftragsnr:"",rechnungsnr:"",checklist:{}};setEvent(e);setDays((ev.days||Array.from({length:8},(_,i)=>mkDay(i+1))).map(d=>({...d,date:""})));setActiveDay(0);setTab("event");},[]);
+  const copyEvent=useCallback((ev)=>{setCurrentEventId(null);const e={...EMPTY_EVENT,...(ev.event||{}),auftragsnr:"",checklist:{}};setEvent(e);setDays((ev.days||Array.from({length:8},(_,i)=>mkDay(i+1))).map(d=>({...d,date:""})));setActiveDay(0);setTab("event");},[]);
 
   // LOGIN
   if(!user)return(
@@ -1589,7 +1593,7 @@ export default function App(){
                 <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:"0 16px",className:"rg3"}}>
                   <Sel label="Bereitschaft" value={stammdaten.bereitschaftIdx} onChange={v=>updateStamm("bereitschaftIdx",v)} disabled={user?.rolle!=="admin"&&user?.rolle!=="kbl"} options={(user?.rolle==="admin"||user?.rolle==="kbl")?BEREITSCHAFTEN.map((b,i)=>({value:i,label:`${b.code} — ${b.name}`})):BEREITSCHAFTEN.map((b,i)=>({value:i,label:`${b.code} — ${b.name}`})).filter(o=>BEREITSCHAFTEN[o.value]?.code===user?.bereitschaftCode)}/>
                   <Inp label="Auftragsnummer" value={event.auftragsnr} onChange={v=>updateEvent("auftragsnr",v)} placeholder="Auto-generiert"/>
-                  <Inp label="Rechnungsnummer" value={event.rechnungsnr} onChange={v=>updateEvent("rechnungsnr",v)}/>
+                  <Sel label="Planjahr" value={year} onChange={v=>setYear(Number(v))} options={[{value:new Date().getFullYear(),label:String(new Date().getFullYear())},{value:new Date().getFullYear()+1,label:String(new Date().getFullYear()+1)+" (Vorplanung)"}]}/>
                 </div>
                 <div style={{display:"flex",gap:12,alignItems:"center",padding:"6px 10px",background:C.hellgrau,borderRadius:4,fontSize:11,color:C.dunkelgrau}}>
                   <span>Nächste Nr:</span>
@@ -1823,7 +1827,10 @@ export default function App(){
                 "AAB: Leere zweite Seite durch redundanten Inline-Footer behoben",
                 "PDF-Engine: Persistenter Chromium Browser-Pool – einmaliger Start statt 9x pro Request",
                 "Entsperren: Setzt sowohl angebotVersendet als auch abgeschlossen zurück + Status auf Entwurf",
-                "Sicherheit: Keycloak Token-Validierung – Session wird bei BRK.id Abmeldung ungültig",
+                "Sicherheit: BRK.id Token-Validierung – Session wird bei BRK.id Abmeldung ungültig",
+                "Planjahr: Dropdown im Veranstaltungs-Tab – Vorgänge 1 Jahr im Voraus anlegen mit korrekter Nummerierung",
+                "Vorgänge-Übersicht: Vorplanungs-Tab für Folgejahr sichtbar",
+                "BRK.id Callback: Fehlende Session-State führt zu automatischem Re-Login statt Fehlermeldung",
               ]},
               {v:"v7.0",d:"27.02.2026",c:[
                 "🎉 Major Release: Vollständiges Responsive Design für Smartphone und Tablet",
