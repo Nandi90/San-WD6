@@ -49,6 +49,7 @@ async function validateKeycloakSession(session) {
     if (!resp.ok) throw new Error("Token refresh failed");
     const data = await resp.json();
     session.refreshToken = data.refresh_token;
+    session.accessToken = data.access_token || session.accessToken;
     session.tokenExpiry = Date.now() + (data.expires_in * 1000);
   } catch(e) {
     console.log("Keycloak Session ungueltig:", e.message);

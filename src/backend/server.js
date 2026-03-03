@@ -80,6 +80,7 @@ const PORT = process.env.PORT || 3000;
 
 // ── Middleware ────────────────────────────────────────────────────
 app.set("trust proxy", 1);
+const nextcloud = require("./services/nextcloud");
 app.use(helmet({
   contentSecurityPolicy: {
     directives: {
@@ -500,6 +501,70 @@ app.put("/api/profile", (req, res) => {
 
 
 // ── PDF Vertrag (Puppeteer) ──────────────────────────────────────────
+
+// ═══════════════════════════════════════════════════════════════════
+// Nextcloud Sync
+// ═══════════════════════════════════════════════════════════════════
+app.post("/api/pdf/sync/:id", requireAuth, async (req, res) => {
+  try {
+    if (!nextcloud.isConfigured()) return res.status(501).json({ error: "Nextcloud nicht konfiguriert" });
+    const db = require("./db").getDb();
+    const row = db.prepare("SELECT data, bereitschaft_code FROM vorgaenge WHERE id=?").get(req.params.id);
+    if (!row) return res.status(404).json({ error: "Vorgang nicht gefunden" });
+    const vorgang = { ...JSON.parse(row.data), bereitschaft_code: row.bereitschaft_code };
+    const ev = vorgang.event || {};
+    const stamm = db.prepare("SELECT * FROM bereitschaften WHERE code=?").get(row.bereitschaft_code || req.session.user.bereitschaftCode) || {};
+    const user = db.prepare("SELECT name, titel, ort, email, telefon, mobil, unterschrift FROM users WHERE sub=?").get(req.session.user.sub) || {};
+    const klauselnAAB = db.prepare("SELECT id, titel, inhalt, reihenfolge FROM klauseln WHERE dokument='aab' ORDER BY reihenfolge").all();
+    const { dayCalcs, totalCosts, activeDays } = req.body;
+
+    const pdfs = [];
+    const nr = (ev.auftragsnr || "").replace(/[^a-zA-Z0-9_-]/g, "_");
+
+    // Gefahrenanalyse
+    if (dayCalcs && dayCalcs.length > 0) {
+      const html = buildGefahrenHTML(ev, activeDays || [], dayCalcs, stamm);
+      const data = await BrowserPool.renderPDF(html);
+      pdfs.push({ filename: `${nr}_01_Gefahrenanalyse.pdf`, data });
+    }
+
+    // Angebot
+    const angebotHTML = buildAngebotHTML(ev, dayCalcs || [], totalCosts || 0, activeDays || [], stamm, {}, user);
+    const angebotData = await BrowserPool.renderPDF(angebotHTML, { marginTop: "20mm", marginLeft: "12mm" });
+    pdfs.push({ filename: `${nr}_02_Angebot.pdf`, data: angebotData });
+
+    // Vertrag
+    const vertragHTML = buildVertragHTML(vorgang, stamm, user);
+    const vertragData = await BrowserPool.renderPDF(vertragHTML);
+    pdfs.push({ filename: `${nr}_03_Vertrag.pdf`, data: vertragData });
+
+    // AAB
+    const aabHTML = buildAABHTML(stamm, row.bereitschaft_code || req.session.user.bereitschaftCode, klauselnAAB, ev.auftragsnr || "");
+    const aabData = await BrowserPool.renderPDF(aabHTML);
+    pdfs.push({ filename: `${nr}_04_AAB.pdf`, data: aabData });
+
+    // Upload
+    const result = await nextcloud.syncVorgang(req.session, vorgang, pdfs);
+
+    // Sync-Status in Vorgang speichern
+    if (result.success) {
+      const data = JSON.parse(row.data);
+      data.nextcloudSync = { syncedAt: result.syncedAt, folder: result.folder, files: result.results.map(r => r.file), syncedBy: req.session.user.name };
+      db.prepare("UPDATE vorgaenge SET data = ? WHERE id = ?").run(JSON.stringify(data), req.params.id);
+    }
+
+    res.json(result);
+  } catch(e) {
+    console.error("Nextcloud Sync Fehler:", e);
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// Nextcloud Status
+app.get("/api/nextcloud/status", requireAuth, (req, res) => {
+  res.json({ configured: nextcloud.isConfigured(), url: process.env.NEXTCLOUD_URL || null });
+});
+
 app.post("/api/pdf/vertrag/:id", requireAuth, async (req, res) => {
   // puppeteer via BrowserPool
   const { id } = req.params;
@@ -916,6 +981,25 @@ app.post("/api/pdf/mappe/:id", requireAuth, async (req, res) => {
     const name = (vorgang.event?.name || "Veranstaltung").substring(0,30).replace(/[^a-zA-Z0-9_äöüÄÖÜß -]/g,"").replace(/ /g,"_");
     res.set({ "Content-Type": "application/pdf", "Content-Disposition": `attachment; filename="${nr}_${name}_Angebotsmappe.pdf"` });
     res.send(result);
+
+    // Non-blocking Nextcloud Auto-Sync
+    if (nextcloud.isConfigured()) {
+      setImmediate(async () => {
+        try {
+          const syncResult = await nextcloud.syncVorgang(req.session, vorgang, [
+            { filename: `${nr}_Angebotsmappe.pdf`, data: result }
+          ]);
+          if (syncResult.success) {
+            const freshRow = db.prepare("SELECT data FROM vorgaenge WHERE id=?").get(req.params.id);
+            if (freshRow) {
+              const d = JSON.parse(freshRow.data);
+              d.nextcloudSync = { syncedAt: syncResult.syncedAt, folder: syncResult.folder, files: syncResult.results.map(r=>r.file), syncedBy: req.session.user.name };
+              db.prepare("UPDATE vorgaenge SET data = ? WHERE id = ?").run(JSON.stringify(d), req.params.id);
+            }
+          }
+        } catch(e) { console.error("Nextcloud Auto-Sync:", e.message); }
+      });
+    }
   } catch(e) { console.error("Mappe PDF:", e); res.status(500).json({ error: e.message }); }
 });
 

@@ -113,8 +113,8 @@ const API = {
     return res.blob();
   },
 
-  async syncToNextcloud(vorgangId) {
-    return this.json(`/api/pdf/sync/${vorgangId}`, { method: "POST" });
+  async syncToNextcloud(vorgangId, body) {
+    return this.json(`/api/pdf/sync/${vorgangId}`, { method: "POST", body: JSON.stringify(body || {}) });
   },
 
   // ── Templates (Admin) ───────────────────────────────────────
