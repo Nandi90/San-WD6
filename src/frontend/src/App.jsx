@@ -1425,7 +1425,6 @@ function HistoryWidget({history}){
 // ═══════════════════════════════════════════════════════════════════════════
 function KundenManager({kunden,setKunden,user,toast,showConfirm}){
   const [edit,setEdit]=useState(null);
-  const [editAnchor,setEditAnchor]=useState(null);
   const [csvMsg,setCsvMsg]=useState("");
   const [search,setSearch]=useState("");
   const [selected,setSelected]=useState(new Set());
@@ -1446,11 +1445,9 @@ function KundenManager({kunden,setKunden,user,toast,showConfirm}){
   },[filtered]);
 
   const openEdit=(k,e)=>{
-    const rect=e?.currentTarget?.getBoundingClientRect();
-    setEditAnchor(rect?{top:rect.top+window.scrollY,left:rect.left}:null);
     setEdit(k?{...k,_id:k.id,_origName:k.name}:{...empty,_id:null,_origName:null});
   };
-  const closeEdit=()=>{setEdit(null);setEditAnchor(null);};
+  const closeEdit=()=>{setEdit(null);};
   const save=async()=>{
     if(!edit?.name){toast("Name ist erforderlich","error");return;}
     try{
@@ -1476,34 +1473,6 @@ function KundenManager({kunden,setKunden,user,toast,showConfirm}){
   };
   // Close popover on outside click
   useEffect(()=>{if(!edit)return;const h=(e)=>{if(editRef.current&&!editRef.current.contains(e.target))closeEdit();};const t=setTimeout(()=>document.addEventListener("mousedown",h),100);return()=>{clearTimeout(t);document.removeEventListener("mousedown",h);};},[edit]);
-
-  const EditPopover=()=>{
-    if(!edit)return null;
-    const style={position:editAnchor?"absolute":"relative",top:editAnchor?Math.min(editAnchor.top-40,window.innerHeight-500):undefined,zIndex:1000,background:C.weiss,border:`2px solid ${C.rot}`,borderRadius:8,padding:16,boxShadow:"0 8px 32px #0003",width:520,maxWidth:"95vw",maxHeight:"80vh",overflowY:"auto"};
-    return(<div ref={editRef} style={editAnchor?{position:"fixed",top:0,left:0,right:0,bottom:0,zIndex:999}:{}}>{editAnchor&&<div style={{position:"fixed",top:0,left:0,right:0,bottom:0,background:"#0002"}} onClick={closeEdit}/>}
-      <div style={editAnchor?{...style,position:"fixed",top:"50%",left:"50%",transform:"translate(-50%,-50%)"}:style}>
-        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}>
-          <span style={{fontSize:15,fontWeight:700,color:C.rot}}>{edit._id?"✏️ Kunde bearbeiten":"➕ Neuer Kunde"}</span>
-          <button onClick={closeEdit} style={{background:"none",border:"none",fontSize:18,cursor:"pointer",color:C.bgrau}}>✕</button>
-        </div>
-        <div className="rg2" style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"6px 12px"}}>
-          <Inp label="Firma / Name *" value={edit.name} onChange={v=>setEdit(p=>({...p,name:v}))}/>
-          <Inp label="Kundennummer" value={edit.kundennummer||""} onChange={v=>setEdit(p=>({...p,kundennummer:v}))}/>
-          <Inp label="Ansprechpartner" value={edit.ansprechpartner||""} onChange={v=>setEdit(p=>({...p,ansprechpartner:v}))}/>
-          <Inp label="Telefon" value={edit.telefon||""} onChange={v=>setEdit(p=>({...p,telefon:v}))}/>
-          <Inp label="E-Mail" value={edit.email||""} onChange={v=>setEdit(p=>({...p,email:v}))}/>
-          <Inp label="Anrede" value={edit.anrede||""} onChange={v=>setEdit(p=>({...p,anrede:v}))}/>
-          <Inp label="Rechnungsempfänger" value={edit.rechnungsempfaenger||""} onChange={v=>setEdit(p=>({...p,rechnungsempfaenger:v}))}/>
-          <Inp label="Straße" value={edit.reStrasse||edit.re_strasse||""} onChange={v=>setEdit(p=>({...p,reStrasse:v,re_strasse:v}))}/>
-          <Inp label="PLZ / Ort" value={edit.rePlzOrt||edit.re_plz_ort||""} onChange={v=>setEdit(p=>({...p,rePlzOrt:v,re_plz_ort:v}))}/>
-        </div>
-        <div style={{marginTop:6}}><label style={{display:"block",fontSize:11,color:C.dunkelgrau,marginBottom:3,fontWeight:600}}>Bemerkung</label>
-          <textarea value={edit.bemerkung||""} onChange={e=>setEdit(p=>({...p,bemerkung:e.target.value}))} rows={2} style={{width:"100%",padding:"6px 10px",border:`1px solid ${C.mittelgrau}`,borderRadius:4,fontSize:12,fontFamily:FONT.sans,resize:"vertical",boxSizing:"border-box"}}/>
-        </div>
-        <div style={{display:"flex",gap:6,marginTop:10}}><Btn variant="success" onClick={save}>💾 Speichern</Btn><Btn variant="secondary" onClick={closeEdit}>Abbrechen</Btn></div>
-      </div>
-    </div>);
-  };
 
   return(<div>
     <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:14,flexWrap:"wrap",gap:8}}>
@@ -1564,7 +1533,30 @@ function KundenManager({kunden,setKunden,user,toast,showConfirm}){
       </tr>)}</tbody>
     </table></div>
     {filtered.length===0&&!edit&&<Card><div style={{textAlign:"center",padding:30,color:C.dunkelgrau}}><div style={{fontSize:32,marginBottom:8}}>👥</div>Keine Kunden gefunden</div></Card>}
-    <EditPopover/>
+    {edit&&<div ref={editRef} style={{position:"fixed",top:0,left:0,right:0,bottom:0,zIndex:999}}>
+      <div style={{position:"fixed",top:0,left:0,right:0,bottom:0,background:"#0002"}} onClick={closeEdit}/>
+      <div style={{position:"fixed",top:"50%",left:"50%",transform:"translate(-50%,-50%)",zIndex:1000,background:C.weiss,border:`2px solid ${C.rot}`,borderRadius:8,padding:16,boxShadow:"0 8px 32px #0003",width:520,maxWidth:"95vw",maxHeight:"80vh",overflowY:"auto"}}>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}>
+          <span style={{fontSize:15,fontWeight:700,color:C.rot}}>{edit._id?"✏️ Kunde bearbeiten":"➕ Neuer Kunde"}</span>
+          <button onClick={closeEdit} style={{background:"none",border:"none",fontSize:18,cursor:"pointer",color:C.bgrau}}>✕</button>
+        </div>
+        <div className="rg2" style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"6px 12px"}}>
+          <Inp label="Firma / Name *" value={edit.name} onChange={v=>setEdit(p=>({...p,name:v}))}/>
+          <Inp label="Kundennummer" value={edit.kundennummer||""} onChange={v=>setEdit(p=>({...p,kundennummer:v}))}/>
+          <Inp label="Ansprechpartner" value={edit.ansprechpartner||""} onChange={v=>setEdit(p=>({...p,ansprechpartner:v}))}/>
+          <Inp label="Telefon" value={edit.telefon||""} onChange={v=>setEdit(p=>({...p,telefon:v}))}/>
+          <Inp label="E-Mail" value={edit.email||""} onChange={v=>setEdit(p=>({...p,email:v}))}/>
+          <Inp label="Anrede" value={edit.anrede||""} onChange={v=>setEdit(p=>({...p,anrede:v}))}/>
+          <Inp label="Rechnungsempfänger" value={edit.rechnungsempfaenger||""} onChange={v=>setEdit(p=>({...p,rechnungsempfaenger:v}))}/>
+          <Inp label="Straße" value={edit.reStrasse||edit.re_strasse||""} onChange={v=>setEdit(p=>({...p,reStrasse:v,re_strasse:v}))}/>
+          <Inp label="PLZ / Ort" value={edit.rePlzOrt||edit.re_plz_ort||""} onChange={v=>setEdit(p=>({...p,rePlzOrt:v,re_plz_ort:v}))}/>
+        </div>
+        <div style={{marginTop:6}}><label style={{display:"block",fontSize:11,color:C.dunkelgrau,marginBottom:3,fontWeight:600}}>Bemerkung</label>
+          <textarea value={edit.bemerkung||""} onChange={e=>setEdit(p=>({...p,bemerkung:e.target.value}))} rows={2} style={{width:"100%",padding:"6px 10px",border:`1px solid ${C.mittelgrau}`,borderRadius:4,fontSize:12,fontFamily:FONT.sans,resize:"vertical",boxSizing:"border-box"}}/>
+        </div>
+        <div style={{display:"flex",gap:6,marginTop:10}}><Btn variant="success" onClick={save}>💾 Speichern</Btn><Btn variant="secondary" onClick={closeEdit}>Abbrechen</Btn></div>
+      </div>
+    </div>}
   </div>);
 }
 
