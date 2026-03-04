@@ -983,9 +983,26 @@ function MailComposeModal({event:ev, currentEventId, user, stammdaten, dayCalcs,
   const anrede=ev?.anrede||"Sehr geehrte Damen und Herren,";
   const absender=user?.name||"";
   const orgName=stammdaten?.kvName||"BRK Kreisverband";
+
+  // Frist berechnen: 4 Wochen vor erster Veranstaltung
+  const ersteDatum=activeDays?.find(d=>d.date)?.date;
+  const fristInfo=(()=>{
+    if(!ersteDatum)return{fristStr:"",tageHin:"",hinweis:""};
+    const va=new Date(ersteDatum);
+    const frist=new Date(va);frist.setDate(frist.getDate()-28);
+    const heute=new Date();heute.setHours(0,0,0,0);
+    const tage=Math.ceil((frist-heute)/(1000*60*60*24));
+    const fristStr=frist.toLocaleDateString("de-DE",{day:"2-digit",month:"2-digit",year:"numeric"});
+    const vaStr=va.toLocaleDateString("de-DE",{day:"2-digit",month:"long",year:"numeric"});
+    let hinweis="";
+    if(tage<=0)hinweis=`Da Ihre Veranstaltung am ${vaStr} bereits in weniger als vier Wochen stattfindet, bitten wir Sie um besonders zeitnahe Rückmeldung.`;
+    else if(tage<=14)hinweis=`Bitte beachten Sie, dass die Rücksendefrist am ${fristStr} endet – das sind nur noch ${tage} Tage.`;
+    return{fristStr,tage,hinweis,vaStr};
+  })();
+
   const [to,setTo]=useState(ev?.email||"");
   const [subject,setSubject]=useState(`Angebot Sanitätswachdienst – ${ev?.name||""} ${ev?.auftragsnr||""}`);
-  const [body,setBody]=useState(`${anrede}\n\nanbei erhalten Sie unser Angebot für die sanitätsdienstliche Absicherung Ihrer Veranstaltung „${ev?.name||""}".\n\nBei Fragen stehen wir Ihnen gerne zur Verfügung.\n\nMit freundlichen Grüßen\n${absender}\n${orgName}`);
+  const [body,setBody]=useState(`${anrede}\n\nanbei erhalten Sie unser Angebot für die sanitätsdienstliche Absicherung Ihrer Veranstaltung „${ev?.name||""}". Wir haben die Anforderungen auf Basis Ihrer Angaben kalkuliert und freuen uns, Ihnen ein individuelles Angebot unterbreiten zu können.\n\nSollte Ihnen unser Angebot zusagen, senden Sie uns bitte das beigefügte Angebot sowie den Vertrag unterschrieben zurück. Damit wir die Einsatzplanung und Personalkoordination rechtzeitig sicherstellen können, benötigen wir die unterzeichneten Unterlagen spätestens vier Wochen vor Veranstaltungsbeginn${fristInfo.fristStr?` (bis zum ${fristInfo.fristStr})`:""}.${fristInfo.hinweis?"\n\n"+fristInfo.hinweis:""}\n\nBitte haben Sie Verständnis, dass bei kurzfristigen Beauftragungen innerhalb dieser Frist ein Aufschlag von bis zu 30 % auf die Einsatzkosten anfallen kann, da wir in diesem Fall gegebenenfalls auf externe Einsatzkräfte zurückgreifen müssen.\n\nFür Rückfragen stehen wir Ihnen selbstverständlich gerne zur Verfügung – sprechen Sie uns einfach an.\n\nMit freundlichen Grüßen\n${absender}\n${orgName}`);
   const [attachPdf,setAttachPdf]=useState("mappe");
   const [sending,setSending]=useState(false);
   const [sent,setSent]=useState(false);
