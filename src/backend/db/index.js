@@ -46,6 +46,22 @@ function init() {
     try {
       getDb().prepare("ALTER TABLE anfragen ADD COLUMN vorgang_id TEXT DEFAULT NULL").run();
     } catch {}
+    // Backfill: angenommene Anfragen mit BC + Vorgang-ID aus verknüpften Vorgängen
+    try {
+      const orphans = getDb().prepare("SELECT id FROM anfragen WHERE status='angenommen' AND (bereitschaft_code IS NULL OR vorgang_id IS NULL)").all();
+      if (orphans.length > 0) {
+        const vorgaenge = getDb().prepare("SELECT id, bereitschaft_code, data FROM vorgaenge").all();
+        for (const o of orphans) {
+          const match = vorgaenge.find(v => {
+            try { const d = JSON.parse(v.data); return d.event?.anfrageId === o.id; } catch { return false; }
+          });
+          if (match) {
+            getDb().prepare("UPDATE anfragen SET bereitschaft_code=?, vorgang_id=? WHERE id=?").run(match.bereitschaft_code, match.id, o.id);
+          }
+        }
+        console.log(`Backfill: ${orphans.length} Anfragen geprüft`);
+      }
+    } catch (e) { console.warn("Backfill Anfragen:", e.message); }
 
   // Nextcloud Defaults
   const cfgIns = getDb().prepare("INSERT OR IGNORE INTO app_config (key, value) VALUES (?, ?)");
