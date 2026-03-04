@@ -419,9 +419,11 @@ function AnfragenTab({user,toast,bereitschaften,onOpenVorgang}){
   const [selected,setSelected]=useState(null);
   const [filter,setFilter]=useState("alle");
   const [annBC,setAnnBC]=useState(user?.bereitschaftCode||"BSOB");
+  const [showReassign,setShowReassign]=useState(false);
+  const [reassignBC,setReassignBC]=useState("");
   const [cfm,setCfm]=useState(null);
 
-  const load=()=>{setLoading(true);API.getAnfragen().then(r=>{setAnfragen(r);setLoading(false);}).catch(e=>{toast(e.message,"error");setLoading(false);});};
+  const load=()=>{setLoading(true);API.getAnfragen().then(r=>{setAnfragen(r);if(selected){const upd=r.find(a=>a.id===selected.id);if(upd)setSelected(upd);}setLoading(false);}).catch(e=>{toast(e.message,"error");setLoading(false);});};
   useEffect(load,[]);
 
   const STATUS_C={neu:"#1565c0",angenommen:"#2e7d32",abgelehnt:"#c62828",archiviert:"#757575"};
@@ -478,13 +480,14 @@ function AnfragenTab({user,toast,bereitschaften,onOpenVorgang}){
       {filtered.map(a=>{
         const tage=parseTage(a.datum);
         const isNew=a.status==="neu";
-        return <div key={a.id} onClick={()=>setSelected(a)} style={{padding:"12px 16px",background:selected?.id===a.id?`${C.mittelblau}10`:"#fff",border:`1px solid ${selected?.id===a.id?C.mittelblau:C.mittelgrau}40`,borderLeft:`4px solid ${STATUS_C[a.status]||"#999"}`,borderRadius:8,marginBottom:6,cursor:"pointer",transition:"all 0.15s"}}>
+        return <div key={a.id} onClick={()=>{setSelected(a);setShowReassign(false);}} style={{padding:"12px 16px",background:selected?.id===a.id?`${C.mittelblau}10`:"#fff",border:`1px solid ${selected?.id===a.id?C.mittelblau:C.mittelgrau}40`,borderLeft:`4px solid ${STATUS_C[a.status]||"#999"}`,borderRadius:8,marginBottom:6,cursor:"pointer",transition:"all 0.15s"}}>
           <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start"}}>
             <div>
               <div style={{fontSize:14,fontWeight:700,color:isNew?C.mittelblau:C.dunkelgrau}}>{a.name||"Ohne Name"}</div>
               <div style={{fontSize:11,color:C.dunkelgrau,marginTop:2}}>
                 {a.veranstalter} · {a.ort||"-"}{tage.length>0?` · ${tage.length} Tag${tage.length>1?"e":""}`:""}{a.besucher?` · ~${a.besucher} Besucher`:""}
               </div>
+              {a.bereitschaft_code&&<div style={{fontSize:10,color:"#2e7d32",marginTop:2}}>→ {(bereitschaften||[]).find(b=>b.code===a.bereitschaft_code)?.name||a.bereitschaft_code}</div>}
             </div>
             <div style={{textAlign:"right"}}>
               <span style={{display:"inline-block",padding:"2px 8px",borderRadius:10,fontSize:10,fontWeight:600,background:(STATUS_C[a.status]||"#999")+"20",color:STATUS_C[a.status]||"#999"}}>{STATUS_L[a.status]||a.status}</span>
@@ -546,7 +549,24 @@ function AnfragenTab({user,toast,bereitschaften,onOpenVorgang}){
         </div>}
 
         {selected.status==="angenommen"&&<div style={{borderTop:`1px solid ${C.mittelgrau}40`,paddingTop:14,marginTop:14}}>
-          <div style={{padding:"10px 14px",background:"#e8f5e9",borderRadius:6,fontSize:12,color:"#2e7d32",marginBottom:8}}>✅ Diese Anfrage wurde angenommen. Der Vorgang wurde erstellt.</div>
+          <div style={{padding:"12px 14px",background:"#e8f5e9",borderRadius:6,marginBottom:10}}>
+            <div style={{fontSize:12,color:"#2e7d32",fontWeight:700,marginBottom:6}}>✅ Diese Anfrage wurde angenommen.</div>
+            <div style={{display:"flex",gap:16,fontSize:12,color:"#333",flexWrap:"wrap"}}>
+              <div><span style={{color:"#555"}}>Zugewiesen an:</span> <strong>{(bereitschaften||[]).find(b=>b.code===selected.bereitschaft_code)?.name||selected.bereitschaft_code||"Unbekannt"}</strong></div>
+              {selected.vorgang_id&&<div><span style={{color:"#555"}}>Vorgang:</span> <button onClick={()=>onOpenVorgang&&onOpenVorgang(selected.vorgang_id)} style={{background:"none",border:"none",color:C.mittelblau,fontWeight:700,cursor:"pointer",fontSize:12,fontFamily:FONT.sans,textDecoration:"underline",padding:0}}>{selected.vorgang_id}</button></div>}
+            </div>
+          </div>
+          {showReassign?<div style={{background:"#fff8e1",border:"1px solid #ffe082",borderRadius:6,padding:12,marginBottom:10}}>
+            <div style={{fontSize:12,fontWeight:600,color:"#555",marginBottom:6}}>Bereitschaft umzuweisen:</div>
+            <div style={{display:"flex",gap:8,alignItems:"center"}}>
+              <select value={reassignBC} onChange={e=>setReassignBC(e.target.value)} style={{flex:1,padding:"6px 10px",border:"1px solid #ccc",borderRadius:5,fontSize:12,fontFamily:FONT.sans}}>
+                {(bereitschaften||[]).map(b=><option key={b.code} value={b.code}>{b.name}</option>)}
+              </select>
+              <button onClick={async()=>{try{await API.anfrageUmzuweisen(selected.id,reassignBC);toast("Umzugewiesen an "+(bereitschaften||[]).find(b=>b.code===reassignBC)?.name,"success");setShowReassign(false);load();}catch(e){toast(e.message,"error");}}} disabled={reassignBC===selected.bereitschaft_code} style={{padding:"6px 14px",background:reassignBC===selected.bereitschaft_code?"#ccc":"#e65100",color:"#fff",border:"none",borderRadius:5,fontSize:12,fontWeight:600,cursor:"pointer",fontFamily:FONT.sans}}>Umzuweisen</button>
+              <button onClick={()=>setShowReassign(false)} style={{padding:"6px 10px",background:"#fff",border:"1px solid #ccc",borderRadius:5,fontSize:12,cursor:"pointer",fontFamily:FONT.sans}}>✕</button>
+            </div>
+          </div>
+          :<button onClick={()=>{setReassignBC(selected.bereitschaft_code||user?.bereitschaftCode||"BSOB");setShowReassign(true);}} style={{padding:"6px 14px",background:"#fff",border:"1px solid #ffe082",borderRadius:6,fontSize:11,cursor:"pointer",fontFamily:FONT.sans,color:"#e65100",fontWeight:600,marginBottom:10,display:"block"}}>🔄 Bereitschaft umzuweisen</button>}
           <button onClick={()=>archivieren(selected)} style={{padding:"8px 16px",background:C.hellgrau,border:`1px solid ${C.mittelgrau}`,borderRadius:6,fontSize:12,cursor:"pointer",fontFamily:FONT.sans}}>📦 Archivieren</button>
         </div>}
 

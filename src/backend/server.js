@@ -674,7 +674,7 @@ app.post("/api/anfragen/:id/annehmen", (req, res) => {
     ).run(vorgangId, bc, year, JSON.stringify(vorgang), req.session.user.sub);
 
     // Anfrage-Status updaten
-    db.getDb().prepare("UPDATE anfragen SET status='angenommen' WHERE id=?").run(anfrage.id);
+    db.getDb().prepare("UPDATE anfragen SET status='angenommen', bereitschaft_code=?, vorgang_id=? WHERE id=?").run(bc, vorgangId, anfrage.id);
 
     db.audit(req.session.user, "anfrage_angenommen", "anfrage", String(anfrage.id),
       `Vorgang ${auftragsnr} erstellt (${vorgangId})`);
@@ -682,6 +682,31 @@ app.post("/api/anfragen/:id/annehmen", (req, res) => {
     res.json({ success: true, vorgangId, auftragsnr, bc });
   } catch (e) {
     console.error("Anfrage annehmen:", e);
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// Anfrage umzuweisen (Bereitschaft ändern)
+app.post("/api/anfragen/:id/umzuweisen", requireAuth, (req, res) => {
+  try {
+    const anfrage = db.getDb().prepare("SELECT * FROM anfragen WHERE id=?").get(req.params.id);
+    if (!anfrage) return res.status(404).json({ error: "Anfrage nicht gefunden" });
+    if (!anfrage.vorgang_id) return res.status(400).json({ error: "Kein Vorgang zugeordnet" });
+
+    const newBc = req.body.bereitschaft_code;
+    if (!newBc) return res.status(400).json({ error: "Bereitschaft fehlt" });
+
+    // Vorgang-Bereitschaft updaten
+    db.getDb().prepare("UPDATE vorgaenge SET bereitschaft_code=? WHERE id=?").run(newBc, anfrage.vorgang_id);
+    // Anfrage-Bereitschaft updaten
+    db.getDb().prepare("UPDATE anfragen SET bereitschaft_code=? WHERE id=?").run(newBc, anfrage.id);
+
+    db.audit(req.session.user, "anfrage_umzugewiesen", "anfrage", String(anfrage.id),
+      `Vorgang ${anfrage.vorgang_id} umzugewiesen an ${newBc}`);
+
+    res.json({ success: true });
+  } catch (e) {
+    console.error("Anfrage umzuweisen:", e);
     res.status(500).json({ error: e.message });
   }
 });

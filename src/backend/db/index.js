@@ -40,6 +40,12 @@ function init() {
     try {
       getDb().prepare("ALTER TABLE anfragen ADD COLUMN deleted_at TEXT DEFAULT NULL").run();
     } catch {}
+    try {
+      getDb().prepare("ALTER TABLE anfragen ADD COLUMN bereitschaft_code TEXT DEFAULT NULL").run();
+    } catch {}
+    try {
+      getDb().prepare("ALTER TABLE anfragen ADD COLUMN vorgang_id TEXT DEFAULT NULL").run();
+    } catch {}
 
   // Nextcloud Defaults
   const cfgIns = getDb().prepare("INSERT OR IGNORE INTO app_config (key, value) VALUES (?, ?)");
