@@ -419,6 +419,7 @@ function AnfragenTab({user,toast,bereitschaften,onOpenVorgang}){
   const [selected,setSelected]=useState(null);
   const [filter,setFilter]=useState("alle");
   const [annBC,setAnnBC]=useState(user?.bereitschaftCode||"BSOB");
+  const [cfm,setCfm]=useState(null);
 
   const load=()=>{setLoading(true);API.getAnfragen().then(r=>{setAnfragen(r);setLoading(false);}).catch(e=>{toast(e.message,"error");setLoading(false);});};
   useEffect(load,[]);
@@ -429,28 +430,25 @@ function AnfragenTab({user,toast,bereitschaften,onOpenVorgang}){
   const filtered=anfragen.filter(a=>filter==="alle"||a.status===filter);
   const counts={};anfragen.forEach(a=>{counts[a.status]=(counts[a.status]||0)+1;});
 
-  const annehmen=async(a)=>{
-    if(!confirm(`Anfrage "${a.name}" annehmen und Vorgang für ${(bereitschaften||[]).find(b=>b.code===annBC)?.name||annBC} erstellen?`))return;
-    try{
+  const annehmen=(a)=>{
+    setCfm({title:"Anfrage annehmen",message:`„${a.name}" annehmen und Vorgang für ${(bereitschaften||[]).find(b=>b.code===annBC)?.name||annBC} erstellen?`,icon:"✅",confirmText:"Annehmen & Vorgang erstellen",accent:"#2e7d32",onConfirm:async()=>{setCfm(null);try{
       const r=await API.anfrageAnnehmen(a.id,annBC);
       if(r.success){toast(`✅ Vorgang ${r.auftragsnr} erstellt`,"success");load();setSelected(null);
         if(onOpenVorgang)onOpenVorgang(r.vorgangId);
       }else toast(r.error||"Fehler","error");
-    }catch(e){toast(e.message,"error");}
+    }catch(e){toast(e.message,"error");}}});
   };
 
-  const ablehnen=async(a)=>{
-    if(!confirm(`Anfrage "${a.name}" wirklich ablehnen?`))return;
-    try{await API.updateAnfrageStatus(a.id,"abgelehnt");toast("Anfrage abgelehnt","success");load();setSelected(null);}catch(e){toast(e.message,"error");}
+  const ablehnen=(a)=>{
+    setCfm({title:"Anfrage ablehnen",message:`„${a.name}" wirklich ablehnen? Der Veranstalter wird nicht automatisch benachrichtigt.`,icon:"✕",confirmText:"Ablehnen",accent:"#c62828",onConfirm:async()=>{setCfm(null);try{await API.updateAnfrageStatus(a.id,"abgelehnt");toast("Anfrage abgelehnt","success");load();setSelected(null);}catch(e){toast(e.message,"error");}}});
   };
 
   const archivieren=async(a)=>{
     try{await API.updateAnfrageStatus(a.id,"archiviert");load();setSelected(null);}catch(e){toast(e.message,"error");}
   };
 
-  const loeschen=async(a)=>{
-    if(!confirm("Anfrage endgültig löschen?"))return;
-    try{await API.deleteAnfrage(a.id);toast("Gelöscht","success");load();setSelected(null);}catch(e){toast(e.message,"error");}
+  const loeschen=(a)=>{
+    setCfm({title:"Endgültig löschen",message:"Diese Anfrage wird unwiderruflich gelöscht. Fortfahren?",icon:"🗑️",confirmText:"Endgültig löschen",accent:"#c62828",onConfirm:async()=>{setCfm(null);try{await API.deleteAnfrage(a.id);toast("Gelöscht","success");load();setSelected(null);}catch(e){toast(e.message,"error");}}});
   };
 
   const parseTage=(datum)=>{try{const t=JSON.parse(datum||"[]");return Array.isArray(t)?t:[];}catch{return[];}};
@@ -564,6 +562,8 @@ function AnfragenTab({user,toast,bereitschaften,onOpenVorgang}){
         </div>}
       </Card>
     </div>}
+
+    <ConfirmModal open={!!cfm} title={cfm?.title} message={cfm?.message} icon={cfm?.icon} confirmText={cfm?.confirmText} accent={cfm?.accent} onConfirm={cfm?.onConfirm} onCancel={()=>setCfm(null)}/>
   </div>);
 }
 
