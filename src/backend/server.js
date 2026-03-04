@@ -590,7 +590,18 @@ app.post("/api/anfrage", express.json(), (req, res) => {
 app.get("/api/anfragen", (req, res) => {
   if (!req.session?.user) return res.status(401).json({ error: "Nicht authentifiziert" });
   try {
-    const rows = db.getDb().prepare("SELECT * FROM anfragen ORDER BY created_at DESC").all();
+    const rows = db.getDb().prepare(`
+      SELECT a.*, v.data AS vorgang_data 
+      FROM anfragen a 
+      LEFT JOIN vorgaenge v ON a.vorgang_id = v.id 
+      ORDER BY a.created_at DESC
+    `).all().map(r => {
+      if (r.vorgang_data) {
+        try { r.auftragsnr = JSON.parse(r.vorgang_data).event?.auftragsnr || null; } catch {}
+      }
+      delete r.vorgang_data;
+      return r;
+    });
     res.json(rows);
   } catch (e) { console.error("Anfragen laden:", e); res.status(500).json({ error: "Serverfehler" }); }
 });

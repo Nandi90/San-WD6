@@ -553,7 +553,7 @@ function AnfragenTab({user,toast,bereitschaften,onOpenVorgang}){
             <div style={{fontSize:12,color:"#2e7d32",fontWeight:700,marginBottom:6}}>✅ Diese Anfrage wurde angenommen.</div>
             <div style={{display:"flex",gap:16,fontSize:12,color:"#333",flexWrap:"wrap"}}>
               <div><span style={{color:"#555"}}>Zugewiesen an:</span> <strong>{(bereitschaften||[]).find(b=>b.code===selected.bereitschaft_code)?.name||selected.bereitschaft_code||"Unbekannt"}</strong></div>
-              {selected.vorgang_id&&<div><span style={{color:"#555"}}>Vorgang:</span> <button onClick={()=>onOpenVorgang&&onOpenVorgang(selected.vorgang_id)} style={{background:"none",border:"none",color:C.mittelblau,fontWeight:700,cursor:"pointer",fontSize:12,fontFamily:FONT.sans,textDecoration:"underline",padding:0}}>{selected.vorgang_id}</button></div>}
+              {selected.vorgang_id&&<div><span style={{color:"#555"}}>Vorgang:</span> <button onClick={()=>onOpenVorgang&&onOpenVorgang(selected.vorgang_id)} style={{background:"none",border:"none",color:C.mittelblau,fontWeight:700,cursor:"pointer",fontSize:12,fontFamily:FONT.sans,textDecoration:"underline",padding:0}}>{selected.auftragsnr||selected.vorgang_id}</button></div>}
             </div>
           </div>
           {showReassign?<div style={{background:"#fff8e1",border:"1px solid #ffe082",borderRadius:6,padding:12,marginBottom:10}}>
