@@ -1265,8 +1265,9 @@ function FiBuModal({currentEventId,event:ev,user,stammdaten,dayCalcs,totalCosts,
   const [subject,setSubject]=useState(`FiBu-Abrechnung – ${ev?.name||""} ${ev?.auftragsnr||""}`);
   const [hasFremdHelfer,setHasFremdHelfer]=useState(false);
   const [fremdHelfer,setFremdHelfer]=useState([{bc:otherBCs[0]?.code||"",anzahl:""}]);
-  const [hasFremdFzg,setHasFremdFzg]=useState(false);
-  const [fremdFzg,setFremdFzg]=useState([{bc:otherBCs[0]?.code||"",typ:"KTW",kennzeichen:""}]);
+  const [externeHelfer,setExterneHelfer]=useState("");
+  const [hasFzg,setHasFzg]=useState(false);
+  const [fahrzeuge,setFahrzeuge]=useState([{typ:"KTW",kennzeichen:"",bc:""}]);
   const [sending,setSending]=useState(false);
   const [sent,setSent]=useState(false);
   const [notifiedBCs,setNotifiedBCs]=useState([]);
@@ -1280,21 +1281,22 @@ function FiBuModal({currentEventId,event:ev,user,stammdaten,dayCalcs,totalCosts,
       const b=BEREITSCHAFTEN.find(x=>x.code===h.bc);
       return`- ${h.anzahl} Helfer von ${b?.name||h.bc}`;
     });
-    return lines.length?"\n\nHelfer anderer Bereitschaften:\n"+lines.join("\n"):"";
+    if(externeHelfer.trim())lines.push(`- Externe: ${externeHelfer.trim()}`);
+    return lines.length?"\n\nHelfer anderer Bereitschaften / Externe:\n"+lines.join("\n"):"";
   };
   const fzgSummary=()=>{
-    if(!hasFremdFzg)return"";
-    const lines=fremdFzg.filter(f=>f.bc&&f.typ).map(f=>{
-      const b=BEREITSCHAFTEN.find(x=>x.code===f.bc);
-      return`- ${f.typ}${f.kennzeichen?" ("+f.kennzeichen+")":""} von ${b?.name||f.bc}`;
+    if(!hasFzg)return"";
+    const lines=fahrzeuge.filter(f=>f.typ||f.kennzeichen).map(f=>{
+      const bcInfo=f.bc?` (${BEREITSCHAFTEN.find(x=>x.code===f.bc)?.name||f.bc})`:"";
+      return`- ${f.typ||"Fahrzeug"}${f.kennzeichen?" – "+f.kennzeichen:""}${bcInfo}`;
     });
-    return lines.length?"\n\nFahrzeuge anderer Bereitschaften:\n"+lines.join("\n"):"";
+    return lines.length?"\n\nEingesetzte Fahrzeuge:\n"+lines.join("\n"):"";
   };
 
   const bodyText=`Sehr geehrte Damen und Herren,\n\nanbei die Abrechnung für den Sanitätswachdienst der Veranstaltung „${ev?.name||""}" (${ev?.auftragsnr||""}).\n\nVeranstalter: ${ev?.veranstalter||""}\nDatum: ${activeDays?.filter(d=>d.date).map(d=>new Date(d.date).toLocaleDateString("de-DE")).join(", ")||""}\nGesamtkosten: ${totalCosts?new Intl.NumberFormat("de-DE",{minimumFractionDigits:2}).format(totalCosts)+" €":""}${helferSummary()}${fzgSummary()}\n\nDas Angebot liegt als PDF bei.\n\nMit freundlichen Grüßen\n${absender}\n${ownBC.name} · ${orgName}`;
 
   const [body,setBody]=useState("");
-  useEffect(()=>{setBody(bodyText);},[hasFremdHelfer,hasFremdFzg,fremdHelfer,fremdFzg]);
+  useEffect(()=>{setBody(bodyText);},[hasFremdHelfer,hasFzg,fremdHelfer,fahrzeuge,externeHelfer]);
   // Init body
   useEffect(()=>{setBody(bodyText);},[]);
 
@@ -1308,7 +1310,7 @@ function FiBuModal({currentEventId,event:ev,user,stammdaten,dayCalcs,totalCosts,
       const r=await API.sendFiBuMail(currentEventId,{
         to:fibuEmail,subject,body,
         fremdHelfer:hasFremdHelfer?fremdHelfer.filter(h=>h.bc&&h.anzahl):[],
-        fremdFahrzeuge:hasFremdFzg?fremdFzg.filter(f=>f.bc&&f.typ):[],
+        fremdFahrzeuge:hasFzg?fahrzeuge.filter(f=>f.typ||f.kennzeichen):[],
         dayCalcs,totalCosts,activeDays
       });
       if(r.success){setSent(true);setNotifiedBCs(r.notifiedBCs||[]);toast("✉️ FiBu-Mail gesendet","success");if(onSent)onSent();}
@@ -1320,9 +1322,9 @@ function FiBuModal({currentEventId,event:ev,user,stammdaten,dayCalcs,totalCosts,
   const addHelfer=()=>setFremdHelfer(p=>[...p,{bc:otherBCs[0]?.code||"",anzahl:""}]);
   const removeHelfer=(i)=>setFremdHelfer(p=>p.filter((_,j)=>j!==i));
   const updHelfer=(i,k,v)=>setFremdHelfer(p=>p.map((h,j)=>j===i?{...h,[k]:v}:h));
-  const addFzg=()=>setFremdFzg(p=>[...p,{bc:otherBCs[0]?.code||"",typ:"KTW",kennzeichen:""}]);
-  const removeFzg=(i)=>setFremdFzg(p=>p.filter((_,j)=>j!==i));
-  const updFzg=(i,k,v)=>setFremdFzg(p=>p.map((f,j)=>j===i?{...f,[k]:v}:f));
+  const addFzg=()=>setFahrzeuge(p=>[...p,{typ:"KTW",kennzeichen:"",bc:""}]);
+  const removeFzg=(i)=>setFahrzeuge(p=>p.filter((_,j)=>j!==i));
+  const updFzg=(i,k,v)=>setFahrzeuge(p=>p.map((f,j)=>j===i?{...f,[k]:v}:f));
 
   const sI={width:"100%",padding:"8px 10px",border:"1px solid #ccc",borderRadius:5,fontSize:12,fontFamily:FONT.sans,boxSizing:"border-box"};
   const sL={fontSize:11,fontWeight:600,color:"#555",marginBottom:3,display:"block"};
@@ -1375,9 +1377,10 @@ function FiBuModal({currentEventId,event:ev,user,stammdaten,dayCalcs,totalCosts,
           <label style={{display:"flex",alignItems:"center",gap:10,cursor:"pointer",marginBottom:hasFremdHelfer?12:0}} onClick={()=>setHasFremdHelfer(!hasFremdHelfer)}>
             <div style={{width:20,height:20,borderRadius:4,border:`2px solid ${hasFremdHelfer?"#e65100":"#bbb"}`,background:hasFremdHelfer?"#e65100":"transparent",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>{hasFremdHelfer&&<svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M2 6l3 3 5-5" stroke="#fff" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/></svg>}</div>
             <div><div style={{fontSize:13,fontWeight:600}}>👥 Helfer anderer Bereitschaften</div>
-              <div style={{fontSize:10,color:"#888"}}>Waren Helfer einer anderen Bereitschaft im Einsatz?</div></div>
+              <div style={{fontSize:10,color:"#888"}}>Waren Helfer einer anderen Bereitschaft oder externer Organisation im Einsatz?</div></div>
           </label>
           {hasFremdHelfer&&<div>
+            <div style={{fontSize:11,fontWeight:600,color:"#555",marginBottom:6}}>BRK-Bereitschaften:</div>
             {fremdHelfer.map((h,i)=><div key={i} style={{display:"flex",gap:8,alignItems:"center",marginBottom:6}}>
               <select value={h.bc} onChange={e=>updHelfer(i,"bc",e.target.value)} style={{...sI,flex:2}}>
                 {otherBCs.map(b=><option key={b.code} value={b.code}>{b.name}</option>)}
@@ -1385,37 +1388,41 @@ function FiBuModal({currentEventId,event:ev,user,stammdaten,dayCalcs,totalCosts,
               <input type="number" min="1" placeholder="Anz." value={h.anzahl} onChange={e=>updHelfer(i,"anzahl",e.target.value)} style={{...sI,flex:1,textAlign:"center"}}/>
               {fremdHelfer.length>1&&<button onClick={()=>removeHelfer(i)} style={{background:"none",border:"none",color:C.rot,cursor:"pointer",fontSize:14,padding:2}}>✕</button>}
             </div>)}
-            <button onClick={addHelfer} style={{background:"none",border:"1px dashed #bbb",borderRadius:4,padding:"4px 12px",fontSize:11,cursor:"pointer",color:"#555",fontFamily:FONT.sans}}>+ Weitere Bereitschaft</button>
+            <button onClick={addHelfer} style={{background:"none",border:"1px dashed #bbb",borderRadius:4,padding:"4px 12px",fontSize:11,cursor:"pointer",color:"#555",fontFamily:FONT.sans,marginBottom:12}}>+ Weitere Bereitschaft</button>
+            <div style={{fontSize:11,fontWeight:600,color:"#555",marginBottom:4,marginTop:4}}>Externe Helfer (ohne Benachrichtigung):</div>
+            <input value={externeHelfer} onChange={e=>setExterneHelfer(e.target.value)} placeholder="z.B. 2 Helfer THW, 1 Helfer ASB Ingolstadt..." style={{...sI}}/>
+            <div style={{fontSize:10,color:"#888",marginTop:3}}>Freitext – diese Angabe fließt in die Mail ein, es wird aber keine Benachrichtigung versendet.</div>
           </div>}
         </div>
 
-        {/* Fahrzeuge anderer Bereitschaften */}
-        <div style={{marginBottom:14,padding:"14px 16px",background:hasFremdFzg?"#e3f2fd":"#fafafa",border:`1px solid ${hasFremdFzg?"#90caf9":"#e0e0e0"}`,borderRadius:8}}>
-          <label style={{display:"flex",alignItems:"center",gap:10,cursor:"pointer",marginBottom:hasFremdFzg?12:0}} onClick={()=>setHasFremdFzg(!hasFremdFzg)}>
-            <div style={{width:20,height:20,borderRadius:4,border:`2px solid ${hasFremdFzg?"#1565c0":"#bbb"}`,background:hasFremdFzg?"#1565c0":"transparent",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>{hasFremdFzg&&<svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M2 6l3 3 5-5" stroke="#fff" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/></svg>}</div>
-            <div><div style={{fontSize:13,fontWeight:600}}>🚑 Fahrzeuge anderer Bereitschaften</div>
-              <div style={{fontSize:10,color:"#888"}}>Wurden Fahrzeuge einer anderen Bereitschaft eingesetzt?</div></div>
+        {/* Fahrzeuge */}
+        <div style={{marginBottom:14,padding:"14px 16px",background:hasFzg?"#e3f2fd":"#fafafa",border:`1px solid ${hasFzg?"#90caf9":"#e0e0e0"}`,borderRadius:8}}>
+          <label style={{display:"flex",alignItems:"center",gap:10,cursor:"pointer",marginBottom:hasFzg?12:0}} onClick={()=>setHasFzg(!hasFzg)}>
+            <div style={{width:20,height:20,borderRadius:4,border:`2px solid ${hasFzg?"#1565c0":"#bbb"}`,background:hasFzg?"#1565c0":"transparent",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>{hasFzg&&<svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M2 6l3 3 5-5" stroke="#fff" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/></svg>}</div>
+            <div><div style={{fontSize:13,fontWeight:600}}>🚑 Eingesetzte Fahrzeuge</div>
+              <div style={{fontSize:10,color:"#888"}}>Fahrzeuge mit Typ und Kennzeichen angeben</div></div>
           </label>
-          {hasFremdFzg&&<div>
-            {fremdFzg.map((f,i)=><div key={i} style={{display:"flex",gap:6,alignItems:"center",marginBottom:6,flexWrap:"wrap"}}>
-              <select value={f.bc} onChange={e=>updFzg(i,"bc",e.target.value)} style={{...sI,flex:2,minWidth:120}}>
-                {otherBCs.map(b=><option key={b.code} value={b.code}>{b.name}</option>)}
-              </select>
+          {hasFzg&&<div>
+            {fahrzeuge.map((f,i)=><div key={i} style={{display:"flex",gap:6,alignItems:"center",marginBottom:6,flexWrap:"wrap"}}>
               <select value={f.typ} onChange={e=>updFzg(i,"typ",e.target.value)} style={{...sI,flex:1,minWidth:80}}>
                 {["KTW","RTW","GKTW","MTW","EL-KFZ","SEG","Sonstige"].map(t=><option key={t} value={t}>{t}</option>)}
               </select>
-              <input placeholder="Kennzeichen" value={f.kennzeichen} onChange={e=>updFzg(i,"kennzeichen",e.target.value)} style={{...sI,flex:1.5,minWidth:100}}/>
-              {fremdFzg.length>1&&<button onClick={()=>removeFzg(i)} style={{background:"none",border:"none",color:C.rot,cursor:"pointer",fontSize:14,padding:2}}>✕</button>}
+              <input placeholder="Kennzeichen" value={f.kennzeichen} onChange={e=>updFzg(i,"kennzeichen",e.target.value)} style={{...sI,flex:1.5,minWidth:120}}/>
+              <select value={f.bc||""} onChange={e=>updFzg(i,"bc",e.target.value)} style={{...sI,flex:2,minWidth:120,color:f.bc?"":C.bgrau}}>
+                <option value="">Eigene Bereitschaft</option>
+                {otherBCs.map(b=><option key={b.code} value={b.code}>{b.name}</option>)}
+              </select>
+              {fahrzeuge.length>1&&<button onClick={()=>removeFzg(i)} style={{background:"none",border:"none",color:C.rot,cursor:"pointer",fontSize:14,padding:2}}>✕</button>}
             </div>)}
             <button onClick={addFzg} style={{background:"none",border:"1px dashed #bbb",borderRadius:4,padding:"4px 12px",fontSize:11,cursor:"pointer",color:"#555",fontFamily:FONT.sans}}>+ Weiteres Fahrzeug</button>
           </div>}
         </div>
 
         {/* Benachrichtigungshinweis */}
-        {(hasFremdHelfer||hasFremdFzg)&&(()=>{
+        {(()=>{
           const allBCs=new Set();
           if(hasFremdHelfer)fremdHelfer.filter(h=>h.bc&&h.anzahl).forEach(h=>allBCs.add(h.bc));
-          if(hasFremdFzg)fremdFzg.filter(f=>f.bc&&f.typ).forEach(f=>allBCs.add(f.bc));
+          if(hasFzg)fahrzeuge.filter(f=>f.bc).forEach(f=>allBCs.add(f.bc));
           if(allBCs.size===0)return null;
           return <div style={{marginBottom:14,padding:"10px 14px",background:"#e8f5e9",border:"1px solid #a5d6a7",borderRadius:6,fontSize:11,color:"#2e7d32"}}>
             <div style={{fontWeight:700,marginBottom:4}}>📨 Automatische Benachrichtigung an:</div>

@@ -1249,8 +1249,8 @@ app.post("/api/mail/fibu/:id", requireAuth, async (req, res) => {
     const notifiedBCs = [];
     if (fremdHelfer?.length > 0 || fremdFahrzeuge?.length > 0) {
       const allBCs = new Set();
-      (fremdHelfer || []).forEach(h => allBCs.add(h.bc));
-      (fremdFahrzeuge || []).forEach(f => allBCs.add(f.bc));
+      (fremdHelfer || []).forEach(h => { if(h.bc) allBCs.add(h.bc); });
+      (fremdFahrzeuge || []).forEach(f => { if(f.bc) allBCs.add(f.bc); });
 
       for (const bcCode of allBCs) {
         const bcRow = dbi.prepare("SELECT name, email FROM bereitschaften WHERE code=?").get(bcCode);
