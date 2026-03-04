@@ -124,4 +124,24 @@ router.post("/import", requireWriteAccess, (req, res) => {
   res.json({ success: true, imported, skipped });
 });
 
+// POST batch delete
+router.post("/batch-delete", requireWriteAccess, (req, res) => {
+  const bc = getBereitschaftCode(req);
+  const { ids } = req.body;
+  if (!Array.isArray(ids) || ids.length === 0) return res.status(400).json({ error: "Keine IDs angegeben" });
+  const isAdmin = req.session.user.rolle === "admin";
+  const stmt = isAdmin
+    ? getDb().prepare("DELETE FROM kunden WHERE id = ?")
+    : getDb().prepare("DELETE FROM kunden WHERE id = ? AND bereitschaft_code = ?");
+  let count = 0;
+  getDb().transaction(() => {
+    for (const id of ids) {
+      const r = isAdmin ? stmt.run(id) : stmt.run(id, bc);
+      if (r.changes > 0) count++;
+    }
+  })();
+  audit(req.session.user, "batch_delete", "kunden", `${count} gelöscht`, `IDs: ${ids.join(",")}`);
+  res.json({ success: true, deleted: count });
+});
+
 module.exports = router;

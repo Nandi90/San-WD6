@@ -1425,83 +1425,146 @@ function HistoryWidget({history}){
 // ═══════════════════════════════════════════════════════════════════════════
 function KundenManager({kunden,setKunden,user,toast,showConfirm}){
   const [edit,setEdit]=useState(null);
+  const [editAnchor,setEditAnchor]=useState(null);
   const [csvMsg,setCsvMsg]=useState("");
   const [search,setSearch]=useState("");
+  const [selected,setSelected]=useState(new Set());
+  const [bcFilter,setBcFilter]=useState("alle");
+  const editRef=useRef(null);
+  const isAdmin=user?.rolle==="admin";
   const empty={name:"",kundennummer:"",ansprechpartner:"",telefon:"",email:"",rechnungsempfaenger:"",reStrasse:"",rePlzOrt:"",anrede:"Sehr geehrte Damen und Herren,",bemerkung:""};
-  const filtered=kunden.filter(k=>{const s=search.toLowerCase();return !s||k.name?.toLowerCase().includes(s)||k.kundennummer?.toLowerCase().includes(s)||k.ansprechpartner?.toLowerCase().includes(s);});
-  const save=async()=>{if(!edit?.name)return;try{await API.saveKunde(edit);const k=await API.getKunden();setKunden(k);setEdit(null);}catch(e){toast(e.message,"error");}};
-  const del=async(name)=>{if(!await showConfirm({title:"Kunde löschen",message:`"${name}" wirklich löschen?`,confirmLabel:"Löschen",variant:"danger"}))return;try{await API.deleteKunde(name);const k=await API.getKunden();setKunden(k);}catch(e){toast(e.message,"error");}};
+  const bcName=(code)=>BEREITSCHAFTEN.find(b=>b.code===code)?.short||code||"?";
+  const bcColor=(code)=>{const m={"BSOB":"#1565c0","BND":"#2e7d32","BBGH":"#6a1b9a","BKAHU":"#e65100","BKK":"#00838f","BWEIG":"#4e342e","KBL":"#c62828"};return m[code]||"#555";};
+  const filtered=kunden.filter(k=>{
+    if(bcFilter!=="alle"&&k.bereitschaft_code!==bcFilter)return false;
+    const s=search.toLowerCase();return !s||k.name?.toLowerCase().includes(s)||k.kundennummer?.toLowerCase().includes(s)||k.ansprechpartner?.toLowerCase().includes(s)||k.email?.toLowerCase().includes(s);
+  });
+  // Group by BC for display
+  const grouped=useMemo(()=>{
+    const g={};filtered.forEach(k=>{const bc=k.bereitschaft_code||"?";if(!g[bc])g[bc]=[];g[bc].push(k);});
+    return Object.entries(g).sort((a,b)=>a[0].localeCompare(b[0]));
+  },[filtered]);
+
+  const openEdit=(k,e)=>{
+    const rect=e?.currentTarget?.getBoundingClientRect();
+    setEditAnchor(rect?{top:rect.top+window.scrollY,left:rect.left}:null);
+    setEdit(k?{...k,_id:k.id,_origName:k.name}:{...empty,_id:null,_origName:null});
+  };
+  const closeEdit=()=>{setEdit(null);setEditAnchor(null);};
+  const save=async()=>{
+    if(!edit?.name){toast("Name ist erforderlich","error");return;}
+    try{
+      const data={name:edit.name,kundennummer:edit.kundennummer||"",ansprechpartner:edit.ansprechpartner||"",telefon:edit.telefon||"",email:edit.email||"",rechnungsempfaenger:edit.rechnungsempfaenger||edit.name,re_strasse:edit.reStrasse||edit.re_strasse||"",re_plz_ort:edit.rePlzOrt||edit.re_plz_ort||"",anrede:edit.anrede||"Sehr geehrte Damen und Herren,",bemerkung:edit.bemerkung||""};
+      if(edit._id){await API.updateKunde(edit._id,data);}else{await API.saveKunde(data);}
+      const k=await API.getKunden();setKunden(k);closeEdit();toast("Kunde gespeichert","success");
+    }catch(e){toast(e.message,"error");}
+  };
+  const del=async(k)=>{
+    if(!await showConfirm({title:"Kunde löschen",message:`"${k.name}" wirklich löschen?`,confirmLabel:"Löschen",variant:"danger"}))return;
+    try{await API.deleteKunde(k.id);const r=await API.getKunden();setKunden(r);selected.delete(k.id);setSelected(new Set(selected));}catch(e){toast(e.message,"error");}
+  };
+  const batchDel=async()=>{
+    if(selected.size===0)return;
+    if(!await showConfirm({title:`${selected.size} Kunden löschen`,message:`Wirklich ${selected.size} ausgewählte Kunden endgültig löschen?`,confirmLabel:`${selected.size} löschen`,variant:"danger"}))return;
+    try{await API.batchDeleteKunden([...selected]);const k=await API.getKunden();setKunden(k);setSelected(new Set());toast(`${selected.size} Kunden gelöscht`,"success");}catch(e){toast(e.message,"error");}
+  };
+  const toggleSel=(id)=>{const s=new Set(selected);if(s.has(id))s.delete(id);else s.add(id);setSelected(s);};
+  const toggleAll=()=>{if(selected.size===filtered.length){setSelected(new Set());}else{setSelected(new Set(filtered.map(k=>k.id)));}};
   const handleCSV=async(e)=>{
     const file=e.target.files[0];if(!file)return;setCsvMsg("Importiere...");
-    const text=await file.text();const lines=text.split("\n").filter(l=>l.trim());
-    if(lines.length<2){setCsvMsg("Keine Daten gefunden");return;}
-    const headers=lines[0].split(";").map(h=>h.trim().replace(/"/g,""));
-    const nameIdx=headers.findIndex(h=>/firma|name|organisation|company/i.test(h));
-    const apIdx=headers.findIndex(h=>/ansprech|kontakt|contact/i.test(h));
-    const telIdx=headers.findIndex(h=>/telefon|tel|phone/i.test(h));
-    const mailIdx=headers.findIndex(h=>/mail|email/i.test(h));
-    const strIdx=headers.findIndex(h=>/stra(ss|ß)e|street|adress/i.test(h));
-    const plzIdx=headers.findIndex(h=>/plz|ort|city|postleitzahl/i.test(h));
-    const nrIdx=headers.findIndex(h=>/nummer|nr|number|kunden/i.test(h));
-    if(nameIdx<0){setCsvMsg("Spalte 'Firma/Name' nicht gefunden");return;}
-    let count=0;
-    for(let i=1;i<lines.length;i++){
-      const cols=lines[i].split(";").map(c=>c.trim().replace(/^"|"$/g,""));
-      const name=cols[nameIdx];if(!name)continue;
-      const kunde={name,kundennummer:nrIdx>=0?cols[nrIdx]||"":"",ansprechpartner:apIdx>=0?cols[apIdx]||"":"",telefon:telIdx>=0?cols[telIdx]||"":"",email:mailIdx>=0?cols[mailIdx]||"":"",rechnungsempfaenger:name,reStrasse:strIdx>=0?cols[strIdx]||"":"",rePlzOrt:plzIdx>=0?cols[plzIdx]||"":"",anrede:"Sehr geehrte Damen und Herren,",bemerkung:""};
-      try{await API.saveKunde(kunde);count++;}catch(e){console.error("Fehler:",e);}
-    }
-    const k=await API.getKunden();setKunden(k);
-    setCsvMsg(`${count} Kunden importiert`);setTimeout(()=>setCsvMsg(""),5000);
+    try{const text=await file.text();const r=await API.importKunden(text);const k=await API.getKunden();setKunden(k);setCsvMsg(`${r.imported} Kunden importiert${r.skipped?`, ${r.skipped} übersprungen`:""}`);setTimeout(()=>setCsvMsg(""),5000);}catch(e){setCsvMsg("Fehler: "+e.message);}
   };
+  // Close popover on outside click
+  useEffect(()=>{if(!edit)return;const h=(e)=>{if(editRef.current&&!editRef.current.contains(e.target))closeEdit();};const t=setTimeout(()=>document.addEventListener("mousedown",h),100);return()=>{clearTimeout(t);document.removeEventListener("mousedown",h);};},[edit]);
+
+  const EditPopover=()=>{
+    if(!edit)return null;
+    const style={position:editAnchor?"absolute":"relative",top:editAnchor?Math.min(editAnchor.top-40,window.innerHeight-500):undefined,zIndex:1000,background:C.weiss,border:`2px solid ${C.rot}`,borderRadius:8,padding:16,boxShadow:"0 8px 32px #0003",width:520,maxWidth:"95vw",maxHeight:"80vh",overflowY:"auto"};
+    return(<div ref={editRef} style={editAnchor?{position:"fixed",top:0,left:0,right:0,bottom:0,zIndex:999}:{}}>{editAnchor&&<div style={{position:"fixed",top:0,left:0,right:0,bottom:0,background:"#0002"}} onClick={closeEdit}/>}
+      <div style={editAnchor?{...style,position:"fixed",top:"50%",left:"50%",transform:"translate(-50%,-50%)"}:style}>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}>
+          <span style={{fontSize:15,fontWeight:700,color:C.rot}}>{edit._id?"✏️ Kunde bearbeiten":"➕ Neuer Kunde"}</span>
+          <button onClick={closeEdit} style={{background:"none",border:"none",fontSize:18,cursor:"pointer",color:C.bgrau}}>✕</button>
+        </div>
+        <div className="rg2" style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"6px 12px"}}>
+          <Inp label="Firma / Name *" value={edit.name} onChange={v=>setEdit(p=>({...p,name:v}))}/>
+          <Inp label="Kundennummer" value={edit.kundennummer||""} onChange={v=>setEdit(p=>({...p,kundennummer:v}))}/>
+          <Inp label="Ansprechpartner" value={edit.ansprechpartner||""} onChange={v=>setEdit(p=>({...p,ansprechpartner:v}))}/>
+          <Inp label="Telefon" value={edit.telefon||""} onChange={v=>setEdit(p=>({...p,telefon:v}))}/>
+          <Inp label="E-Mail" value={edit.email||""} onChange={v=>setEdit(p=>({...p,email:v}))}/>
+          <Inp label="Anrede" value={edit.anrede||""} onChange={v=>setEdit(p=>({...p,anrede:v}))}/>
+          <Inp label="Rechnungsempfänger" value={edit.rechnungsempfaenger||""} onChange={v=>setEdit(p=>({...p,rechnungsempfaenger:v}))}/>
+          <Inp label="Straße" value={edit.reStrasse||edit.re_strasse||""} onChange={v=>setEdit(p=>({...p,reStrasse:v,re_strasse:v}))}/>
+          <Inp label="PLZ / Ort" value={edit.rePlzOrt||edit.re_plz_ort||""} onChange={v=>setEdit(p=>({...p,rePlzOrt:v,re_plz_ort:v}))}/>
+        </div>
+        <div style={{marginTop:6}}><label style={{display:"block",fontSize:11,color:C.dunkelgrau,marginBottom:3,fontWeight:600}}>Bemerkung</label>
+          <textarea value={edit.bemerkung||""} onChange={e=>setEdit(p=>({...p,bemerkung:e.target.value}))} rows={2} style={{width:"100%",padding:"6px 10px",border:`1px solid ${C.mittelgrau}`,borderRadius:4,fontSize:12,fontFamily:FONT.sans,resize:"vertical",boxSizing:"border-box"}}/>
+        </div>
+        <div style={{display:"flex",gap:6,marginTop:10}}><Btn variant="success" onClick={save}>💾 Speichern</Btn><Btn variant="secondary" onClick={closeEdit}>Abbrechen</Btn></div>
+      </div>
+    </div>);
+  };
+
   return(<div>
-    <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:14}}>
-      <div><h2 style={{margin:0,fontSize:18,fontWeight:700}}>👥 Kundenverwaltung</h2><p style={{margin:"2px 0 0",fontSize:12,color:C.dunkelgrau}}>{kunden.length} Kunden</p></div>
-      <div style={{display:"flex",gap:6}}>
+    <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:14,flexWrap:"wrap",gap:8}}>
+      <div><h2 style={{margin:0,fontSize:18,fontWeight:700}}>👥 Kundenverwaltung</h2><p style={{margin:"2px 0 0",fontSize:12,color:C.dunkelgrau}}>{kunden.length} Kunden{bcFilter!=="alle"?` (Filter: ${bcName(bcFilter)})`:""}</p></div>
+      <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
+        {selected.size>0&&<Btn small variant="ghost" onClick={batchDel} style={{color:C.rot}}>🗑 {selected.size} löschen</Btn>}
         <Btn small variant="secondary" onClick={()=>{const el=document.createElement("input");el.type="file";el.accept=".csv";el.onchange=handleCSV;el.click();}}>📥 CSV Import</Btn>
-        <Btn onClick={()=>setEdit({...empty})} icon="➕">Neuer Kunde</Btn>
+        <Btn onClick={(e)=>openEdit(null,e)} icon="➕">Neuer Kunde</Btn>
       </div>
     </div>
     {csvMsg&&<div style={{padding:"8px 14px",background:"#e8f5e9",borderRadius:6,marginBottom:10,fontSize:12,color:"#2e7d32"}}>{csvMsg}</div>}
-    <div style={{marginBottom:10}}><input type="text" value={search} onChange={e=>setSearch(e.target.value)} placeholder="Kunden suchen..." style={{width:"100%",padding:"8px 12px",border:`1px solid ${C.mittelgrau}`,borderRadius:4,fontSize:13,fontFamily:FONT.sans,boxSizing:"border-box"}}/></div>
-    {edit&&<Card title={edit.name?"Kunde bearbeiten":"Neuer Kunde"} accent="#1a7a3a">
-      <div className="rg2" style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"0 16px"}}>
-        <Inp label="Firma / Name *" value={edit.name} onChange={v=>setEdit(p=>({...p,name:v}))}/>
-        <Inp label="Kundennummer" value={edit.kundennummer||""} onChange={v=>setEdit(p=>({...p,kundennummer:v}))}/>
-        <Inp label="Ansprechpartner" value={edit.ansprechpartner} onChange={v=>setEdit(p=>({...p,ansprechpartner:v}))}/>
-        <Inp label="Telefon" value={edit.telefon} onChange={v=>setEdit(p=>({...p,telefon:v}))}/>
-        <Inp label="E-Mail" value={edit.email} onChange={v=>setEdit(p=>({...p,email:v}))}/>
-        <Inp label="Anrede" value={edit.anrede} onChange={v=>setEdit(p=>({...p,anrede:v}))}/>
-        <Inp label="Rechnungsempfänger" value={edit.rechnungsempfaenger} onChange={v=>setEdit(p=>({...p,rechnungsempfaenger:v}))}/>
-        <Inp label="Straße" value={edit.reStrasse} onChange={v=>setEdit(p=>({...p,reStrasse:v}))}/>
-        <Inp label="PLZ / Ort" value={edit.rePlzOrt} onChange={v=>setEdit(p=>({...p,rePlzOrt:v}))}/>
-      </div>
-      <div style={{marginTop:6}}><label style={{display:"block",fontSize:11,color:C.dunkelgrau,marginBottom:3,fontWeight:600}}>Bemerkung</label>
-        <textarea value={edit.bemerkung||""} onChange={e=>setEdit(p=>({...p,bemerkung:e.target.value}))} rows={2} style={{width:"100%",padding:"6px 10px",border:`1px solid ${C.mittelgrau}`,borderRadius:4,fontSize:12,fontFamily:FONT.sans,resize:"vertical",boxSizing:"border-box"}}/>
-      </div>
-      <div style={{display:"flex",gap:6,marginTop:10}}><Btn variant="success" onClick={save}>💾 Speichern</Btn><Btn variant="secondary" onClick={()=>setEdit(null)}>Abbrechen</Btn></div>
-    </Card>}
-    {filtered.map((k,i)=>(<Card key={i}>
-      <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start"}}>
-        <div style={{cursor:"pointer",flex:1}} onClick={()=>setEdit({...k})}>
-          <div style={{display:"flex",alignItems:"center",gap:8}}>
-            <span style={{fontSize:14,fontWeight:700}}>{k.name}</span>
-            {k.kundennummer&&<span style={{fontSize:10,color:C.rot,fontWeight:600,background:`${C.rot}11`,padding:"1px 6px",borderRadius:8}}>#{k.kundennummer}</span>}
-          </div>
-          <div style={{fontSize:12,color:C.dunkelgrau,marginTop:2}}>
-            {k.ansprechpartner&&<span style={{marginRight:10}}>👤 {k.ansprechpartner}</span>}
-            {k.telefon&&<span style={{marginRight:10}}>📞 {k.telefon}</span>}
-            {k.email&&<span>✉️ {k.email}</span>}
-          </div>
-          {k.bemerkung&&<div style={{fontSize:11,color:C.bgrau,marginTop:3,fontStyle:"italic"}}>{k.bemerkung}</div>}
-        </div>
-        <div style={{display:"flex",gap:4}}>
-          <Btn small variant="secondary" onClick={()=>setEdit({...k})}>✏️</Btn>
-          <Btn small variant="ghost" onClick={()=>del(k.name)} style={{color:C.rot}}>✕</Btn>
-        </div>
-      </div>
-    </Card>))}
+    <div style={{display:"flex",gap:8,marginBottom:10,flexWrap:"wrap"}}>
+      <input type="text" value={search} onChange={e=>setSearch(e.target.value)} placeholder="Kunden suchen..." style={{flex:1,minWidth:200,padding:"8px 12px",border:`1px solid ${C.mittelgrau}`,borderRadius:4,fontSize:13,fontFamily:FONT.sans,boxSizing:"border-box"}}/>
+      {isAdmin&&<select value={bcFilter} onChange={e=>setBcFilter(e.target.value)} style={{padding:"8px 10px",border:`1px solid ${C.mittelgrau}`,borderRadius:4,fontSize:12,fontFamily:FONT.sans}}>
+        <option value="alle">Alle Bereitschaften</option>
+        {BEREITSCHAFTEN.map(b=><option key={b.code} value={b.code}>{b.short}</option>)}
+      </select>}
+    </div>
+    {/* Select all */}
+    {filtered.length>0&&<div style={{display:"flex",alignItems:"center",gap:8,marginBottom:8,padding:"4px 8px"}}>
+      <input type="checkbox" checked={selected.size===filtered.length&&filtered.length>0} onChange={toggleAll} style={{cursor:"pointer",width:16,height:16,accentColor:C.rot}}/>
+      <span style={{fontSize:11,color:C.bgrau}}>{selected.size>0?`${selected.size} ausgewählt`:"Alle auswählen"}</span>
+    </div>}
+    {/* Table */}
+    <div style={{border:`1px solid ${C.mittelgrau}40`,borderRadius:6,overflow:"hidden"}}>
+    <table style={{width:"100%",borderCollapse:"collapse",fontSize:12,fontFamily:FONT.sans}}>
+      <thead><tr style={{background:C.hellgrau,fontSize:11,fontWeight:600,color:C.dunkelgrau}}>
+        <th style={{padding:"8px 6px",width:30}}></th>
+        <th style={{padding:"8px 6px",textAlign:"left"}}>Firma / Name</th>
+        <th style={{padding:"8px 6px",textAlign:"left"}} className="mob-hide">Ansprechpartner</th>
+        <th style={{padding:"8px 6px",textAlign:"left"}} className="mob-hide">Kontakt</th>
+        <th style={{padding:"8px 6px",textAlign:"left"}} className="mob-hide">Adresse</th>
+        {isAdmin&&<th style={{padding:"8px 6px",textAlign:"center",width:60}}>BC</th>}
+        <th style={{padding:"8px 6px",textAlign:"right",width:80}}>Aktion</th>
+      </tr></thead>
+      <tbody>{filtered.map((k,i)=><tr key={k.id} style={{borderBottom:`1px solid ${C.mittelgrau}30`,background:selected.has(k.id)?"#fff3e0":i%2===0?"#fff":"#fafafa",cursor:"pointer"}} onDoubleClick={(e)=>openEdit(k,e)}>
+        <td style={{padding:"6px",textAlign:"center"}}><input type="checkbox" checked={selected.has(k.id)} onChange={()=>toggleSel(k.id)} style={{cursor:"pointer",accentColor:C.rot}} onClick={e=>e.stopPropagation()}/></td>
+        <td style={{padding:"6px"}}>
+          <div style={{fontWeight:600}}>{k.name}</div>
+          {k.kundennummer&&<span style={{fontSize:10,color:C.rot,fontWeight:600,background:`${C.rot}11`,padding:"0 5px",borderRadius:6}}>#{k.kundennummer}</span>}
+          {k.bemerkung&&<div style={{fontSize:10,color:C.bgrau,fontStyle:"italic",marginTop:1}}>{k.bemerkung}</div>}
+        </td>
+        <td style={{padding:"6px",color:C.dunkelgrau}} className="mob-hide">{k.ansprechpartner||"—"}</td>
+        <td style={{padding:"6px"}} className="mob-hide">
+          {k.telefon&&<div style={{fontSize:11}}>📞 {k.telefon}</div>}
+          {k.email&&<div style={{fontSize:11}}>✉️ <a href={`mailto:${k.email}`} style={{color:C.mittelblau}} onClick={e=>e.stopPropagation()}>{k.email}</a></div>}
+        </td>
+        <td style={{padding:"6px",fontSize:11,color:C.dunkelgrau}} className="mob-hide">
+          {(k.re_strasse||k.reStrasse)&&<div>{k.re_strasse||k.reStrasse}</div>}
+          {(k.re_plz_ort||k.rePlzOrt)&&<div>{k.re_plz_ort||k.rePlzOrt}</div>}
+          {!(k.re_strasse||k.reStrasse||k.re_plz_ort||k.rePlzOrt)&&"—"}
+        </td>
+        {isAdmin&&<td style={{padding:"6px",textAlign:"center"}}><span style={{fontSize:10,fontWeight:700,color:bcColor(k.bereitschaft_code),background:bcColor(k.bereitschaft_code)+"18",padding:"2px 6px",borderRadius:8}}>{bcName(k.bereitschaft_code)}</span></td>}
+        <td style={{padding:"6px",textAlign:"right"}}>
+          <button onClick={(e)=>{e.stopPropagation();openEdit(k,e);}} style={{background:"none",border:"none",cursor:"pointer",fontSize:13,padding:"2px 6px"}} title="Bearbeiten">✏️</button>
+          <button onClick={(e)=>{e.stopPropagation();del(k);}} style={{background:"none",border:"none",cursor:"pointer",fontSize:13,padding:"2px 6px",color:C.rot}} title="Löschen">✕</button>
+        </td>
+      </tr>)}</tbody>
+    </table></div>
     {filtered.length===0&&!edit&&<Card><div style={{textAlign:"center",padding:30,color:C.dunkelgrau}}><div style={{fontSize:32,marginBottom:8}}>👥</div>Keine Kunden gefunden</div></Card>}
+    <EditPopover/>
   </div>);
 }
 
@@ -2166,6 +2229,12 @@ const LATEST_RELEASE={v:"v7.5",d:"04.03.2026",c:[
 "Angebotsversand: Vorgang wird nach Versand automatisch gesperrt",
 "Bestätigungsdialoge: Anfragen-Tab nutzt gestylte Modals statt Browser-Dialoge",
 "Anfragen: Badge am Tab zeigt Anzahl neuer Anfragen (Polling alle 60s)",
+"Kunden: Tabellenansicht statt Karten-Layout mit Checkbox-Mehrfachauswahl",
+"Kunden: Popover-Bearbeitungsmaske öffnet sich über dem Datensatz",
+"Kunden: Name ändern aktualisiert den Kunden statt einen neuen anzulegen",
+"Kunden: Bereitschafts-Zuordnung sichtbar für Admins (farbige BC-Badges)",
+"Kunden: CSV-Import nutzt Backend-Route (Adresse + PLZ/Ort werden korrekt importiert)",
+"Kunden: Batch-Löschung mehrerer Kunden gleichzeitig",
 ]};
 const RELEASE_V74={v:"v7.4",d:"04.03.2026",c:[
 "Statistik-Dashboard: Einsätze pro Monat, Status-Verteilung, Bereitschafts-Übersicht",
@@ -2295,7 +2364,7 @@ export default function App(){
 
   const saveKunden=useCallback(async(k)=>{try{for(const kunde of k){await API.saveKunde(kunde);}}catch(e){console.error("Fehler:",e);}},[]);
 
-  const upsertKunde=useCallback((ev)=>{if(!ev.veranstalter&&!ev.rechnungsempfaenger)return;const name=ev.veranstalter||ev.rechnungsempfaenger;const entry={name,ansprechpartner:ev.ansprechpartner||"",telefon:ev.telefon||"",email:ev.email||"",rechnungsempfaenger:ev.rechnungsempfaenger||"",reStrasse:ev.reStrasse||"",rePlzOrt:ev.rePlzOrt||"",anrede:ev.anrede||"Sehr geehrte Damen und Herren,"};API.saveKunde(entry).catch(()=>{});setKunden(prev=>{const idx=prev.findIndex(k=>k.name===name);return idx>=0?prev.map((k,i)=>i===idx?entry:k):[...prev,entry];});},[]);
+  const upsertKunde=useCallback((ev)=>{if(!ev.veranstalter&&!ev.rechnungsempfaenger)return;const name=ev.veranstalter||ev.rechnungsempfaenger;const entry={name,ansprechpartner:ev.ansprechpartner||"",telefon:ev.telefon||"",email:ev.email||"",rechnungsempfaenger:ev.rechnungsempfaenger||"",re_strasse:ev.reStrasse||"",re_plz_ort:ev.rePlzOrt||"",anrede:ev.anrede||"Sehr geehrte Damen und Herren,"};API.saveKunde(entry).catch(()=>{});setKunden(prev=>{const idx=prev.findIndex(k=>k.name===name);return idx>=0?prev.map((k,i)=>i===idx?{...k,...entry}:k):[...prev,entry];});},[]);
 
   useEffect(()=>{if(!user)return;(async()=>{try{const c=await API.getCounter(year);setLaufendeNr(c.nextNr||1);}catch(e){console.error("Fehler:",e);}})();},[user,year]);
 
@@ -2553,7 +2622,7 @@ export default function App(){
               <Card title="Veranstalter / Rechnungsempfänger" accent={C.dunkelblau}>
                 {kunden.length>0&&<div style={{marginBottom:10}}>
                   <label style={{fontSize:11,fontWeight:600,color:C.dunkelgrau,display:"block",marginBottom:3}}>Aus Kundenstamm wählen</label>
-                  <select style={{width:"100%",padding:"7px 10px",border:`1px solid ${C.mittelgrau}80`,borderRadius:4,fontSize:13,fontFamily:FONT.sans,background:C.weiss,color:C.schwarz}} value="" onChange={e=>{const k=kunden.find(c=>c.name===e.target.value);if(k){setEvent(p=>({...p,veranstalter:k.name,ansprechpartner:k.ansprechpartner,telefon:k.telefon,email:k.email,rechnungsempfaenger:k.rechnungsempfaenger||k.name,reStrasse:k.reStrasse,rePlzOrt:k.rePlzOrt,anrede:k.anrede||p.anrede}));}}}>
+                  <select style={{width:"100%",padding:"7px 10px",border:`1px solid ${C.mittelgrau}80`,borderRadius:4,fontSize:13,fontFamily:FONT.sans,background:C.weiss,color:C.schwarz}} value="" onChange={e=>{const k=kunden.find(c=>c.name===e.target.value);if(k){setEvent(p=>({...p,veranstalter:k.name,ansprechpartner:k.ansprechpartner,telefon:k.telefon,email:k.email,rechnungsempfaenger:k.rechnungsempfaenger||k.name,reStrasse:k.re_strasse||k.reStrasse||"",rePlzOrt:k.re_plz_ort||k.rePlzOrt||"",anrede:k.anrede||p.anrede}));}}}>
                     <option value="">— Kunde wählen —</option>
                     {kunden.sort((a,b)=>a.name.localeCompare(b.name)).map((k,i)=><option key={i} value={k.name}>{k.name}{k.kundennummer?` #${k.kundennummer}`:""}{k.ansprechpartner?` (${k.ansprechpartner})`:""}</option>)}
                   </select>

@@ -116,6 +116,10 @@ const API = {
     return this.json(`/api/kunden/${id}`, { method: "DELETE" });
   },
 
+  async batchDeleteKunden(ids) {
+    return this.json("/api/kunden/batch-delete", { method: "POST", body: JSON.stringify({ ids }) });
+  },
+
   // ── PDF ──────────────────────────────────────────────────────
   async generateILS(vorgangId) {
     const res = await this._fetch(`/api/pdf/ils/${vorgangId}`, { method: "POST" });
