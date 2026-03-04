@@ -305,8 +305,13 @@ app.get("/api/health", (req, res) => {
 
 // === Public Anfrage-Formular (kein Auth) ===
 app.get("/anfrage", (req, res) => {
-  // CSP Override: Inline-Script im öffentlichen Formular erlauben
-  res.setHeader("Content-Security-Policy", "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; frame-src 'none'; object-src 'none'");
+  const embed = req.query.embed === "1";
+  // CSP Override: Inline-Script erlauben + frame-ancestors für Einbettung
+  const framePolicy = embed
+    ? "frame-ancestors 'self' https://www.kvndsob.brk.de https://kvndsob.brk.de"
+    : "frame-ancestors 'self'";
+  res.setHeader("Content-Security-Policy", `default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; ${framePolicy}; object-src 'none'`);
+  if (embed) res.removeHeader("X-Frame-Options");
   const stamm = db.getDb().prepare("SELECT * FROM bereitschaften LIMIT 1").get() || {};
   const ROT = "#E60005";
   const BLAU = "#002F5F";
@@ -325,8 +330,8 @@ app.get("/anfrage", (req, res) => {
 <title>Sanit\u00e4tswachdienst anfragen \u2013 ${kvName}</title>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
-body{font-family:'Segoe UI',Arial,sans-serif;background:#f5f5f0;color:#1a1a1a;line-height:1.5}
-.ctn{max-width:680px;margin:0 auto;padding:0 16px}
+body{font-family:'Segoe UI',Arial,sans-serif;background:${embed ? "transparent" : "#f5f5f0"};color:#1a1a1a;line-height:1.5}
+.ctn{max-width:680px;margin:0 auto;padding:${embed ? "0" : "0 16px"}}
 .card{background:#fff;border-radius:8px;border:1px solid #ddd;padding:24px 28px;margin-bottom:16px;box-shadow:0 1px 4px #0001}
 .hdr{background:#fff;padding:24px 28px 18px;border-radius:8px 8px 0 0;border:1px solid #ddd;border-bottom:none;display:flex;align-items:center;gap:18px;margin-top:20px}
 .hdr-text{flex:1}
@@ -357,7 +362,13 @@ textarea{resize:vertical;min-height:80px}
 .add-day:hover{border-color:${ROT};color:${ROT}}
 .sec{font-size:15px;color:${ROT};font-weight:700;margin-bottom:14px;padding-bottom:6px;border-bottom:1px solid #eee}
 @media(max-width:600px){.row,.row3{grid-template-columns:1fr}.hdr{flex-direction:column;text-align:center}.ctn{padding:0 10px}}
-</style></head><body>
+body.embed .hdr,body.embed .hdr-accent,body.embed .sub,body.embed .ft{display:none}
+body.embed{background:transparent}
+body.embed .ctn{padding:0;max-width:100%}
+body.embed .card{border:none;box-shadow:none;padding:16px 0}
+body.embed .ok-fertig{display:none}
+body.embed .ok{border-radius:0;border:none}
+</style></head><body class="${embed ? "embed" : ""}">
 <div class="ctn">
   <div class="hdr">
     <div>${logoTag}</div>
@@ -420,8 +431,8 @@ textarea{resize:vertical;min-height:80px}
     <strong>Vielen Dank f\u00fcr Ihre Anfrage!</strong><br>
     Wir werden uns zeitnah bei Ihnen melden und Ihnen ein Angebot erstellen.
     <div style="display:flex;gap:12px;justify-content:center;margin-top:18px">
-      <a href="${fertigUrl}" class="btn" style="text-decoration:none;display:inline-block;width:auto;padding:10px 24px">Fertig</a>
-      <button class="btn" style="background:#004B91;width:auto;padding:10px 24px" onclick="document.getElementById('ok').style.display='none';document.getElementById('frm').style.display='block';document.getElementById('frm').reset();document.getElementById('dsgvo').checked=false;document.getElementById('sbtn').disabled=false;document.getElementById('sbtn').textContent='Anfrage absenden';">Neue Anfrage</button>
+      <a href="${fertigUrl}" class="btn ok-fertig" style="text-decoration:none;display:inline-block;width:auto;padding:10px 24px">Fertig</a>
+      <button class="btn" style="background:#004B91;width:auto;padding:10px 24px" onclick="document.getElementById('ok').style.display='none';document.getElementById('frm').style.display='block';document.getElementById('frm').reset();document.getElementById('dsgvo').checked=false;document.getElementById('sbtn').disabled=false;document.getElementById('sbtn').textContent='Anfrage absenden';if(typeof resizeFrame==='function')resizeFrame();">Neue Anfrage</button>
     </div>
   </div>
 
@@ -472,9 +483,15 @@ document.getElementById("frm").onsubmit=async function(e){
     delete d["tag_"+i+"_datum"];delete d["tag_"+i+"_von"];delete d["tag_"+i+"_bis"];
   }
   try{var r=await fetch("/api/anfrage",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(d)});
-    if(!r.ok)throw new Error();document.getElementById("frm").style.display="none";document.getElementById("ok").style.display="block";
+    if(!r.ok)throw new Error();document.getElementById("frm").style.display="none";document.getElementById("ok").style.display="block";if(typeof resizeFrame==="function")resizeFrame();
   }catch(err){alert("Fehler beim Senden. Bitte versuchen Sie es erneut.");b.disabled=false;b.textContent="Anfrage absenden";}
 };
+if(document.body.classList.contains("embed")){
+  function resizeFrame(){var h=document.documentElement.scrollHeight;window.parent.postMessage({sanwdHeight:h},"*");}
+  new MutationObserver(resizeFrame).observe(document.body,{childList:true,subtree:true,attributes:true});
+  window.addEventListener("resize",resizeFrame);
+  setTimeout(resizeFrame,100);setTimeout(resizeFrame,500);setTimeout(resizeFrame,1500);
+}
 </script></body></html>`);
 });
 
