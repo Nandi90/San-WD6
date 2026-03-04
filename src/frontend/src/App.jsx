@@ -980,57 +980,100 @@ function SmtpConfig({toast}){
 // Mail Compose Modal
 // ═══════════════════════════════════════════════════════════════════
 function MailComposeModal({event:ev, currentEventId, user, stammdaten, dayCalcs, totalCosts, activeDays, toast, onClose}){
-  const [to,setTo]=useState(ev?.kundenEmail||"");
-  const [subject,setSubject]=useState(`Angebot Sanitätswachdienst - ${ev?.name||""} ${ev?.auftragsnr||""}`);
-  const [body,setBody]=useState(`<p>Sehr geehrte Damen und Herren,</p><p>anbei erhalten Sie unser Angebot für die sanitätsdienstliche Absicherung Ihrer Veranstaltung <strong>${ev?.name||""}</strong>.</p><p>Bei Fragen stehen wir Ihnen gerne zur Verfügung.</p><p>Mit freundlichen Grüßen<br/>${user?.name||""}<br/>${stammdaten?.kvName||"BRK"}</p>`);
+  const anrede=ev?.anrede||"Sehr geehrte Damen und Herren,";
+  const absender=user?.name||"";
+  const orgName=stammdaten?.kvName||"BRK Kreisverband";
+  const [to,setTo]=useState(ev?.email||"");
+  const [subject,setSubject]=useState(`Angebot Sanitätswachdienst – ${ev?.name||""} ${ev?.auftragsnr||""}`);
+  const [body,setBody]=useState(`${anrede}\n\nanbei erhalten Sie unser Angebot für die sanitätsdienstliche Absicherung Ihrer Veranstaltung „${ev?.name||""}".\n\nBei Fragen stehen wir Ihnen gerne zur Verfügung.\n\nMit freundlichen Grüßen\n${absender}\n${orgName}`);
   const [attachPdf,setAttachPdf]=useState("mappe");
   const [sending,setSending]=useState(false);
+  const [sent,setSent]=useState(false);
+
   const send=async()=>{
     if(!to){toast("Empfänger fehlt","warning");return;}
+    if(!to.includes("@")){toast("Ungültige E-Mail-Adresse","warning");return;}
     setSending(true);
     try{
-      const r=await API.sendMail(currentEventId,{to,subject,body,attachPdf,dayCalcs,totalCosts,activeDays});
-      if(r.success){toast("✉️ E-Mail gesendet an "+to,"success");onClose();}
+      const htmlBody=body.split("\n").map(l=>l.trim()?`<p>${l}</p>`:"<p>&nbsp;</p>").join("");
+      const r=await API.sendMail(currentEventId,{to,subject,body:htmlBody,attachPdf,dayCalcs,totalCosts,activeDays});
+      if(r.success){setSent(true);toast("✉️ E-Mail gesendet an "+to,"success");}
       else toast("Fehler: "+(r.error||""),"error");
     }catch(e){toast("E-Mail: "+e.message,"error");}
     finally{setSending(false);}
   };
+
+  const attachLabels={mappe:"Angebotsmappe (Angebot + Gefahrenanalyse + AAB + Vertrag)",angebot:"Nur Angebot (PDF)",none:"Kein Anhang"};
+
   return(<div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.5)",backdropFilter:"blur(3px)",zIndex:9999,display:"flex",alignItems:"center",justifyContent:"center"}} onClick={onClose}>
-    <div style={{background:"#fff",borderRadius:10,padding:"24px 28px",maxWidth:560,width:"92%",maxHeight:"85vh",overflowY:"auto",boxShadow:"0 20px 60px rgba(0,0,0,0.3)"}} onClick={e=>e.stopPropagation()}>
-      <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:16}}>
-        <div style={{display:"flex",alignItems:"center",gap:10}}><span style={{fontSize:24}}>✉️</span><div><div style={{fontSize:16,fontWeight:700}}>Angebot per E-Mail senden</div><div style={{fontSize:11,color:C.dunkelgrau}}>{ev?.name} · {ev?.auftragsnr}</div></div></div>
+    <div style={{background:"#fff",borderRadius:12,maxWidth:600,width:"92%",maxHeight:"88vh",overflowY:"auto",boxShadow:"0 20px 60px rgba(0,0,0,0.3)"}} onClick={e=>e.stopPropagation()}>
+      {/* Header */}
+      <div style={{padding:"18px 24px",borderBottom:"1px solid #f0f0f0",display:"flex",alignItems:"center",justifyContent:"space-between"}}>
+        <div style={{display:"flex",alignItems:"center",gap:10}}>
+          <span style={{fontSize:24}}>✉️</span>
+          <div><div style={{fontSize:16,fontWeight:700,color:"#1a1a2e"}}>Angebot per E-Mail senden</div>
+          <div style={{fontSize:11,color:C.dunkelgrau}}>{ev?.name} · {ev?.auftragsnr}</div></div>
+        </div>
         <button onClick={onClose} style={{background:"none",border:"none",fontSize:20,cursor:"pointer",color:"#999"}}>✕</button>
       </div>
 
-      <div style={{marginBottom:10}}>
-        <div style={{fontSize:11,fontWeight:600,color:"#555",marginBottom:3}}>An</div>
-        <input value={to} onChange={e=>setTo(e.target.value)} placeholder="veranstalter@example.com" style={{width:"100%",padding:"8px 10px",border:"1px solid #ccc",borderRadius:5,fontSize:13,fontFamily:FONT.sans}}/>
+      {sent?<div style={{padding:"40px 24px",textAlign:"center"}}>
+        <div style={{fontSize:48,marginBottom:12}}>✅</div>
+        <div style={{fontSize:16,fontWeight:700,color:"#2e7d32",marginBottom:6}}>E-Mail erfolgreich gesendet</div>
+        <div style={{fontSize:13,color:C.dunkelgrau,marginBottom:20}}>An: {to}{attachPdf!=="none"?` · Anhang: ${attachPdf==="mappe"?"Angebotsmappe":"Angebot PDF"}`:""}</div>
+        <button onClick={onClose} style={{padding:"10px 28px",background:C.dunkelblau,color:"#fff",border:"none",borderRadius:6,fontSize:14,fontWeight:600,cursor:"pointer",fontFamily:FONT.sans}}>Schließen</button>
       </div>
 
-      <div style={{marginBottom:10}}>
-        <div style={{fontSize:11,fontWeight:600,color:"#555",marginBottom:3}}>Betreff</div>
-        <input value={subject} onChange={e=>setSubject(e.target.value)} style={{width:"100%",padding:"8px 10px",border:"1px solid #ccc",borderRadius:5,fontSize:13,fontFamily:FONT.sans}}/>
-      </div>
-
-      <div style={{marginBottom:10}}>
-        <div style={{fontSize:11,fontWeight:600,color:"#555",marginBottom:3}}>PDF-Anhang</div>
-        <div style={{display:"flex",gap:6}}>
-          {[{v:"mappe",l:"📦 Angebotsmappe"},{v:"angebot",l:"📄 Nur Angebot"},{v:"none",l:"Kein Anhang"}].map(o=>(
-            <button key={o.v} onClick={()=>setAttachPdf(o.v)} style={{flex:1,padding:"6px 10px",background:attachPdf===o.v?"#e65100":"#fff",color:attachPdf===o.v?"#fff":"#333",border:`1px solid ${attachPdf===o.v?"#e65100":"#ccc"}`,borderRadius:5,fontSize:11,fontWeight:600,cursor:"pointer",fontFamily:FONT.sans}}>{o.l}</button>
-          ))}
+      :<div style={{padding:"20px 24px"}}>
+        {/* Empfänger */}
+        <div style={{marginBottom:12}}>
+          <div style={{fontSize:11,fontWeight:600,color:"#555",marginBottom:3}}>An *</div>
+          <input value={to} onChange={e=>setTo(e.target.value)} placeholder="veranstalter@example.com" style={{width:"100%",padding:"9px 12px",border:`1px solid ${to&&!to.includes("@")?"#ef5350":"#ccc"}`,borderRadius:6,fontSize:13,fontFamily:FONT.sans}}/>
+          {!to&&ev?.veranstalter&&<div style={{fontSize:10,color:"#f57c00",marginTop:3}}>⚠️ Keine E-Mail-Adresse beim Kunden hinterlegt</div>}
         </div>
-      </div>
 
-      <div style={{marginBottom:14}}>
-        <div style={{fontSize:11,fontWeight:600,color:"#555",marginBottom:3}}>Nachricht</div>
-        <textarea value={body.replace(/<[^>]+>/g," ").replace(/\s+/g," ").trim()} onChange={e=>setBody(e.target.value)} rows={6} style={{width:"100%",padding:"8px 10px",border:"1px solid #ccc",borderRadius:5,fontSize:12,fontFamily:FONT.sans,lineHeight:1.5,resize:"vertical"}}/>
-        <div style={{fontSize:10,color:"#888",marginTop:2}}>Reply-To: {user?.email||"nicht gesetzt"} · CC: {stammdaten?.email||"keine"}</div>
-      </div>
+        {/* Betreff */}
+        <div style={{marginBottom:12}}>
+          <div style={{fontSize:11,fontWeight:600,color:"#555",marginBottom:3}}>Betreff</div>
+          <input value={subject} onChange={e=>setSubject(e.target.value)} style={{width:"100%",padding:"9px 12px",border:"1px solid #ccc",borderRadius:6,fontSize:13,fontFamily:FONT.sans}}/>
+        </div>
 
-      <div style={{display:"flex",gap:8,justifyContent:"flex-end"}}>
-        <button onClick={onClose} style={{padding:"8px 20px",background:C.hellgrau,border:"1px solid #ccc",borderRadius:6,fontSize:13,cursor:"pointer",fontFamily:FONT.sans}}>Abbrechen</button>
-        <button onClick={send} disabled={sending} style={{padding:"8px 24px",background:"#e65100",color:"#fff",border:"none",borderRadius:6,fontSize:13,fontWeight:600,cursor:"pointer",fontFamily:FONT.sans}}>{sending?"Sende...":"✉️ Senden"}</button>
-      </div>
+        {/* Anhang */}
+        <div style={{marginBottom:12}}>
+          <div style={{fontSize:11,fontWeight:600,color:"#555",marginBottom:4}}>PDF-Anhang</div>
+          <div style={{display:"flex",flexDirection:"column",gap:4}}>
+            {[{v:"mappe",l:"📦 Angebotsmappe",d:"Angebot + Gefahrenanalyse + AAB + Vertrag"},{v:"angebot",l:"📄 Nur Angebot",d:"Einzelnes Angebots-PDF"},{v:"none",l:"📭 Kein Anhang",d:"Nur Text-E-Mail"}].map(o=>(
+              <label key={o.v} style={{display:"flex",alignItems:"center",gap:10,padding:"8px 12px",background:attachPdf===o.v?"#fff3e0":"#fafafa",border:`1px solid ${attachPdf===o.v?"#e65100":"#e0e0e0"}`,borderRadius:6,cursor:"pointer",transition:"all 0.15s"}} onClick={()=>setAttachPdf(o.v)}>
+                <div style={{width:16,height:16,borderRadius:8,border:`2px solid ${attachPdf===o.v?"#e65100":"#bbb"}`,display:"flex",alignItems:"center",justifyContent:"center"}}>
+                  {attachPdf===o.v&&<div style={{width:8,height:8,borderRadius:4,background:"#e65100"}}/>}
+                </div>
+                <div><div style={{fontSize:12,fontWeight:600}}>{o.l}</div><div style={{fontSize:10,color:"#888"}}>{o.d}</div></div>
+              </label>
+            ))}
+          </div>
+        </div>
+
+        {/* Nachricht */}
+        <div style={{marginBottom:14}}>
+          <div style={{fontSize:11,fontWeight:600,color:"#555",marginBottom:3}}>Nachricht</div>
+          <textarea value={body} onChange={e=>setBody(e.target.value)} rows={10} style={{width:"100%",padding:"10px 12px",border:"1px solid #ccc",borderRadius:6,fontSize:12,fontFamily:FONT.sans,lineHeight:1.6,resize:"vertical"}}/>
+        </div>
+
+        {/* Info-Footer */}
+        <div style={{background:"#f5f5f5",borderRadius:6,padding:"10px 14px",marginBottom:16,fontSize:11,color:C.dunkelgrau}}>
+          <div style={{display:"flex",gap:16,flexWrap:"wrap"}}>
+            <div><span style={{fontWeight:600}}>Von:</span> {stammdaten?.email||"(SMTP Absender)"}</div>
+            {user?.email&&<div><span style={{fontWeight:600}}>Reply-To:</span> {user.email}</div>}
+            {stammdaten?.email&&<div><span style={{fontWeight:600}}>CC:</span> {stammdaten.email}</div>}
+          </div>
+        </div>
+
+        {/* Buttons */}
+        <div style={{display:"flex",gap:8,justifyContent:"flex-end"}}>
+          <button onClick={onClose} style={{padding:"9px 20px",background:"#fff",border:"1px solid #d0d0d0",borderRadius:6,fontSize:13,fontWeight:600,cursor:"pointer",color:"#555",fontFamily:FONT.sans}}>Abbrechen</button>
+          <button onClick={send} disabled={sending||!to} style={{padding:"9px 28px",background:sending?"#bbb":"#e65100",color:"#fff",border:"none",borderRadius:6,fontSize:13,fontWeight:700,cursor:sending?"default":"pointer",fontFamily:FONT.sans}}>{sending?"Wird gesendet...":"✉️ Senden"}</button>
+        </div>
+      </div>}
     </div>
   </div>);
 }
