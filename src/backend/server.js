@@ -959,9 +959,8 @@ app.post("/api/mail/send/:id", requireAuth, async (req, res) => {
         }
         
         if (attachPdf === "mappe") {
-          // Alle Dokumente generieren
+          // Angebotsmappe: Angebot + Vertrag + AAB (ohne Gefahrenanalyse)
           const docs = [];
-          try { docs.push(await BrowserPool.renderPDF(buildGefahrenHTML(ev, vorgang.days || [], req.body.dayCalcs || [], stamm))); } catch {}
           docs.push(await BrowserPool.renderPDF(buildAngebotHTML(ev, req.body.dayCalcs || [], req.body.totalCosts || 0, req.body.activeDays || vorgang.days || [], stamm, kosten, user), { marginTop: "20mm", marginLeft: "12mm" }));
           try { docs.push(await BrowserPool.renderPDF(buildVertragHTML(vorgang, stamm, user))); } catch {}
           try { docs.push(await BrowserPool.renderPDF(buildAABHTML(stamm, row.bereitschaft_code, klauselnAAB, ev.auftragsnr || ""))); } catch {}
