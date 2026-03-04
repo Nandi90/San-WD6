@@ -456,8 +456,8 @@ body.embed .btn{font-size:14px;padding:10px 24px}
     </div>
 
     <div class="sec" style="margin-top:18px">Angebots- / Rechnungsadresse</div>
-    <label><span>Rechnungsempf\\u00e4nger <span style="font-weight:400;color:#888">(falls abweichend vom Veranstalter)</span></span><input name="rechnungsempfaenger" placeholder="Firma / Verein / Name"></label>
-    <label><span>Stra\\u00dfe / Hausnummer</span><input name="reStrasse" placeholder="z.B. Musterstra\\u00dfe 12"></label>
+    <label><span>Rechnungsempf\u00e4nger <span style="font-weight:400;color:#888">(falls abweichend vom Veranstalter)</span></span><input name="rechnungsempfaenger" placeholder="Firma / Verein / Name"></label>
+    <label><span>Stra\u00dfe / Hausnummer</span><input name="reStrasse" placeholder="z.B. Musterstra\u00dfe 12"></label>
     <div class="row">
       <label><span>PLZ</span><input name="rePlz" maxlength="5" placeholder="z.B. 86529"></label>
       <label><span>Ort</span><input name="reOrt" placeholder="z.B. Schrobenhausen"></label>
