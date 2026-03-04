@@ -1378,8 +1378,9 @@ function FiBuModal({currentEventId,event:ev,user,stammdaten,dayCalcs,totalCosts,
   const absender=user?.name||"";
   const orgName=stammdaten?.kvName||"BRK Kreisverband";
 
+  const isKorrektur=!!ev?.checklist?.fibuWeitergeleitet;
   const [fibuEmail,setFibuEmail]=useState("");
-  const [subject,setSubject]=useState(`FiBu-Abrechnung – ${ev?.name||""} ${ev?.auftragsnr||""}`);
+  const [subject,setSubject]=useState(`${isKorrektur?"KORREKTUR: ":""}FiBu-Abrechnung – ${ev?.name||""} ${ev?.auftragsnr||""}`);
   const [hasFremdHelfer,setHasFremdHelfer]=useState(false);
   const [fremdHelfer,setFremdHelfer]=useState([{bc:otherBCs[0]?.code||"",anzahl:""}]);
   const [externeHelfer,setExterneHelfer]=useState("");
@@ -1410,7 +1411,7 @@ function FiBuModal({currentEventId,event:ev,user,stammdaten,dayCalcs,totalCosts,
     return lines.length?"\n\nEingesetzte Fahrzeuge:\n"+lines.join("\n"):"";
   };
 
-  const bodyText=`Sehr geehrte Damen und Herren,\n\nanbei die Abrechnung für den Sanitätswachdienst der Veranstaltung „${ev?.name||""}" (${ev?.auftragsnr||""}).\n\nVeranstalter: ${ev?.veranstalter||""}\nDatum: ${activeDays?.filter(d=>d.date).map(d=>new Date(d.date).toLocaleDateString("de-DE")).join(", ")||""}\nGesamtkosten: ${totalCosts?new Intl.NumberFormat("de-DE",{minimumFractionDigits:2}).format(totalCosts)+" €":""}${helferSummary()}${fzgSummary()}\n\nDas Angebot liegt als PDF bei.\n\nMit freundlichen Grüßen\n${absender}\n${ownBC.name} · ${orgName}`;
+  const bodyText=`Sehr geehrte Damen und Herren,\n${isKorrektur?"\n⚠️ ACHTUNG KORREKTUR – Diese Abrechnung ersetzt die vorherige Weiterleitung.\n":""}\nanbei die ${isKorrektur?"korrigierte ":""}Abrechnung für den Sanitätswachdienst der Veranstaltung „${ev?.name||""}" (${ev?.auftragsnr||""}).\n\nVeranstalter: ${ev?.veranstalter||""}\nDatum: ${activeDays?.filter(d=>d.date).map(d=>new Date(d.date).toLocaleDateString("de-DE")).join(", ")||""}\nGesamtkosten: ${totalCosts?new Intl.NumberFormat("de-DE",{minimumFractionDigits:2}).format(totalCosts)+" €":""}${helferSummary()}${fzgSummary()}\n\nDas Angebot liegt als PDF bei.\n\nMit freundlichen Grüßen\n${absender}\n${ownBC.name} · ${orgName}`;
 
   const [body,setBody]=useState("");
   useEffect(()=>{setBody(bodyText);},[hasFremdHelfer,hasFzg,fremdHelfer,fahrzeuge,externeHelfer]);
@@ -1452,7 +1453,7 @@ function FiBuModal({currentEventId,event:ev,user,stammdaten,dayCalcs,totalCosts,
       <div style={{padding:"18px 24px",borderBottom:"1px solid #f0f0f0",display:"flex",alignItems:"center",justifyContent:"space-between"}}>
         <div style={{display:"flex",alignItems:"center",gap:10}}>
           <span style={{fontSize:24}}>💳</span>
-          <div><div style={{fontSize:16,fontWeight:700,color:"#1a1a2e"}}>Weiterleitung an FiBu</div>
+          <div><div style={{fontSize:16,fontWeight:700,color:isKorrektur?"#e65100":"#1a1a2e"}}>{isKorrektur?"⚠️ Korrektur: ":""}Weiterleitung an FiBu</div>
           <div style={{fontSize:11,color:C.dunkelgrau}}>{ev?.name} · {ev?.auftragsnr}</div></div>
         </div>
         <button onClick={onClose} style={{background:"none",border:"none",fontSize:20,cursor:"pointer",color:"#999"}}>✕</button>
@@ -1476,6 +1477,11 @@ function FiBuModal({currentEventId,event:ev,user,stammdaten,dayCalcs,totalCosts,
       </div>
 
       :<div style={{padding:"20px 24px"}}>
+        {isKorrektur&&<div style={{marginBottom:14,padding:"10px 14px",background:"#fff3e0",border:"1px solid #ffcc80",borderRadius:6,display:"flex",alignItems:"center",gap:8}}>
+          <span style={{fontSize:18}}>⚠️</span>
+          <div><div style={{fontSize:12,fontWeight:700,color:"#e65100"}}>Korrektur-Abrechnung</div>
+          <div style={{fontSize:11,color:"#bf360c"}}>Erste Weiterleitung: {fTS(ev?.checklist?.fibuWeitergeleitet)} – Diese E-Mail ersetzt die vorherige.</div></div>
+        </div>}
         {/* FiBu E-Mail */}
         <div style={{marginBottom:14}}>
           <label style={sL}>FiBu E-Mail-Adresse *</label>
@@ -1566,7 +1572,7 @@ function FiBuModal({currentEventId,event:ev,user,stammdaten,dayCalcs,totalCosts,
         {/* Buttons */}
         <div style={{display:"flex",gap:8,justifyContent:"flex-end"}}>
           <button onClick={onClose} style={{padding:"9px 20px",background:"#fff",border:"1px solid #d0d0d0",borderRadius:6,fontSize:13,fontWeight:600,cursor:"pointer",color:"#555",fontFamily:FONT.sans}}>Abbrechen</button>
-          <button onClick={send} disabled={sending||!fibuEmail} style={{padding:"9px 28px",background:sending?"#bbb":"#1a237e",color:"#fff",border:"none",borderRadius:6,fontSize:13,fontWeight:700,cursor:sending?"default":"pointer",fontFamily:FONT.sans,opacity:fibuEmail?1:0.4}}>{sending?"Wird gesendet...":"💳 An FiBu senden & abschließen"}</button>
+          <button onClick={send} disabled={sending||!fibuEmail} style={{padding:"9px 28px",background:sending?"#bbb":isKorrektur?"#e65100":"#1a237e",color:"#fff",border:"none",borderRadius:6,fontSize:13,fontWeight:700,cursor:sending?"default":"pointer",fontFamily:FONT.sans,opacity:fibuEmail?1:0.4}}>{sending?"Wird gesendet...":isKorrektur?"⚠️ Korrektur an FiBu senden":"💳 An FiBu senden & abschließen"}</button>
         </div>
       </div>}
     </div>
