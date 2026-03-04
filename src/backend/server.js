@@ -364,10 +364,14 @@ textarea{resize:vertical;min-height:80px}
 @media(max-width:600px){.row,.row3{grid-template-columns:1fr}.hdr{flex-direction:column;text-align:center}.ctn{padding:0 10px}}
 body.embed .hdr,body.embed .hdr-accent,body.embed .sub,body.embed .ft{display:none}
 body.embed{background:transparent}
-body.embed .ctn{padding:0;max-width:100%}
-body.embed .card{border:none;box-shadow:none;padding:16px 0}
+body.embed .ctn{padding:0;max-width:640px;margin:0}
+body.embed .card{box-shadow:none;padding:20px 24px;border:1px solid #e0e0e0;border-radius:6px}
 body.embed .ok-fertig{display:none}
-body.embed .ok{border-radius:0;border:none}
+body.embed .ok{border-radius:6px}
+body.embed .sec{font-size:14px}
+body.embed label>span{font-size:11px}
+body.embed input,body.embed textarea,body.embed select{font-size:13px;padding:7px 10px}
+body.embed .btn{font-size:14px;padding:10px 24px}
 </style></head><body class="${embed ? "embed" : ""}">
 <div class="ctn">
   <div class="hdr">
