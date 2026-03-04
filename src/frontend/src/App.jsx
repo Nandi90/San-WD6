@@ -2107,8 +2107,16 @@ const LATEST_RELEASE={v:"v7.5",d:"04.03.2026",c:[
 "Anfragen: Annehmen → automatisch Vorgang mit Auftragsnr erstellen",
 "Anfragen: Status-Workflow (Neu → Angenommen/Abgelehnt → Archiviert)",
 "Anfragen: Zuweisung an Bereitschaft bei Annahme",
-"Anfragen: E-Mail-Benachrichtigung bei neuer Anfrage (wenn SMTP aktiv)",
 "Anfragen: Detail-Ansicht mit Kontaktdaten, Tagen, Bemerkungen",
+"Anfragen: Bestätigungsmail an Veranstalter bei neuer Anfrage",
+"Anfragen: Konfigurierbare Empfänger-Liste (Einstellungen → E-Mail)",
+"Anfrageformular: CSP-Fix – Formular sendet jetzt korrekt ab",
+"Angebotsversand: Mail-Dialog komplett überarbeitet",
+"Angebotsversand: Angebotsmappe als Anhang (Deckblatt + Angebot + Vertrag + AAB)",
+"Angebotsversand: Professioneller Standard-Mailtext mit automatischer Fristberechnung",
+"Angebotsversand: Hinweis auf 4-Wochen-Frist und 30%-Aufschlag bei Kurzfristigkeit",
+"Angebotsversand: Erfolgsbestätigung nach Versand",
+"Bestätigungsdialoge: Anfragen-Tab nutzt gestylte Modals statt Browser-Dialoge",
 ]};
 const RELEASE_V74={v:"v7.4",d:"04.03.2026",c:[
 "Statistik-Dashboard: Einsätze pro Monat, Status-Verteilung, Bereitschafts-Übersicht",
