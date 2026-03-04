@@ -583,7 +583,7 @@ function EinstellungenTab({stammdaten,updateStamm,updateRate,user,toast,klauseln
 function EinsatzprotokollLive({event:ev,currentEventId,days,user,toast}){
   const activeDays=(days||[]).filter(d=>d.active!==false);
   const [dayIdx,setDayIdx]=useState(0);
-  const [proto,setProto]=useState({helfer:"",fahrzeuge:"",ankunftPlan:"",ankunftReal:"",abfahrtPlan:"",abfahrtReal:"",behandelteGesamt:0,behandelteBagatelle:0,transporte:0,besonderheiten:"",tagebuch:[]});
+  const [proto,setProto]=useState({helfer:"",fahrzeuge:"",ankunftPlan:"",ankunftReal:"",abfahrtPlan:"",abfahrtReal:"",behandelt:0,bagatelle:0,transporte:0,besonderheiten:"",tagebuch:[]});
   const [loading,setLoading]=useState(true);
   const [saving,setSaving]=useState(false);
   const [lastSaved,setLastSaved]=useState(null);
@@ -595,8 +595,8 @@ function EinsatzprotokollLive({event:ev,currentEventId,days,user,toast}){
     API.getProtokoll(currentEventId).then(r=>{
       const p=r.protokoll?.[String(dayIdx)];
       const day=activeDays[dayIdx];
-      if(p){setProto({helfer:"",fahrzeuge:"",ankunftPlan:day?.startTime||"",ankunftReal:"",abfahrtPlan:day?.endTime||"",abfahrtReal:"",behandelteGesamt:0,behandelteBagatelle:0,transporte:0,besonderheiten:"",tagebuch:[],...p});}
-      else{setProto({helfer:"",fahrzeuge:"",ankunftPlan:day?.startTime||"",ankunftReal:"",abfahrtPlan:day?.endTime||"",abfahrtReal:"",behandelteGesamt:0,behandelteBagatelle:0,transporte:0,besonderheiten:"",tagebuch:[]});}
+      if(p){setProto({helfer:"",fahrzeuge:"",ankunftPlan:day?.startTime||"",ankunftReal:"",abfahrtPlan:day?.endTime||"",abfahrtReal:"",behandelt:0,bagatelle:0,transporte:0,besonderheiten:"",tagebuch:[],...p});}
+      else{setProto({helfer:"",fahrzeuge:"",ankunftPlan:day?.startTime||"",ankunftReal:"",abfahrtPlan:day?.endTime||"",abfahrtReal:"",behandelt:0,bagatelle:0,transporte:0,besonderheiten:"",tagebuch:[]});}
       setLoading(false);
     }).catch(()=>setLoading(false));
   },[currentEventId,dayIdx]);
@@ -685,20 +685,23 @@ function EinsatzprotokollLive({event:ev,currentEventId,days,user,toast}){
 
     {/* Einsatzzahlen */}
     <Card title="Einsatzzahlen" accent={C.rot}>
-      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:12}}>
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:12,marginBottom:14}}>
         <div style={{textAlign:"center",padding:"14px 10px",background:`${C.rot}08`,borderRadius:8,border:`1px solid ${C.rot}30`}}>
-          <div style={{fontSize:10,fontWeight:600,color:C.dunkelgrau,marginBottom:4}}>Behandelte Personen gesamt</div>
-          <input type="number" min={0} value={proto.behandelteGesamt||0} onChange={e=>up("behandelteGesamt",+e.target.value)} style={{width:80,padding:"8px",border:`2px solid ${C.rot}`,borderRadius:8,fontSize:22,fontWeight:800,textAlign:"center",color:C.rot,fontFamily:FONT.sans}}/>
-          <div style={{fontSize:9,color:"#888",marginTop:2}}>ohne Datenerfassung</div>
+          <div style={{fontSize:10,fontWeight:600,color:C.dunkelgrau,marginBottom:4}}>Behandelt</div>
+          <input type="number" min={0} value={proto.behandelt||0} onChange={e=>up("behandelt",+e.target.value)} style={{width:80,padding:"8px",border:`2px solid ${C.rot}`,borderRadius:8,fontSize:22,fontWeight:800,textAlign:"center",color:C.rot,fontFamily:FONT.sans}}/>
         </div>
         <div style={{textAlign:"center",padding:"14px 10px",background:"#fff8e1",borderRadius:8,border:"1px solid #ffcc80"}}>
-          <div style={{fontSize:10,fontWeight:600,color:C.dunkelgrau,marginBottom:4}}>davon Bagatelle</div>
-          <input type="number" min={0} value={proto.behandelteBagatelle||0} onChange={e=>up("behandelteBagatelle",+e.target.value)} style={{width:80,padding:"8px",border:"2px solid #f9a825",borderRadius:8,fontSize:22,fontWeight:800,textAlign:"center",color:"#f9a825",fontFamily:FONT.sans}}/>
+          <div style={{fontSize:10,fontWeight:600,color:C.dunkelgrau,marginBottom:4}}>Bagatelle</div>
+          <input type="number" min={0} value={proto.bagatelle||0} onChange={e=>up("bagatelle",+e.target.value)} style={{width:80,padding:"8px",border:"2px solid #f9a825",borderRadius:8,fontSize:22,fontWeight:800,textAlign:"center",color:"#f9a825",fontFamily:FONT.sans}}/>
         </div>
         <div style={{textAlign:"center",padding:"14px 10px",background:"#e3f2fd",borderRadius:8,border:"1px solid #90caf9"}}>
-          <div style={{fontSize:10,fontWeight:600,color:C.dunkelgrau,marginBottom:4}}>Transporte</div>
+          <div style={{fontSize:10,fontWeight:600,color:C.dunkelgrau,marginBottom:4}}>Transport</div>
           <input type="number" min={0} value={proto.transporte||0} onChange={e=>up("transporte",+e.target.value)} style={{width:80,padding:"8px",border:"2px solid #1565c0",borderRadius:8,fontSize:22,fontWeight:800,textAlign:"center",color:"#1565c0",fontFamily:FONT.sans}}/>
         </div>
+      </div>
+      <div style={{textAlign:"center",padding:"12px 16px",background:"#f5f5f5",borderRadius:8,border:`1px solid ${C.mittelgrau}`}}>
+        <div style={{fontSize:10,fontWeight:600,color:C.dunkelgrau,marginBottom:2}}>Gesamte Behandelte</div>
+        <div style={{fontSize:30,fontWeight:900,color:C.rot,fontFamily:FONT.sans}}>{(proto.behandelt||0)+(proto.bagatelle||0)+(proto.transporte||0)}</div>
       </div>
     </Card>
 

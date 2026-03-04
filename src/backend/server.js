@@ -243,7 +243,7 @@ app.get("/api/statistik/:year", requireAuth, (req, res) => {
       for (const key of Object.keys(protokoll)) {
         const p = protokoll[key];
         if (p) {
-          totalPatienten += (p.behandelteGesamt || 0);
+          totalPatienten += (p.behandelt || 0) + (p.bagatelle || 0) + (p.transporte || 0);
           totalTransporte += (p.transporte || 0);
         }
       }
@@ -1414,9 +1414,12 @@ function buildEinsatzprotokollHTML(vorgang, stamm, dayIdx) {
 <hr/>
 <table class="info-table" style="margin-top:8px;">
 <tr>
-  <td style="width:33%;text-align:center;"><strong>Behandelte Personen</strong><br/><span style="font-size:24px;font-weight:bold">${proto.behandelteGesamt||0}</span></td>
-  <td style="width:33%;text-align:center;"><strong>davon Bagatelle</strong><br/><span style="font-size:24px;font-weight:bold">${proto.behandelteBagatelle||0}</span></td>
-  <td style="width:33%;text-align:center;"><strong>Transporte</strong><br/><span style="font-size:24px;font-weight:bold">${proto.transporte||0}</span></td>
+  <td style="width:33%;text-align:center;"><strong>Behandelt</strong><br/><span style="font-size:24px;font-weight:bold">${proto.behandelt||0}</span></td>
+  <td style="width:33%;text-align:center;"><strong>Bagatelle</strong><br/><span style="font-size:24px;font-weight:bold">${proto.bagatelle||0}</span></td>
+  <td style="width:33%;text-align:center;"><strong>Transport</strong><br/><span style="font-size:24px;font-weight:bold">${proto.transporte||0}</span></td>
+</tr>
+<tr>
+  <td colspan="3" style="text-align:center;padding-top:8px;"><strong>Gesamt: ${(proto.behandelt||0)+(proto.bagatelle||0)+(proto.transporte||0)} Behandelte</strong></td>
 </tr>
 </table>
 
