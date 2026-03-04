@@ -1235,7 +1235,7 @@ app.post("/api/mail/fibu/:id", requireAuth, async (req, res) => {
     const fromEmail = stamm.email || require("./db").getConfig("smtp_from_email", "");
     const fromName = require("./db").getConfig("smtp_from_name", "BRK Sanitätswachdienst");
 
-    const result = await smtp.send({
+    const result = await smtp.sendMail({
       from: `"${fromName}" <${fromEmail}>`,
       to,
       subject,
@@ -1277,7 +1277,7 @@ app.post("/api/mail/fibu/:id", requireAuth, async (req, res) => {
           <p>Mit kameradschaftlichen Grüßen<br/>${user.name || stamm.leiter_name || ""}<br/>${stamm.name || ""}</p>`;
 
         try {
-          await smtp.send({
+          await smtp.sendMail({
             from: `"${fromName}" <${fromEmail}>`,
             to: bcRow.email,
             subject: `FiBu-Abrechnung: ${ev.name || ""} (${ev.auftragsnr || ""}) – Eure Helfer/Fahrzeuge`,
