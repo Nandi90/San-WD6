@@ -267,7 +267,7 @@ const API = {
   async getStatusLog(id) { return this.json("/api/vorgaenge/"+id+"/status-log"); },
   async getAnfragen() { return this.json("/api/anfragen"); },
   async getAnfragenCount() { return this.json("/api/anfragen/count"); },
-  async updateAnfrageStatus(id,status) { return this.json("/api/anfragen/"+id+"/status",{method:"PUT",body:JSON.stringify({status})}); },
+  async updateAnfrageStatus(id,status,grund) { return this.json("/api/anfragen/"+id+"/status",{method:"PUT",body:JSON.stringify({status,grund})}); },
   async anfrageAnnehmen(id, bc) { return this.json(`/api/anfragen/${id}/annehmen`, { method: "POST", body: JSON.stringify({ bereitschaft_code: bc }) }); },
   async anfrageUmzuweisen(id, bc) { return this.json(`/api/anfragen/${id}/umzuweisen`, { method: "POST", body: JSON.stringify({ bereitschaft_code: bc }) }); },
   async deleteAnfrage(id) { return this.json("/api/anfragen/"+id,{method:"DELETE"}); },

@@ -61,6 +61,9 @@ function init() {
     try {
       getDb().prepare("ALTER TABLE anfragen ADD COLUMN re_plz_ort TEXT DEFAULT ''").run();
     } catch {}
+    try {
+      getDb().prepare("ALTER TABLE anfragen ADD COLUMN ablehnung_grund TEXT DEFAULT NULL").run();
+    } catch {}
     // Backfill: angenommene Anfragen mit BC + Vorgang-ID aus verknüpften Vorgängen
     try {
       const orphans = getDb().prepare("SELECT id FROM anfragen WHERE status='angenommen' AND (bereitschaft_code IS NULL OR vorgang_id IS NULL)").all();

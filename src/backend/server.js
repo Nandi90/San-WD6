@@ -669,8 +669,12 @@ app.get("/api/anfragen/count", (req, res) => {
 app.put("/api/anfragen/:id/status", (req, res) => {
   if (!req.session?.user) return res.status(401).json({ error: "Nicht authentifiziert" });
   try {
-    const { status } = req.body;
-    db.getDb().prepare("UPDATE anfragen SET status=? WHERE id=?").run(status, req.params.id);
+    const { status, grund } = req.body;
+    if (status === "abgelehnt" && grund) {
+      db.getDb().prepare("UPDATE anfragen SET status=?, ablehnung_grund=? WHERE id=?").run(status, grund, req.params.id);
+    } else {
+      db.getDb().prepare("UPDATE anfragen SET status=? WHERE id=?").run(status, req.params.id);
+    }
     res.json({ success: true });
   } catch (e) { res.status(500).json({ error: "Serverfehler" }); }
 });

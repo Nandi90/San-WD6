@@ -422,6 +422,8 @@ function AnfragenTab({user,toast,bereitschaften,onOpenVorgang}){
   const [showReassign,setShowReassign]=useState(false);
   const [reassignBC,setReassignBC]=useState("");
   const [cfm,setCfm]=useState(null);
+  const [showAblehnen,setShowAblehnen]=useState(null);
+  const [ablehnGrund,setAblehnGrund]=useState("");
 
   const load=()=>{setLoading(true);API.getAnfragen().then(r=>{setAnfragen(r);if(selected){const upd=r.find(a=>a.id===selected.id);if(upd)setSelected(upd);}setLoading(false);}).catch(e=>{toast(e.message,"error");setLoading(false);});};
   useEffect(load,[]);
@@ -442,7 +444,11 @@ function AnfragenTab({user,toast,bereitschaften,onOpenVorgang}){
   };
 
   const ablehnen=(a)=>{
-    setCfm({title:"Anfrage ablehnen",message:`„${a.name}" wirklich ablehnen? Der Veranstalter wird nicht automatisch benachrichtigt.`,icon:"✕",confirmText:"Ablehnen",accent:"#c62828",onConfirm:async()=>{setCfm(null);try{await API.updateAnfrageStatus(a.id,"abgelehnt");toast("Anfrage abgelehnt","success");load();setSelected(null);}catch(e){toast(e.message,"error");}}});
+    setAblehnGrund("");setShowAblehnen(a);
+  };
+  const doAblehnen=async()=>{
+    if(!showAblehnen||!ablehnGrund)return;
+    try{await API.updateAnfrageStatus(showAblehnen.id,"abgelehnt",ablehnGrund);toast("Anfrage abgelehnt","success");setShowAblehnen(null);load();setSelected(null);}catch(e){toast(e.message,"error");}
   };
 
   const archivieren=async(a)=>{
@@ -580,6 +586,10 @@ function AnfragenTab({user,toast,bereitschaften,onOpenVorgang}){
         </div>}
 
         {selected.status==="abgelehnt"&&<div style={{borderTop:`1px solid ${C.mittelgrau}40`,paddingTop:14,marginTop:14}}>
+          <div style={{padding:"10px 14px",background:"#ffebee",borderRadius:6,marginBottom:10}}>
+            <div style={{fontSize:12,color:"#c62828",fontWeight:700}}>✕ Diese Anfrage wurde abgelehnt.</div>
+            {selected.ablehnung_grund&&<div style={{fontSize:12,color:"#b71c1c",marginTop:4}}>Grund: <strong>{selected.ablehnung_grund}</strong></div>}
+          </div>
           <div style={{display:"flex",gap:8}}>
             <button onClick={()=>archivieren(selected)} style={{padding:"8px 16px",background:C.hellgrau,border:`1px solid ${C.mittelgrau}`,borderRadius:6,fontSize:12,cursor:"pointer",fontFamily:FONT.sans}}>📦 Archivieren</button>
             <button onClick={()=>loeschen(selected)} style={{padding:"8px 16px",background:"#fff",color:"#c62828",border:"1px solid #ef9a9a",borderRadius:6,fontSize:12,cursor:"pointer",fontFamily:FONT.sans}}>🗑️ Endgültig löschen</button>
@@ -590,6 +600,25 @@ function AnfragenTab({user,toast,bereitschaften,onOpenVorgang}){
           <button onClick={()=>loeschen(selected)} style={{padding:"8px 16px",background:"#fff",color:"#c62828",border:"1px solid #ef9a9a",borderRadius:6,fontSize:12,cursor:"pointer",fontFamily:FONT.sans}}>🗑️ Endgültig löschen</button>
         </div>}
       </Card>
+    </div>}
+
+    {/* Ablehnung Modal */}
+    {showAblehnen&&<div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.5)",backdropFilter:"blur(3px)",zIndex:9999,display:"flex",alignItems:"center",justifyContent:"center"}} onClick={()=>setShowAblehnen(null)}>
+      <div style={{background:"#fff",borderRadius:10,padding:"24px 28px",maxWidth:400,width:"90%",boxShadow:"0 20px 60px rgba(0,0,0,0.3)"}} onClick={e=>e.stopPropagation()}>
+        <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:16}}><span style={{fontSize:24}}>✕</span><div><div style={{fontSize:16,fontWeight:700,color:"#c62828"}}>Anfrage ablehnen</div><div style={{fontSize:11,color:C.dunkelgrau}}>Warum wird die Anfrage „{showAblehnen.name}" abgelehnt?</div></div></div>
+        <div style={{display:"flex",flexDirection:"column",gap:6,marginBottom:12}}>
+          {["Zu teuer","Anderer Anbieter","Veranstaltung abgesagt","Veranstalter stellt eigene Sanitäter","Kapazität nicht verfügbar","Sonstiges"].map(g=>(
+            <button key={g} onClick={()=>setAblehnGrund(g)} style={{padding:"8px 14px",background:ablehnGrund===g||(g==="Anderer Anbieter"&&ablehnGrund.startsWith("Anderer Anbieter"))||(g==="Sonstiges"&&ablehnGrund&&!["Zu teuer","Anderer Anbieter","Veranstaltung abgesagt","Veranstalter stellt eigene Sanitäter","Kapazität nicht verfügbar"].includes(ablehnGrund)&&!ablehnGrund.startsWith("Anderer Anbieter"))?"#ffebee":"#f5f5f5",border:`1px solid ${ablehnGrund===g||(g==="Anderer Anbieter"&&ablehnGrund.startsWith("Anderer Anbieter"))?"#e53935":"#ddd"}`,borderRadius:6,textAlign:"left",fontSize:13,cursor:"pointer",fontWeight:ablehnGrund===g||(g==="Anderer Anbieter"&&ablehnGrund.startsWith("Anderer Anbieter"))?600:400,color:ablehnGrund===g||(g==="Anderer Anbieter"&&ablehnGrund.startsWith("Anderer Anbieter"))?"#c62828":C.schwarz,fontFamily:FONT.sans}}>{g}</button>
+          ))}
+        </div>
+        {(ablehnGrund==="Anderer Anbieter"||ablehnGrund.startsWith("Anderer Anbieter:"))&&<input type="text" autoFocus placeholder="Welcher Anbieter? (z.B. ASB, MHD, JUH...)" value={ablehnGrund.startsWith("Anderer Anbieter:")?ablehnGrund.replace("Anderer Anbieter: ",""):""} onChange={e=>setAblehnGrund(e.target.value?`Anderer Anbieter: ${e.target.value}`:"Anderer Anbieter")} style={{width:"100%",padding:"8px 12px",border:"1px solid #e53935",borderRadius:6,fontSize:13,marginBottom:12,fontFamily:FONT.sans,boxSizing:"border-box"}}/>}
+        {ablehnGrund==="Sonstiges"&&<input type="text" autoFocus placeholder="Grund eingeben..." onChange={e=>{if(e.target.value)setAblehnGrund(e.target.value);}} style={{width:"100%",padding:"8px 12px",border:"1px solid #ccc",borderRadius:6,fontSize:13,marginBottom:12,fontFamily:FONT.sans,boxSizing:"border-box"}}/>}
+        <div style={{fontSize:11,color:"#888",marginBottom:12}}>Der Veranstalter wird nicht automatisch benachrichtigt.</div>
+        <div style={{display:"flex",gap:8,justifyContent:"flex-end"}}>
+          <button onClick={()=>setShowAblehnen(null)} style={{padding:"8px 18px",background:C.hellgrau,border:"none",borderRadius:6,fontSize:13,cursor:"pointer",fontFamily:FONT.sans}}>Abbrechen</button>
+          <button disabled={!ablehnGrund} onClick={doAblehnen} style={{padding:"8px 22px",background:"#c62828",color:"#fff",border:"none",borderRadius:6,fontSize:13,fontWeight:700,cursor:"pointer",fontFamily:FONT.sans,opacity:ablehnGrund?1:0.4}}>Ablehnen</button>
+        </div>
+      </div>
     </div>}
 
     <ConfirmModal open={!!cfm} title={cfm?.title} message={cfm?.message} icon={cfm?.icon} confirmText={cfm?.confirmText} accent={cfm?.accent} onConfirm={cfm?.onConfirm} onCancel={()=>setCfm(null)}/>
@@ -1271,11 +1300,12 @@ function VorgangChecklist({checklist={},onChange,onLockSave,eventDate}){
       <div style={{background:"#fff",borderRadius:10,padding:"24px 28px",maxWidth:400,width:"90%",boxShadow:"0 20px 60px rgba(0,0,0,0.3)"}} onClick={e=>e.stopPropagation()}>
         <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:16}}><span style={{fontSize:24}}>🚫</span><div><div style={{fontSize:16,fontWeight:700,color:"#c62828"}}>Angebot abgelehnt</div><div style={{fontSize:11,color:C.dunkelgrau}}>Warum wurde das Angebot nicht angenommen?</div></div></div>
         <div style={{display:"flex",flexDirection:"column",gap:6,marginBottom:12}}>
-          {["Zu teuer","Anderer Anbieter","Veranstaltung abgesagt","Eigene Absanitäter","Sonstiges"].map(g=>(
-            <button key={g} onClick={()=>setAblehnGrund(g)} style={{padding:"8px 14px",background:ablehnGrund===g?"#ffebee":"#f5f5f5",border:`1px solid ${ablehnGrund===g?"#e53935":"#ddd"}`,borderRadius:6,textAlign:"left",fontSize:13,cursor:"pointer",fontWeight:ablehnGrund===g?600:400,color:ablehnGrund===g?"#c62828":C.schwarz,fontFamily:FONT.sans}}>{g}</button>
+          {["Zu teuer","Anderer Anbieter","Veranstaltung abgesagt","Veranstalter stellt eigene Sanitäter","Kapazität nicht verfügbar","Sonstiges"].map(g=>(
+            <button key={g} onClick={()=>setAblehnGrund(g)} style={{padding:"8px 14px",background:ablehnGrund===g||(g==="Anderer Anbieter"&&ablehnGrund.startsWith("Anderer Anbieter"))||(g==="Sonstiges"&&ablehnGrund&&!["Zu teuer","Anderer Anbieter","Veranstaltung abgesagt","Veranstalter stellt eigene Sanitäter","Kapazität nicht verfügbar"].includes(ablehnGrund)&&!ablehnGrund.startsWith("Anderer Anbieter"))?"#ffebee":"#f5f5f5",border:`1px solid ${ablehnGrund===g||(g==="Anderer Anbieter"&&ablehnGrund.startsWith("Anderer Anbieter"))?"#e53935":"#ddd"}`,borderRadius:6,textAlign:"left",fontSize:13,cursor:"pointer",fontWeight:ablehnGrund===g||(g==="Anderer Anbieter"&&ablehnGrund.startsWith("Anderer Anbieter"))?600:400,color:ablehnGrund===g||(g==="Anderer Anbieter"&&ablehnGrund.startsWith("Anderer Anbieter"))?"#c62828":C.schwarz,fontFamily:FONT.sans}}>{g}</button>
           ))}
         </div>
-        {ablehnGrund==="Sonstiges"&&<input type="text" autoFocus placeholder="Grund eingeben..." onChange={e=>{if(e.target.value)setAblehnGrund(e.target.value);}} style={{width:"100%",padding:"8px 12px",border:"1px solid #ccc",borderRadius:6,fontSize:13,marginBottom:12,fontFamily:FONT.sans}}/>}
+        {(ablehnGrund==="Anderer Anbieter"||ablehnGrund.startsWith("Anderer Anbieter:"))&&<input type="text" autoFocus placeholder="Welcher Anbieter? (z.B. ASB, MHD, JUH...)" value={ablehnGrund.startsWith("Anderer Anbieter:")?ablehnGrund.replace("Anderer Anbieter: ",""):""} onChange={e=>setAblehnGrund(e.target.value?`Anderer Anbieter: ${e.target.value}`:"Anderer Anbieter")} style={{width:"100%",padding:"8px 12px",border:"1px solid #e53935",borderRadius:6,fontSize:13,marginBottom:12,fontFamily:FONT.sans,boxSizing:"border-box"}}/>}
+        {ablehnGrund==="Sonstiges"&&<input type="text" autoFocus placeholder="Grund eingeben..." onChange={e=>{if(e.target.value)setAblehnGrund(e.target.value);}} style={{width:"100%",padding:"8px 12px",border:"1px solid #ccc",borderRadius:6,fontSize:13,marginBottom:12,fontFamily:FONT.sans,boxSizing:"border-box"}}/>}
         <div style={{display:"flex",gap:8,justifyContent:"flex-end"}}>
           <button onClick={()=>setShowAblehnung(false)} style={{padding:"8px 18px",background:C.hellgrau,border:"none",borderRadius:6,fontSize:13,cursor:"pointer",fontFamily:FONT.sans}}>Abbrechen</button>
           <button disabled={!ablehnGrund} onClick={()=>{const newCL={...checklist,angebotAbgelehnt:Date.now(),ablehnungsGrund:ablehnGrund};onChange(newCL);if(onLockSave)onLockSave(newCL);setShowAblehnung(false);}} style={{padding:"8px 22px",background:"#c62828",color:"#fff",border:"none",borderRadius:6,fontSize:13,fontWeight:700,cursor:"pointer",fontFamily:FONT.sans,opacity:ablehnGrund?1:0.4}}>Ablehnung speichern</button>
