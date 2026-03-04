@@ -1021,6 +1021,15 @@ function SmtpConfig({toast}){
           <div style={{fontSize:10,color:"#888",marginTop:3,marginLeft:26}}>Der Veranstalter erhält automatisch eine Eingangsbestätigung per E-Mail.</div>
         </div>
 
+        <div style={{background:"#e8eaf6",borderRadius:6,padding:"14px 14px",marginBottom:12,border:"1px solid #c5cae9"}}>
+          <div style={{fontSize:12,fontWeight:700,color:"#1a237e",marginBottom:10}}>💳 FiBu-Weiterleitung</div>
+          <div>
+            <div style={{fontSize:11,fontWeight:600,color:"#555",marginBottom:3}}>FiBu E-Mail-Adresse</div>
+            <input value={cfg.fibu_email||""} onChange={e=>setCfg(p=>({...p,fibu_email:e.target.value}))} placeholder="fibu@brk-ndsob.de" style={{width:"100%",padding:"7px 10px",border:"1px solid #ccc",borderRadius:5,fontSize:12,fontFamily:FONT.sans}}/>
+            <div style={{fontSize:10,color:"#888",marginTop:3}}>Standard-Empfänger für die FiBu-Weiterleitung aus der Checkliste.</div>
+          </div>
+        </div>
+
         <div style={{display:"flex",gap:8}}>
           <button onClick={save} disabled={saving} style={{padding:"8px 20px",background:"#e65100",color:"#fff",border:"none",borderRadius:6,fontSize:13,fontWeight:600,cursor:"pointer",fontFamily:FONT.sans}}>{saving?"Speichern...":"Speichern"}</button>
           <button onClick={doTest} style={{padding:"8px 20px",background:C.hellgrau,border:"1px solid #ccc",borderRadius:6,fontSize:13,cursor:"pointer",fontFamily:FONT.sans}}>Verbindung testen</button>
@@ -1243,13 +1252,213 @@ function NextcloudConfig({toast}){
   </div>);
 }
 
-function VorgangChecklist({checklist={},onChange,onLockSave,eventDate}){
+// ═══════════════════════════════════════════════════════════════════════════
+// FIBU WEITERLEITUNG MODAL
+// ═══════════════════════════════════════════════════════════════════════════
+function FiBuModal({currentEventId,event:ev,user,stammdaten,dayCalcs,totalCosts,activeDays,toast,onClose,onSent}){
+  const ownBC=BEREITSCHAFTEN[stammdaten?.bereitschaftIdx]||BEREITSCHAFTEN[0];
+  const otherBCs=BEREITSCHAFTEN.filter(b=>b.code!==ownBC.code&&b.code!=="KBL");
+  const absender=user?.name||"";
+  const orgName=stammdaten?.kvName||"BRK Kreisverband";
+
+  const [fibuEmail,setFibuEmail]=useState("");
+  const [subject,setSubject]=useState(`FiBu-Abrechnung – ${ev?.name||""} ${ev?.auftragsnr||""}`);
+  const [hasFremdHelfer,setHasFremdHelfer]=useState(false);
+  const [fremdHelfer,setFremdHelfer]=useState([{bc:otherBCs[0]?.code||"",anzahl:""}]);
+  const [hasFremdFzg,setHasFremdFzg]=useState(false);
+  const [fremdFzg,setFremdFzg]=useState([{bc:otherBCs[0]?.code||"",typ:"KTW",kennzeichen:""}]);
+  const [sending,setSending]=useState(false);
+  const [sent,setSent]=useState(false);
+  const [notifiedBCs,setNotifiedBCs]=useState([]);
+
+  // FiBu-Mail laden
+  useEffect(()=>{API.getFiBuConfig().then(r=>setFibuEmail(r.fibu_email||"")).catch(()=>{});},[]);
+
+  const helferSummary=()=>{
+    if(!hasFremdHelfer)return"";
+    const lines=fremdHelfer.filter(h=>h.bc&&h.anzahl).map(h=>{
+      const b=BEREITSCHAFTEN.find(x=>x.code===h.bc);
+      return`- ${h.anzahl} Helfer von ${b?.name||h.bc}`;
+    });
+    return lines.length?"\n\nHelfer anderer Bereitschaften:\n"+lines.join("\n"):"";
+  };
+  const fzgSummary=()=>{
+    if(!hasFremdFzg)return"";
+    const lines=fremdFzg.filter(f=>f.bc&&f.typ).map(f=>{
+      const b=BEREITSCHAFTEN.find(x=>x.code===f.bc);
+      return`- ${f.typ}${f.kennzeichen?" ("+f.kennzeichen+")":""} von ${b?.name||f.bc}`;
+    });
+    return lines.length?"\n\nFahrzeuge anderer Bereitschaften:\n"+lines.join("\n"):"";
+  };
+
+  const bodyText=`Sehr geehrte Damen und Herren,\n\nanbei die Abrechnung für den Sanitätswachdienst der Veranstaltung „${ev?.name||""}" (${ev?.auftragsnr||""}).\n\nVeranstalter: ${ev?.veranstalter||""}\nDatum: ${activeDays?.filter(d=>d.date).map(d=>new Date(d.date).toLocaleDateString("de-DE")).join(", ")||""}\nGesamtkosten: ${totalCosts?new Intl.NumberFormat("de-DE",{minimumFractionDigits:2}).format(totalCosts)+" €":""}${helferSummary()}${fzgSummary()}\n\nDas Angebot liegt als PDF bei.\n\nMit freundlichen Grüßen\n${absender}\n${ownBC.name} · ${orgName}`;
+
+  const [body,setBody]=useState("");
+  useEffect(()=>{setBody(bodyText);},[hasFremdHelfer,hasFremdFzg,fremdHelfer,fremdFzg]);
+  // Init body
+  useEffect(()=>{setBody(bodyText);},[]);
+
+  const send=async()=>{
+    if(!fibuEmail){toast("FiBu-E-Mail-Adresse fehlt","warning");return;}
+    if(!fibuEmail.includes("@")){toast("Ungültige E-Mail-Adresse","warning");return;}
+    setSending(true);
+    try{
+      // FiBu-Mail an config speichern
+      await API.saveFiBuConfig({fibu_email:fibuEmail});
+      const r=await API.sendFiBuMail(currentEventId,{
+        to:fibuEmail,subject,body,
+        fremdHelfer:hasFremdHelfer?fremdHelfer.filter(h=>h.bc&&h.anzahl):[],
+        fremdFahrzeuge:hasFremdFzg?fremdFzg.filter(f=>f.bc&&f.typ):[],
+        dayCalcs,totalCosts,activeDays
+      });
+      if(r.success){setSent(true);setNotifiedBCs(r.notifiedBCs||[]);toast("✉️ FiBu-Mail gesendet","success");if(onSent)onSent();}
+      else toast("Fehler: "+(r.error||""),"error");
+    }catch(e){toast("Fehler: "+e.message,"error");}
+    finally{setSending(false);}
+  };
+
+  const addHelfer=()=>setFremdHelfer(p=>[...p,{bc:otherBCs[0]?.code||"",anzahl:""}]);
+  const removeHelfer=(i)=>setFremdHelfer(p=>p.filter((_,j)=>j!==i));
+  const updHelfer=(i,k,v)=>setFremdHelfer(p=>p.map((h,j)=>j===i?{...h,[k]:v}:h));
+  const addFzg=()=>setFremdFzg(p=>[...p,{bc:otherBCs[0]?.code||"",typ:"KTW",kennzeichen:""}]);
+  const removeFzg=(i)=>setFremdFzg(p=>p.filter((_,j)=>j!==i));
+  const updFzg=(i,k,v)=>setFremdFzg(p=>p.map((f,j)=>j===i?{...f,[k]:v}:f));
+
+  const sI={width:"100%",padding:"8px 10px",border:"1px solid #ccc",borderRadius:5,fontSize:12,fontFamily:FONT.sans,boxSizing:"border-box"};
+  const sL={fontSize:11,fontWeight:600,color:"#555",marginBottom:3,display:"block"};
+
+  return(<div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.5)",backdropFilter:"blur(3px)",zIndex:9999,display:"flex",alignItems:"center",justifyContent:"center"}} onClick={onClose}>
+    <div style={{background:"#fff",borderRadius:12,maxWidth:640,width:"92%",maxHeight:"90vh",overflowY:"auto",boxShadow:"0 20px 60px rgba(0,0,0,0.3)"}} onClick={e=>e.stopPropagation()}>
+      {/* Header */}
+      <div style={{padding:"18px 24px",borderBottom:"1px solid #f0f0f0",display:"flex",alignItems:"center",justifyContent:"space-between"}}>
+        <div style={{display:"flex",alignItems:"center",gap:10}}>
+          <span style={{fontSize:24}}>💳</span>
+          <div><div style={{fontSize:16,fontWeight:700,color:"#1a1a2e"}}>Weiterleitung an FiBu</div>
+          <div style={{fontSize:11,color:C.dunkelgrau}}>{ev?.name} · {ev?.auftragsnr}</div></div>
+        </div>
+        <button onClick={onClose} style={{background:"none",border:"none",fontSize:20,cursor:"pointer",color:"#999"}}>✕</button>
+      </div>
+
+      {sent?<div style={{padding:"40px 24px",textAlign:"center"}}>
+        <div style={{fontSize:48,marginBottom:12}}>✅</div>
+        <div style={{fontSize:16,fontWeight:700,color:"#2e7d32",marginBottom:6}}>FiBu-Mail erfolgreich gesendet</div>
+        <div style={{fontSize:13,color:C.dunkelgrau,marginBottom:6}}>An: {fibuEmail}</div>
+        <div style={{background:"#e8f5e9",borderRadius:8,padding:"12px 16px",marginBottom:12,textAlign:"left",fontSize:12,color:"#2e7d32"}}>
+          <div style={{fontWeight:700,marginBottom:6}}>📋 Erledigt:</div>
+          <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:3}}>☑️ Weiterleitung an FiBu</div>
+          <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:3}}>☑️ Vorgang abgeschlossen</div>
+          <div style={{display:"flex",alignItems:"center",gap:6}}>📎 Angebot als PDF angehängt</div>
+          {notifiedBCs.length>0&&<div style={{marginTop:8,borderTop:"1px solid #c8e6c9",paddingTop:6}}>
+            <div style={{fontWeight:600}}>📨 Benachrichtigt:</div>
+            {notifiedBCs.map((bc,i)=><div key={i} style={{marginLeft:8}}>• {bc}</div>)}
+          </div>}
+        </div>
+        <button onClick={onClose} style={{padding:"10px 28px",background:C.dunkelblau,color:"#fff",border:"none",borderRadius:6,fontSize:14,fontWeight:600,cursor:"pointer",fontFamily:FONT.sans}}>Schließen</button>
+      </div>
+
+      :<div style={{padding:"20px 24px"}}>
+        {/* FiBu E-Mail */}
+        <div style={{marginBottom:14}}>
+          <label style={sL}>FiBu E-Mail-Adresse *</label>
+          <input value={fibuEmail} onChange={e=>setFibuEmail(e.target.value)} placeholder="fibu@brk-ndsob.de" style={{...sI,border:`1px solid ${fibuEmail&&!fibuEmail.includes("@")?"#ef5350":"#ccc"}`}}/>
+          <div style={{fontSize:10,color:"#888",marginTop:2}}>Wird gespeichert und beim nächsten Mal vorausgefüllt</div>
+        </div>
+
+        {/* Betreff */}
+        <div style={{marginBottom:14}}>
+          <label style={sL}>Betreff</label>
+          <input value={subject} onChange={e=>setSubject(e.target.value)} style={sI}/>
+        </div>
+
+        {/* Helfer anderer Bereitschaften */}
+        <div style={{marginBottom:14,padding:"14px 16px",background:hasFremdHelfer?"#fff8e1":"#fafafa",border:`1px solid ${hasFremdHelfer?"#ffe082":"#e0e0e0"}`,borderRadius:8}}>
+          <label style={{display:"flex",alignItems:"center",gap:10,cursor:"pointer",marginBottom:hasFremdHelfer?12:0}} onClick={()=>setHasFremdHelfer(!hasFremdHelfer)}>
+            <div style={{width:20,height:20,borderRadius:4,border:`2px solid ${hasFremdHelfer?"#e65100":"#bbb"}`,background:hasFremdHelfer?"#e65100":"transparent",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>{hasFremdHelfer&&<svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M2 6l3 3 5-5" stroke="#fff" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/></svg>}</div>
+            <div><div style={{fontSize:13,fontWeight:600}}>👥 Helfer anderer Bereitschaften</div>
+              <div style={{fontSize:10,color:"#888"}}>Waren Helfer einer anderen Bereitschaft im Einsatz?</div></div>
+          </label>
+          {hasFremdHelfer&&<div>
+            {fremdHelfer.map((h,i)=><div key={i} style={{display:"flex",gap:8,alignItems:"center",marginBottom:6}}>
+              <select value={h.bc} onChange={e=>updHelfer(i,"bc",e.target.value)} style={{...sI,flex:2}}>
+                {otherBCs.map(b=><option key={b.code} value={b.code}>{b.name}</option>)}
+              </select>
+              <input type="number" min="1" placeholder="Anz." value={h.anzahl} onChange={e=>updHelfer(i,"anzahl",e.target.value)} style={{...sI,flex:1,textAlign:"center"}}/>
+              {fremdHelfer.length>1&&<button onClick={()=>removeHelfer(i)} style={{background:"none",border:"none",color:C.rot,cursor:"pointer",fontSize:14,padding:2}}>✕</button>}
+            </div>)}
+            <button onClick={addHelfer} style={{background:"none",border:"1px dashed #bbb",borderRadius:4,padding:"4px 12px",fontSize:11,cursor:"pointer",color:"#555",fontFamily:FONT.sans}}>+ Weitere Bereitschaft</button>
+          </div>}
+        </div>
+
+        {/* Fahrzeuge anderer Bereitschaften */}
+        <div style={{marginBottom:14,padding:"14px 16px",background:hasFremdFzg?"#e3f2fd":"#fafafa",border:`1px solid ${hasFremdFzg?"#90caf9":"#e0e0e0"}`,borderRadius:8}}>
+          <label style={{display:"flex",alignItems:"center",gap:10,cursor:"pointer",marginBottom:hasFremdFzg?12:0}} onClick={()=>setHasFremdFzg(!hasFremdFzg)}>
+            <div style={{width:20,height:20,borderRadius:4,border:`2px solid ${hasFremdFzg?"#1565c0":"#bbb"}`,background:hasFremdFzg?"#1565c0":"transparent",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>{hasFremdFzg&&<svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M2 6l3 3 5-5" stroke="#fff" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/></svg>}</div>
+            <div><div style={{fontSize:13,fontWeight:600}}>🚑 Fahrzeuge anderer Bereitschaften</div>
+              <div style={{fontSize:10,color:"#888"}}>Wurden Fahrzeuge einer anderen Bereitschaft eingesetzt?</div></div>
+          </label>
+          {hasFremdFzg&&<div>
+            {fremdFzg.map((f,i)=><div key={i} style={{display:"flex",gap:6,alignItems:"center",marginBottom:6,flexWrap:"wrap"}}>
+              <select value={f.bc} onChange={e=>updFzg(i,"bc",e.target.value)} style={{...sI,flex:2,minWidth:120}}>
+                {otherBCs.map(b=><option key={b.code} value={b.code}>{b.name}</option>)}
+              </select>
+              <select value={f.typ} onChange={e=>updFzg(i,"typ",e.target.value)} style={{...sI,flex:1,minWidth:80}}>
+                {["KTW","RTW","GKTW","MTW","EL-KFZ","SEG","Sonstige"].map(t=><option key={t} value={t}>{t}</option>)}
+              </select>
+              <input placeholder="Kennzeichen" value={f.kennzeichen} onChange={e=>updFzg(i,"kennzeichen",e.target.value)} style={{...sI,flex:1.5,minWidth:100}}/>
+              {fremdFzg.length>1&&<button onClick={()=>removeFzg(i)} style={{background:"none",border:"none",color:C.rot,cursor:"pointer",fontSize:14,padding:2}}>✕</button>}
+            </div>)}
+            <button onClick={addFzg} style={{background:"none",border:"1px dashed #bbb",borderRadius:4,padding:"4px 12px",fontSize:11,cursor:"pointer",color:"#555",fontFamily:FONT.sans}}>+ Weiteres Fahrzeug</button>
+          </div>}
+        </div>
+
+        {/* Benachrichtigungshinweis */}
+        {(hasFremdHelfer||hasFremdFzg)&&(()=>{
+          const allBCs=new Set();
+          if(hasFremdHelfer)fremdHelfer.filter(h=>h.bc&&h.anzahl).forEach(h=>allBCs.add(h.bc));
+          if(hasFremdFzg)fremdFzg.filter(f=>f.bc&&f.typ).forEach(f=>allBCs.add(f.bc));
+          if(allBCs.size===0)return null;
+          return <div style={{marginBottom:14,padding:"10px 14px",background:"#e8f5e9",border:"1px solid #a5d6a7",borderRadius:6,fontSize:11,color:"#2e7d32"}}>
+            <div style={{fontWeight:700,marginBottom:4}}>📨 Automatische Benachrichtigung an:</div>
+            {[...allBCs].map(bc=>{const b=BEREITSCHAFTEN.find(x=>x.code===bc);return <div key={bc}>• {b?.name||bc}</div>;})}
+            <div style={{marginTop:4,fontSize:10,color:"#388e3c"}}>Die Bereitschaften werden an ihre hinterlegte E-Mail informiert, dass eine Abrechnung mit ihren Helfern/Fahrzeugen an die FiBu ging.</div>
+          </div>;
+        })()}
+
+        {/* Nachricht */}
+        <div style={{marginBottom:14}}>
+          <label style={sL}>Nachricht an FiBu</label>
+          <textarea value={body} onChange={e=>setBody(e.target.value)} rows={10} style={{...sI,resize:"vertical",lineHeight:1.6}}/>
+        </div>
+
+        {/* Anhang-Info */}
+        <div style={{background:"#f5f5f5",borderRadius:6,padding:"10px 14px",marginBottom:16,fontSize:11,color:C.dunkelgrau}}>
+          <div style={{display:"flex",gap:16,flexWrap:"wrap"}}>
+            <div>📎 <span style={{fontWeight:600}}>Anhang:</span> Angebot (PDF)</div>
+            <div><span style={{fontWeight:600}}>Von:</span> {stammdaten?.email||"(SMTP)"}</div>
+            <div><span style={{fontWeight:600}}>CC:</span> {stammdaten?.email||"eigene BC"}</div>
+          </div>
+        </div>
+
+        {/* Buttons */}
+        <div style={{display:"flex",gap:8,justifyContent:"flex-end"}}>
+          <button onClick={onClose} style={{padding:"9px 20px",background:"#fff",border:"1px solid #d0d0d0",borderRadius:6,fontSize:13,fontWeight:600,cursor:"pointer",color:"#555",fontFamily:FONT.sans}}>Abbrechen</button>
+          <button onClick={send} disabled={sending||!fibuEmail} style={{padding:"9px 28px",background:sending?"#bbb":"#1a237e",color:"#fff",border:"none",borderRadius:6,fontSize:13,fontWeight:700,cursor:sending?"default":"pointer",fontFamily:FONT.sans,opacity:fibuEmail?1:0.4}}>{sending?"Wird gesendet...":"💳 An FiBu senden & abschließen"}</button>
+        </div>
+      </div>}
+    </div>
+  </div>);
+}
+
+function VorgangChecklist({checklist={},onChange,onLockSave,eventDate,currentEventId,event:ev,user,stammdaten,dayCalcs,totalCosts,activeDays,toast}){
   const [confirmKey,setConfirmKey]=useState(null);
   const [showAblehnung,setShowAblehnung]=useState(false);
   const [ablehnGrund,setAblehnGrund]=useState("");
+  const [showFiBu,setShowFiBu]=useState(false);
   const isLocked=!!(checklist.angebotVersendet||checklist.abgeschlossen);
   const toggle=(key)=>{
     if((key==="angebotVersendet"||key==="abgeschlossen")&&checklist[key])return;
+    if(key==="fibuWeitergeleitet"&&!checklist[key]){setShowFiBu(true);return;}
+    if(key==="fibuWeitergeleitet"&&checklist[key])return;
     if((key==="angebotVersendet"||key==="abgeschlossen")&&!checklist[key]){
       setConfirmKey(key);return;
     }
@@ -1312,6 +1521,8 @@ function VorgangChecklist({checklist={},onChange,onLockSave,eventDate}){
         </div>
       </div>
     </div>}
+    {/* FiBu Weiterleitung Modal */}
+    {showFiBu&&<FiBuModal currentEventId={currentEventId} event={ev} user={user} stammdaten={stammdaten} dayCalcs={dayCalcs} totalCosts={totalCosts} activeDays={activeDays} toast={toast} onClose={()=>setShowFiBu(false)} onSent={()=>{setShowFiBu(false);const now=Date.now();const newCL={...checklist,fibuWeitergeleitet:now,abgeschlossen:now};onChange(newCL);if(onLockSave)onLockSave(newCL);}}/>}
     <ConfirmModal open={!!confirmKey} title={confirmLabels[confirmKey]?.title||""} message={confirmLabels[confirmKey]?.msg||""} icon={confirmLabels[confirmKey]?.icon} accent={confirmLabels[confirmKey]?.accent} confirmText="Ja, sperren" cancelText="Abbrechen" onConfirm={confirmLock} onCancel={()=>setConfirmKey(null)}/>
   </div>);
 }
@@ -2257,6 +2468,11 @@ const LATEST_RELEASE={v:"v7.5",d:"04.03.2026",c:[
 "Kunden: Bereitschafts-Zuordnung sichtbar für Admins (farbige BC-Badges)",
 "Kunden: CSV-Import nutzt Backend-Route (Adresse + PLZ/Ort werden korrekt importiert)",
 "Kunden: Batch-Löschung mehrerer Kunden gleichzeitig",
+"FiBu: Weiterleitung per E-Mail mit Angebots-PDF als Anhang",
+"FiBu: Abfrage Helfer/Fahrzeuge anderer Bereitschaften (BC, Anzahl, Kennzeichen)",
+"FiBu: Automatische Benachrichtigung betroffener Bereitschaften per E-Mail",
+"FiBu: Markiert Checkliste 'Weiterleitung an FiBu' + 'Abgeschlossen' automatisch",
+"FiBu: E-Mail-Adresse in SMTP-Konfiguration konfigurierbar",
 ]};
 const RELEASE_V74={v:"v7.4",d:"04.03.2026",c:[
 "Statistik-Dashboard: Einsätze pro Monat, Status-Verteilung, Bereitschafts-Übersicht",
@@ -2674,7 +2890,7 @@ export default function App(){
             {/* RIGHT COLUMN: Checkliste */}
             <div>
               <Card title="Checkliste" accent="#d4920a" sub="Vorgangs-Status">
-                <VorgangChecklist checklist={event.checklist||{}} onChange={updateChecklist} onLockSave={async(newCL)=>{const id=currentEventId;if(!id||!user)return;try{const bc=BEREITSCHAFTEN[stammdaten.bereitschaftIdx]?.code;const lockEvent={...event,checklist:newCL};await API.saveVorgang(id,{id,event:lockEvent,days,year,updatedAt:Date.now(),activeDays:days.filter(d=>d.active).length,createdBy:user.name,bereitschaftCode:bc});console.log("Lock-Save OK:",id);toast("Status gespeichert","success");}catch(e){console.error("Lock-Save Fehler:",e);toast("Speichern fehlgeschlagen: "+e.message,"error");}}} eventDate={activeDays[activeDays.length-1]?.date||activeDays[0]?.date}/>
+                <VorgangChecklist checklist={event.checklist||{}} onChange={updateChecklist} onLockSave={async(newCL)=>{const id=currentEventId;if(!id||!user)return;try{const bc=BEREITSCHAFTEN[stammdaten.bereitschaftIdx]?.code;const lockEvent={...event,checklist:newCL};await API.saveVorgang(id,{id,event:lockEvent,days,year,updatedAt:Date.now(),activeDays:days.filter(d=>d.active).length,createdBy:user.name,bereitschaftCode:bc});console.log("Lock-Save OK:",id);toast("Status gespeichert","success");}catch(e){console.error("Lock-Save Fehler:",e);toast("Speichern fehlgeschlagen: "+e.message,"error");}}} eventDate={activeDays[activeDays.length-1]?.date||activeDays[0]?.date} currentEventId={currentEventId} event={event} user={user} stammdaten={stammdaten} dayCalcs={dayCalcs} totalCosts={totalCosts} activeDays={activeDays} toast={toast}/>
               </Card>
               <Card title="Zusammenfassung">
                 <div style={{display:"grid",gap:6}}>

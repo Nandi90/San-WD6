@@ -1194,6 +1194,118 @@ app.post("/api/mail/send/:id", requireAuth, async (req, res) => {
   }
 });
 
+// ── FiBu Weiterleitung ─────────────────────────────────────────────
+app.get("/api/config/fibu", requireAuth, (req, res) => {
+  const { getConfig } = require("./db");
+  res.json({ fibu_email: getConfig("fibu_email", "") });
+});
+app.put("/api/config/fibu", requireAuth, (req, res) => {
+  const { setConfig } = require("./db");
+  setConfig("fibu_email", req.body.fibu_email || "");
+  res.json({ success: true });
+});
+
+app.post("/api/mail/fibu/:id", requireAuth, async (req, res) => {
+  try {
+    if (!smtp.isConfigured()) return res.status(501).json({ error: "E-Mail nicht konfiguriert" });
+    const dbi = require("./db").getDb();
+    const row = dbi.prepare("SELECT data, bereitschaft_code FROM vorgaenge WHERE id=?").get(req.params.id);
+    if (!row) return res.status(404).json({ error: "Vorgang nicht gefunden" });
+
+    const vorgang = JSON.parse(row.data);
+    const ev = vorgang.event || {};
+    const stamm = dbi.prepare("SELECT * FROM bereitschaften WHERE code=?").get(row.bereitschaft_code) || {};
+    const user = dbi.prepare("SELECT name, titel, ort, email, telefon, mobil FROM users WHERE sub=?").get(req.session.user.sub) || {};
+    const kosten = dbi.prepare("SELECT * FROM kostensaetze WHERE bereitschaft_code=?").get(row.bereitschaft_code) || {};
+
+    const { to, subject, body, fremdHelfer, fremdFahrzeuge, dayCalcs, totalCosts, activeDays } = req.body;
+    if (!to) return res.status(400).json({ error: "FiBu-E-Mail fehlt" });
+
+    // Angebot-PDF generieren
+    const attachments = [];
+    try {
+      const html = buildAngebotHTML(ev, dayCalcs || [], totalCosts || 0, activeDays || vorgang.days || [], stamm, kosten, user);
+      const pdf = await BrowserPool.renderPDF(html, { marginTop: "20mm", marginLeft: "12mm" });
+      const nr = (ev.auftragsnr || "").replace(/[^a-zA-Z0-9_-]/g, "_");
+      attachments.push({ filename: `${nr}_Angebot.pdf`, content: pdf, contentType: "application/pdf" });
+    } catch (e) { console.warn("FiBu PDF:", e.message); }
+
+    // Haupt-Mail an FiBu
+    const htmlBody = body.split("\n").map(l => l.trim() ? `<p>${l}</p>` : "<p>&nbsp;</p>").join("");
+    const fromEmail = stamm.email || require("./db").getConfig("smtp_from_email", "");
+    const fromName = require("./db").getConfig("smtp_from_name", "BRK Sanitätswachdienst");
+
+    const result = await smtp.send({
+      from: `"${fromName}" <${fromEmail}>`,
+      to,
+      subject,
+      html: htmlBody,
+      replyTo: user.email || stamm.email || fromEmail,
+      cc: stamm.email || undefined,
+      attachments
+    });
+
+    // Benachrichtigung an andere Bereitschaften
+    const notifiedBCs = [];
+    if (fremdHelfer?.length > 0 || fremdFahrzeuge?.length > 0) {
+      const allBCs = new Set();
+      (fremdHelfer || []).forEach(h => allBCs.add(h.bc));
+      (fremdFahrzeuge || []).forEach(f => allBCs.add(f.bc));
+
+      for (const bcCode of allBCs) {
+        const bcRow = dbi.prepare("SELECT name, email FROM bereitschaften WHERE code=?").get(bcCode);
+        if (!bcRow?.email) continue;
+
+        const helferForBC = (fremdHelfer || []).filter(h => h.bc === bcCode);
+        const fzgForBC = (fremdFahrzeuge || []).filter(f => f.bc === bcCode);
+
+        let details = "";
+        if (helferForBC.length > 0) {
+          const totalH = helferForBC.reduce((s, h) => s + (parseInt(h.anzahl) || 0), 0);
+          details += `<p><strong>Helfer:</strong> ${totalH} Helfer aus ${bcRow.name}</p>`;
+        }
+        if (fzgForBC.length > 0) {
+          details += `<p><strong>Fahrzeuge:</strong></p><ul>${fzgForBC.map(f => `<li>${f.typ || "Fahrzeug"}${f.kennzeichen ? " – " + f.kennzeichen : ""}</li>`).join("")}</ul>`;
+        }
+
+        const bcNotifyHTML = `
+          <p>Hallo ${bcRow.name},</p>
+          <p>hiermit informieren wir euch, dass für die Veranstaltung <strong>${ev.name || ""}</strong> (${ev.auftragsnr || ""}) eine Abrechnung an die Finanzbuchhaltung weitergeleitet wurde.</p>
+          <p>Dabei wurden folgende Ressourcen eurer Bereitschaft eingesetzt:</p>
+          ${details}
+          <p>Falls ihr Fragen habt, meldet euch gerne bei uns.</p>
+          <p>Mit kameradschaftlichen Grüßen<br/>${user.name || stamm.leiter_name || ""}<br/>${stamm.name || ""}</p>`;
+
+        try {
+          await smtp.send({
+            from: `"${fromName}" <${fromEmail}>`,
+            to: bcRow.email,
+            subject: `FiBu-Abrechnung: ${ev.name || ""} (${ev.auftragsnr || ""}) – Eure Helfer/Fahrzeuge`,
+            html: bcNotifyHTML,
+            replyTo: user.email || stamm.email || fromEmail
+          });
+          notifiedBCs.push(bcRow.name);
+        } catch (e) { console.warn("BC-Notify:", bcCode, e.message); }
+      }
+    }
+
+    // Checklist updaten: fibuWeitergeleitet + abgeschlossen
+    const now = Date.now();
+    vorgang.event.checklist = { ...(vorgang.event.checklist || {}), fibuWeitergeleitet: now, abgeschlossen: now };
+    if (fremdHelfer?.length > 0) vorgang.event.checklist.fibuFremdHelfer = fremdHelfer;
+    if (fremdFahrzeuge?.length > 0) vorgang.event.checklist.fibuFremdFahrzeuge = fremdFahrzeuge;
+    dbi.prepare("UPDATE vorgaenge SET data=? WHERE id=?").run(JSON.stringify(vorgang), req.params.id);
+
+    const { audit } = require("./db");
+    audit(req.session.user, "fibu_mail", "vorgang", req.params.id, `An: ${to}, Benachrichtigt: ${notifiedBCs.join(", ") || "keine"}`);
+
+    res.json({ success: true, notifiedBCs });
+  } catch(e) {
+    console.error("FiBu Mail:", e);
+    res.status(500).json({ error: e.message });
+  }
+});
+
 // Nextcloud Test-Verbindung
 app.post("/api/config/nextcloud/test", requireAuth, async (req, res) => {
   if (req.session.user.rolle !== "admin") return res.status(403).json({ error: "Nur Admin" });

@@ -248,6 +248,9 @@ const API = {
   async saveSmtpConfig(cfg) { return this.json("/api/config/smtp", { method: "PUT", body: JSON.stringify(cfg) }); },
   async testSmtp() { return this.json("/api/config/smtp/test", { method: "POST" }); },
   async sendMail(vorgangId, data) { return this.json(`/api/mail/send/${vorgangId}`, { method: "POST", body: JSON.stringify(data) }); },
+  async sendFiBuMail(vorgangId, data) { return this.json(`/api/mail/fibu/${vorgangId}`, { method: "POST", body: JSON.stringify(data) }); },
+  async getFiBuConfig() { return this.json("/api/config/fibu"); },
+  async saveFiBuConfig(data) { return this.json("/api/config/fibu", { method: "PUT", body: JSON.stringify(data) }); },
 
   async getNextcloudConfig() { return this.json("/api/config/nextcloud"); },
   async saveNextcloudConfig(cfg) { return this.json("/api/config/nextcloud", { method: "PUT", body: JSON.stringify(cfg) }); },
