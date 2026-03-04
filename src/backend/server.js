@@ -454,6 +454,14 @@ body.embed .btn{font-size:14px;padding:10px 24px}
       <label><span class="req">Telefon</span><input type="tel" name="telefon" required></label>
       <label><span class="req">E-Mail</span><input type="email" name="email" required></label>
     </div>
+
+    <div class="sec" style="margin-top:18px">Angebots- / Rechnungsadresse</div>
+    <label><span>Rechnungsempf\\u00e4nger <span style="font-weight:400;color:#888">(falls abweichend vom Veranstalter)</span></span><input name="rechnungsempfaenger" placeholder="Firma / Verein / Name"></label>
+    <label><span>Stra\\u00dfe / Hausnummer</span><input name="reStrasse" placeholder="z.B. Musterstra\\u00dfe 12"></label>
+    <div class="row">
+      <label><span>PLZ</span><input name="rePlz" maxlength="5" placeholder="z.B. 86529"></label>
+      <label><span>Ort</span><input name="reOrt" placeholder="z.B. Schrobenhausen"></label>
+    </div>
     <label><span>Bemerkung / besondere Anforderungen</span><textarea name="bemerkung" placeholder="z.B. Auflagen der Beh\u00f6rde, Gel\u00e4ndebesonderheiten..."></textarea></label>
 
     <label class="chk"><input type="checkbox" id="dsgvo" required><span>Ich stimme der Verarbeitung meiner Daten gem\u00e4\u00df der <a href="${dsUrl}" target="_blank" rel="noopener" style="color:#004B91;text-decoration:underline">Datenschutzerkl\u00e4rung</a> zu. *</span></label>
@@ -543,10 +551,10 @@ if(document.body.classList.contains("embed")){
 
 app.post("/api/anfrage", express.json(), (req, res) => {
   try {
-    const { name, ort, adresse, tage, besucher, veranstalter, ansprechpartner, telefon, email, bemerkung, art } = req.body;
+    const { name, ort, adresse, tage, besucher, veranstalter, ansprechpartner, telefon, email, bemerkung, art, rechnungsempfaenger, reStrasse, rePlz, reOrt } = req.body;
     if (!name || !veranstalter || !ansprechpartner || !telefon || !email) return res.status(400).json({ error: "Pflichtfelder fehlen" });
-    db.getDb().prepare("INSERT INTO anfragen (name,ort,adresse,datum,zeit_von,zeit_bis,besucher,veranstalter,ansprechpartner,telefon,email,bemerkung,art,plz,suggested_bc) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)")
-      .run(name, ort||"", adresse||"", JSON.stringify(tage||[]), "", "", besucher||0, veranstalter, ansprechpartner, telefon, email, bemerkung||"", art||"", req.body.plz||"", req.body.suggested_bc||"");
+    db.getDb().prepare("INSERT INTO anfragen (name,ort,adresse,datum,zeit_von,zeit_bis,besucher,veranstalter,ansprechpartner,telefon,email,bemerkung,art,plz,suggested_bc,rechnungsempfaenger,re_strasse,re_plz_ort) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)")
+      .run(name, ort||"", adresse||"", JSON.stringify(tage||[]), "", "", besucher||0, veranstalter, ansprechpartner, telefon, email, bemerkung||"", art||"", req.body.plz||"", req.body.suggested_bc||"", rechnungsempfaenger||"", reStrasse||"", (rePlz&&reOrt)?`${rePlz} ${reOrt}`:(rePlz||reOrt||""));
     res.json({ success: true });
 
     // E-Mail-Benachrichtigung (non-blocking)
@@ -709,8 +717,8 @@ app.post("/api/anfragen/:id/annehmen", (req, res) => {
         auftragsnr, name: anfrage.name || "", ort: anfrage.ort || "",
         adresse: anfrage.adresse || "", veranstalter: anfrage.veranstalter || "",
         ansprechpartner: anfrage.ansprechpartner || "", telefon: anfrage.telefon || "",
-        email: anfrage.email || "", rechnungsempfaenger: anfrage.veranstalter || "",
-        reStrasse: "", rePlzOrt: "",
+        email: anfrage.email || "", rechnungsempfaenger: anfrage.rechnungsempfaenger || anfrage.veranstalter || "",
+        reStrasse: anfrage.re_strasse || "", rePlzOrt: anfrage.re_plz_ort || "",
         anrede: "Sehr geehrte Damen und Herren,",
         auflagen: "keine", kfzStellplatz: true, sanitaetsraum: false,
         strom: true, verpflegung: true, pauschalangebot: 0,

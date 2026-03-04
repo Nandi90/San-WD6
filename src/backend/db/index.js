@@ -52,6 +52,15 @@ function init() {
     try {
       getDb().prepare("ALTER TABLE anfragen ADD COLUMN suggested_bc TEXT DEFAULT NULL").run();
     } catch {}
+    try {
+      getDb().prepare("ALTER TABLE anfragen ADD COLUMN rechnungsempfaenger TEXT DEFAULT ''").run();
+    } catch {}
+    try {
+      getDb().prepare("ALTER TABLE anfragen ADD COLUMN re_strasse TEXT DEFAULT ''").run();
+    } catch {}
+    try {
+      getDb().prepare("ALTER TABLE anfragen ADD COLUMN re_plz_ort TEXT DEFAULT ''").run();
+    } catch {}
     // Backfill: angenommene Anfragen mit BC + Vorgang-ID aus verknüpften Vorgängen
     try {
       const orphans = getDb().prepare("SELECT id FROM anfragen WHERE status='angenommen' AND (bereitschaft_code IS NULL OR vorgang_id IS NULL)").all();

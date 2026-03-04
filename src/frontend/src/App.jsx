@@ -517,6 +517,12 @@ function AnfragenTab({user,toast,bereitschaften,onOpenVorgang}){
           <div><span style={{fontWeight:600,color:"#555"}}>Art:</span> {selected.art||"-"}</div>
           {selected.suggested_bc&&<div><span style={{fontWeight:600,color:"#555"}}>Vorgeschlagene BC:</span> <span style={{color:"#e65100",fontWeight:600}}>{(bereitschaften||[]).find(b=>b.code===selected.suggested_bc)?.name||selected.suggested_bc}</span> <span style={{fontSize:10,color:"#888"}}>(PLZ {selected.plz})</span></div>}
           <div style={{gridColumn:"1/-1"}}><span style={{fontWeight:600,color:"#555"}}>Eingegangen:</span> {fDateTime(selected.created_at)}</div>
+          {(selected.rechnungsempfaenger||selected.re_strasse||selected.re_plz_ort)&&<div style={{gridColumn:"1/-1",marginTop:4,padding:"8px 12px",background:"#f5f5f5",borderRadius:6}}>
+            <div style={{fontSize:11,fontWeight:600,color:"#555",marginBottom:4}}>Angebots-/Rechnungsadresse:</div>
+            <div style={{fontSize:12}}>{selected.rechnungsempfaenger||selected.veranstalter}</div>
+            {selected.re_strasse&&<div style={{fontSize:12}}>{selected.re_strasse}</div>}
+            {selected.re_plz_ort&&<div style={{fontSize:12}}>{selected.re_plz_ort}</div>}
+          </div>}
         </div>
 
         {/* Tage */}
@@ -2143,6 +2149,7 @@ const LATEST_RELEASE={v:"v7.5",d:"04.03.2026",c:[
 "Anfragen: Bereitschaft umzuweisen (nachträgliche Korrektur der Zuweisung)",
 "Anfragen: Vorgang-Link klickbar → öffnet direkt den zugehörigen Vorgang",
 "Anfrageformular: PLZ-Feld mit automatischer Bereitschafts-Vorauswahl",
+"Anfrageformular: Angebots-/Rechnungsadresse im Formular erfassbar",
 "Anfrageformular: 18 PLZ im Landkreis ND-SOB → Bereitschafts-Zuordnung",
 "Anfrageformular: iFrame-Embed-Modus (?embed=1) für BRK-Website",
 "Anfrageformular: Transparenter Hintergrund, kein Header/Footer im Embed",
