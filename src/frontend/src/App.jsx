@@ -979,7 +979,7 @@ function SmtpConfig({toast}){
 // ═══════════════════════════════════════════════════════════════════
 // Mail Compose Modal
 // ═══════════════════════════════════════════════════════════════════
-function MailComposeModal({event:ev, currentEventId, user, stammdaten, dayCalcs, totalCosts, activeDays, toast, onClose}){
+function MailComposeModal({event:ev, currentEventId, user, stammdaten, dayCalcs, totalCosts, activeDays, toast, onClose, onSent}){
   const anrede=ev?.anrede||"Sehr geehrte Damen und Herren,";
   const absender=user?.name||"";
   const orgName=stammdaten?.kvName||"BRK Kreisverband";
@@ -1014,7 +1014,7 @@ function MailComposeModal({event:ev, currentEventId, user, stammdaten, dayCalcs,
     try{
       const htmlBody=body.split("\n").map(l=>l.trim()?`<p>${l}</p>`:"<p>&nbsp;</p>").join("");
       const r=await API.sendMail(currentEventId,{to,subject,body:htmlBody,attachPdf,dayCalcs,totalCosts,activeDays});
-      if(r.success){setSent(true);toast("✉️ E-Mail gesendet an "+to,"success");}
+      if(r.success){setSent(true);toast("✉️ E-Mail gesendet an "+to,"success");if(onSent)onSent(attachPdf);}
       else toast("Fehler: "+(r.error||""),"error");
     }catch(e){toast("E-Mail: "+e.message,"error");}
     finally{setSending(false);}
@@ -1037,7 +1037,13 @@ function MailComposeModal({event:ev, currentEventId, user, stammdaten, dayCalcs,
       {sent?<div style={{padding:"40px 24px",textAlign:"center"}}>
         <div style={{fontSize:48,marginBottom:12}}>✅</div>
         <div style={{fontSize:16,fontWeight:700,color:"#2e7d32",marginBottom:6}}>E-Mail erfolgreich gesendet</div>
-        <div style={{fontSize:13,color:C.dunkelgrau,marginBottom:20}}>An: {to}{attachPdf!=="none"?` · Anhang: ${attachPdf==="mappe"?"Angebotsmappe":"Angebot PDF"}`:""}</div>
+        <div style={{fontSize:13,color:C.dunkelgrau,marginBottom:12}}>An: {to}{attachPdf!=="none"?` · Anhang: ${attachPdf==="mappe"?"Angebotsmappe":"Angebot PDF"}`:""}</div>
+        {attachPdf!=="none"&&<div style={{background:"#e8f5e9",borderRadius:8,padding:"12px 16px",marginBottom:20,textAlign:"left",fontSize:12,color:"#2e7d32"}}>
+          <div style={{fontWeight:700,marginBottom:6}}>📋 Checkliste aktualisiert:</div>
+          <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:3}}>☑️ Angebot versendet</div>
+          {attachPdf==="mappe"&&<div style={{display:"flex",alignItems:"center",gap:6}}>☑️ Vertrag + AAB versendet</div>}
+          <div style={{marginTop:8,fontSize:11,color:"#1b5e20"}}>🔒 Vorgang wurde gesperrt</div>
+        </div>}
         <button onClick={onClose} style={{padding:"10px 28px",background:C.dunkelblau,color:"#fff",border:"none",borderRadius:6,fontSize:14,fontWeight:600,cursor:"pointer",fontFamily:FONT.sans}}>Schließen</button>
       </div>
 
@@ -2117,6 +2123,8 @@ const LATEST_RELEASE={v:"v7.5",d:"04.03.2026",c:[
 "Angebotsversand: Hinweis auf 4-Wochen-Frist und 30%-Aufschlag bei Kurzfristigkeit",
 "Angebotsversand: Erfolgsbestätigung nach Versand",
 "Bestätigungsdialoge: Anfragen-Tab nutzt gestylte Modals statt Browser-Dialoge",
+"Angebotsversand: Checkliste wird automatisch aktualisiert (Angebot/Vertrag+AAB je nach Anhang)",
+"Angebotsversand: Vorgang wird nach Versand automatisch gesperrt",
 ]};
 const RELEASE_V74={v:"v7.4",d:"04.03.2026",c:[
 "Statistik-Dashboard: Einsätze pro Monat, Status-Verteilung, Bereitschafts-Übersicht",
@@ -2927,7 +2935,15 @@ export default function App(){
       <footer className="mob-hide" style={{padding:"12px 20px",borderTop:`1px solid ${C.mittelgrau}40`,textAlign:"center",fontSize:10,color:C.dunkelgrau,background:C.weiss}}>BRK Sanitätswachdienst v7.5 · {bereitschaft.name} · {stammdaten.kvName} · {year}</footer>
 
       {/* ── Angebotsmappe Modal ──────────────────────────────── */}
-      {mailModal&&<MailComposeModal event={event} currentEventId={currentEventId} user={user} stammdaten={stammdaten} dayCalcs={dayCalcs} totalCosts={totalCosts} activeDays={activeDays} toast={toast} onClose={()=>setMailModal(false)}/>}
+      {mailModal&&<MailComposeModal event={event} currentEventId={currentEventId} user={user} stammdaten={stammdaten} dayCalcs={dayCalcs} totalCosts={totalCosts} activeDays={activeDays} toast={toast} onClose={()=>setMailModal(false)} onSent={async(attachType)=>{
+        const now=Date.now();const newCL={...(event.checklist||{})};
+        if(attachType==="mappe"){newCL.angebotVersendet=newCL.angebotVersendet||now;newCL.vertragAabVersendet=newCL.vertragAabVersendet||now;}
+        else if(attachType==="angebot"){newCL.angebotVersendet=newCL.angebotVersendet||now;}
+        if(attachType==="mappe"||attachType==="angebot"){
+          setEvent(p=>({...p,checklist:newCL}));
+          try{const bc=BEREITSCHAFTEN[stammdaten.bereitschaftIdx]?.code;await API.saveVorgang(currentEventId,{id:currentEventId,event:{...event,checklist:newCL},days,year,updatedAt:now,activeDays:days.filter(d=>d.active).length,createdBy:user?.name,bereitschaftCode:bc});toast("Checkliste aktualisiert + Vorgang gesperrt","success");}catch(e){console.error("Checklist-Save:",e);}
+        }
+      }}/>}
 
       {mappeModal&&<div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.5)",backdropFilter:"blur(3px)",zIndex:9999,display:"flex",alignItems:"center",justifyContent:"center"}} onClick={()=>setMappeModal(false)}>
         <div style={{background:"#fff",borderRadius:10,padding:"24px 28px",maxWidth:420,width:"90%",boxShadow:"0 20px 60px rgba(0,0,0,0.3)"}} onClick={e=>e.stopPropagation()}>
