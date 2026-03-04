@@ -735,7 +735,7 @@ function StatistikDashboard({user,year:appYear,toast}){
   </div>);
 }
 
-function EinstellungenTab({stammdaten,updateStamm,updateRate,user,toast,klauseln,klauselnEdit,setKlauselnEdit,klauselnSaving,saveKlauseln,bereitschaft}){
+function EinstellungenTab({stammdaten,updateStamm,updateRate,user,toast,klauseln,klauselnEdit,setKlauselnEdit,klauselnSaving,saveKlauseln,bereitschaft,reloadStammdaten}){
   const [sub,setSub]=useState("org");
   const subs=[{id:"org",label:"Organisation",icon:"🏢"},{id:"bereitschaften",label:"Bereitschaften",icon:"🏥"},{id:"kosten",label:"Kostensätze",icon:"💰"},{id:"klauseln",label:"Textvorlagen",icon:"📝"},{id:"nextcloud",label:"Nextcloud",icon:"☁️"},{id:"email",label:"E-Mail",icon:"✉️"}];
   return(<div>
@@ -763,7 +763,7 @@ function EinstellungenTab({stammdaten,updateStamm,updateRate,user,toast,klauseln
       </div>
     </div>}
 
-    {sub==="bereitschaften"&&<BereitschaftenAdmin toast={toast}/>}
+    {sub==="bereitschaften"&&<BereitschaftenAdmin toast={toast} userBC={user?.bereitschaftCode} reloadStammdaten={reloadStammdaten}/>}
 
     {sub==="kosten"&&<div style={{maxWidth:600}}>
       <Card title="Kostensätze (EUR)" accent="#d4920a"><div className="rg2" style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"0 10px"}}>{[["Helfer (€/Std)","helfer"],["KTW","ktw"],["RTW","rtw"],["GKTW","gktw"],["EL (€/Std)","einsatzleiter"],["EL-KFZ","einsatzleiterKfz"],["SEG-LKW","segLkw"],["MTW","mtw"],["Zelt","zelt"],["Verpfl. (€/P/8h)","verpflegung"]].map(([l,k])=><Inp key={k} small label={l} type="number" min={0} step={0.5} value={stammdaten.rates[k]} onChange={v=>updateRate(k,v)}/>)}</div></Card>
@@ -1053,7 +1053,7 @@ function SmtpConfig({toast}){
 // ═══════════════════════════════════════════════════════════════════════════
 // BEREITSCHAFTEN ADMIN (Einstellungen Tab)
 // ═══════════════════════════════════════════════════════════════════════════
-function BereitschaftenAdmin({toast}){
+function BereitschaftenAdmin({toast,userBC,reloadStammdaten}){
   const [bcs,setBcs]=useState([]);
   const [loading,setLoading]=useState(true);
   const [editBC,setEditBC]=useState(null);
@@ -1067,7 +1067,7 @@ function BereitschaftenAdmin({toast}){
     setSaving(true);
     try{
       const r=await API.updateBereitschaftAdmin(editBC.code,{leiter_name:editBC.leiter_name||"",leiter_title:editBC.leiter_title||"",telefon:editBC.telefon||"",fax:editBC.fax||"",mobil:editBC.mobil||"",email:editBC.email||"",funkgruppe:editBC.funkgruppe||""});
-      if(r?.success){toast(`${editBC.name} gespeichert`,"success");setBcs(p=>p.map(b=>b.code===editBC.code?{...b,...editBC}:b));setEditBC(null);}
+      if(r?.success){toast(`${editBC.name} gespeichert`,"success");setBcs(p=>p.map(b=>b.code===editBC.code?{...b,...editBC}:b));if(editBC.code===userBC&&reloadStammdaten)reloadStammdaten();setEditBC(null);}
       else toast("Fehler","error");
     }catch(e){toast(e.message,"error");}
     finally{setSaving(false);}
@@ -1113,7 +1113,6 @@ function BereitschaftenAdmin({toast}){
             <Inp label="Telefon" value={editBC.telefon||""} onChange={v=>setEditBC(p=>({...p,telefon:v}))}/>
             <Inp label="Fax" value={editBC.fax||""} onChange={v=>setEditBC(p=>({...p,fax:v}))}/>
             <Inp label="Mobil" value={editBC.mobil||""} onChange={v=>setEditBC(p=>({...p,mobil:v}))}/>
-            <Inp label="Funkgruppe" value={editBC.funkgruppe||""} onChange={v=>setEditBC(p=>({...p,funkgruppe:v}))}/>
           </div>
           <div style={{marginTop:4,padding:"12px 14px",background:"#e8eaf6",borderRadius:6,border:"1px solid #c5cae9"}}>
             <Inp label="E-Mail der Bereitschaft *" value={editBC.email||""} onChange={v=>setEditBC(p=>({...p,email:v}))} placeholder="bereitschaft@brk.de"/>
@@ -1153,7 +1152,6 @@ function BereitschaftProfilCard({stammdaten,updateStamm,user,toast,bereitschaft}
       <Inp label="Telefon" value={stammdaten.telefon||""} onChange={canEdit?v=>updateStamm("telefon",v):noop} disabled={!canEdit}/>
       <Inp label="Fax" value={stammdaten.fax||""} onChange={canEdit?v=>updateStamm("fax",v):noop} disabled={!canEdit}/>
       <Inp label="Mobil" value={stammdaten.mobil||""} onChange={canEdit?v=>updateStamm("mobil",v):noop} disabled={!canEdit}/>
-      <Inp label="Funkgruppe" value={stammdaten.funkgruppe||""} onChange={canEdit?v=>updateStamm("funkgruppe",v):noop} disabled={!canEdit}/>
     </div>
     <div style={{marginTop:4}}>
       <Inp label="E-Mail der Bereitschaft *" value={stammdaten.email||""} onChange={canEdit?v=>updateStamm("email",v):noop} disabled={!canEdit} placeholder="bereitschaft@brk.de"/>
@@ -1583,8 +1581,7 @@ function VorgangChecklist({checklist={},onChange,onLockSave,eventDate,currentEve
   const isLocked=!!(checklist.angebotVersendet||checklist.abgeschlossen);
   const toggle=(key)=>{
     if((key==="angebotVersendet"||key==="abgeschlossen")&&checklist[key])return;
-    if(key==="fibuWeitergeleitet"&&!checklist[key]){setShowFiBu(true);return;}
-    if(key==="fibuWeitergeleitet"&&checklist[key])return;
+    if(key==="fibuWeitergeleitet"){setShowFiBu(true);return;}
     if((key==="angebotVersendet"||key==="abgeschlossen")&&!checklist[key]){
       setConfirmKey(key);return;
     }
@@ -1612,6 +1609,7 @@ function VorgangChecklist({checklist={},onChange,onLockSave,eventDate,currentEve
       <span style={{fontSize:14}}>{item.icon}</span>
       <div style={{flex:1}}><div style={{fontSize:13,fontWeight:done?600:400,color:done?"#1a7a3a":C.dunkelgrau,textDecoration:done?"line-through":"none"}}>{item.label}</div>
         {done&&<div style={{fontSize:10,color:C.bgrau}}>Erledigt: {fTS(checklist[item.key])}</div>}
+        {item.key==="fibuWeitergeleitet"&&done&&<div style={{fontSize:10,color:C.mittelblau,fontWeight:600,marginTop:1}}>↻ Erneut an FiBu senden</div>}
         {item.key==="abgeschlossen"&&!done&&wvDate&&<div style={{fontSize:10,color:wvPast?C.rot:"#d4920a",fontWeight:wvPast?700:400}}>Wiedervorlage: {fDate(wvDate.toISOString().split("T")[0])}{wvPast?" ⚠️ Fällig!":""}</div>}
       </div>
     </div>);})}
@@ -2642,7 +2640,8 @@ export default function App(){
   useEffect(()=>{API.getStatus().then(d=>{if(d.authenticated){const bc=d.user.bereitschaftCode;const bIdx=BEREITSCHAFTEN.findIndex(b=>b.code===bc);const u={sub:d.user.sub,name:d.user.name,email:d.user.email,bereitschaftCode:bc,bereitschaftIdx:bIdx>=0?bIdx:0,bereitschaft:(d.user.bereitschaft&&d.user.bereitschaft.name)||bc||"",rolle:d.user.rolle,telefon:"",mobil:"",titel:""};setUser(u);API.getProfile().then(p=>{if(p)setUser(prev=>({...prev,telefon:p.telefon||prev.telefon,mobil:p.mobil||prev.mobil,titel:p.titel||prev.titel,email:p.email||prev.email,ort:p.ort||prev.ort||'',signatur:p.unterschrift||prev.signatur||''}));}).catch(()=>{});}}).catch(()=>{}).finally(()=>setAuthLoading(false));},[]);
   const [tab,setTab]=useState("events");
   const [stammdaten,setStammdaten]=useState(DEFAULT_STAMMDATEN);
-  useEffect(()=>{if(!user)return;API.getStammdaten().then(d=>{if(d){const bIdxS=user?BEREITSCHAFTEN.findIndex(b=>b.code===user.bereitschaftCode):-1;setStammdaten(prev=>({...prev,bereitschaftIdx:bIdxS>=0?bIdxS:prev.bereitschaftIdx,kvName:d.kv_name||prev.kvName,kgf:d.kgf||prev.kgf,kvAdresse:d.kv_adresse||prev.kvAdresse,kvPlzOrt:d.kv_plz_ort||prev.kvPlzOrt,bereitschaftsleiter:d.leiter_name||prev.bereitschaftsleiter,bereitschaftsleiterTitle:d.leiter_title||prev.bereitschaftsleiterTitle,telefon:d.telefon||prev.telefon,fax:d.fax||prev.fax,mobil:d.mobil||prev.mobil,email:d.email||prev.email,funkgruppe:d.funkgruppe||prev.funkgruppe,customLogo:d.logo||null,rates:d.kostensaetze?{helfer:d.kostensaetze.helfer,ktw:d.kostensaetze.ktw,rtw:d.kostensaetze.rtw,gktw:d.kostensaetze.gktw,einsatzleiter:d.kostensaetze.einsatzleiter,aerzte:0,einsatzleiterKfz:d.kostensaetze.einsatzleiter_kfz,mobileSanstation:d.kostensaetze.seg_lkw,segLkw:d.kostensaetze.seg_lkw,mtw:d.kostensaetze.mtw,zelt:d.kostensaetze.zelt,kmKtw:d.kostensaetze.km_ktw,kmRtw:d.kostensaetze.km_rtw,kmGktw:d.kostensaetze.km_gktw,kmElKfz:d.kostensaetze.km_el_kfz,kmSegLkw:d.kostensaetze.km_seg_lkw,kmMtw:d.kostensaetze.km_mtw,verpflegung:d.kostensaetze.verpflegung}:prev.rates}));}setStammdatenLoaded(true);}).catch(e=>{console.warn("Stammdaten laden:",e);setStammdatenLoaded(true);});},[user]);
+  const reloadStammdaten=useCallback(()=>{if(!user)return;API.getStammdaten().then(d=>{if(d){const bIdxS=user?BEREITSCHAFTEN.findIndex(b=>b.code===user.bereitschaftCode):-1;setStammdaten(prev=>({...prev,bereitschaftIdx:bIdxS>=0?bIdxS:prev.bereitschaftIdx,kvName:d.kv_name||prev.kvName,kgf:d.kgf||prev.kgf,kvAdresse:d.kv_adresse||prev.kvAdresse,kvPlzOrt:d.kv_plz_ort||prev.kvPlzOrt,bereitschaftsleiter:d.leiter_name||prev.bereitschaftsleiter,bereitschaftsleiterTitle:d.leiter_title||prev.bereitschaftsleiterTitle,telefon:d.telefon||prev.telefon,fax:d.fax||prev.fax,mobil:d.mobil||prev.mobil,email:d.email||prev.email,funkgruppe:d.funkgruppe||prev.funkgruppe,customLogo:d.logo||null,rates:d.kostensaetze?{helfer:d.kostensaetze.helfer,ktw:d.kostensaetze.ktw,rtw:d.kostensaetze.rtw,gktw:d.kostensaetze.gktw,einsatzleiter:d.kostensaetze.einsatzleiter,aerzte:0,einsatzleiterKfz:d.kostensaetze.einsatzleiter_kfz,mobileSanstation:d.kostensaetze.seg_lkw,segLkw:d.kostensaetze.seg_lkw,mtw:d.kostensaetze.mtw,zelt:d.kostensaetze.zelt,kmKtw:d.kostensaetze.km_ktw,kmRtw:d.kostensaetze.km_rtw,kmGktw:d.kostensaetze.km_gktw,kmElKfz:d.kostensaetze.km_el_kfz,kmSegLkw:d.kostensaetze.km_seg_lkw,kmMtw:d.kostensaetze.km_mtw,verpflegung:d.kostensaetze.verpflegung}:prev.rates}));}setStammdatenLoaded(true);}).catch(e=>{console.warn("Stammdaten laden:",e);setStammdatenLoaded(true);});},[user]);
+  useEffect(()=>{reloadStammdaten();},[user]);
   useEffect(()=>{
   if(!user||user.rolle==="helfer")return;
   const t=setTimeout(()=>{
@@ -3401,7 +3400,7 @@ export default function App(){
             <BereitschaftProfilCard stammdaten={stammdaten} updateStamm={updateStamm} user={user} toast={toast} bereitschaft={bereitschaft}/>
         </div>)}
 
-      {tab==="einstellungen"&&user?.rolle==="admin"&&<EinstellungenTab stammdaten={stammdaten} updateStamm={updateStamm} updateRate={updateRate} user={user} toast={toast} klauseln={klauseln} klauselnEdit={klauselnEdit} setKlauselnEdit={setKlauselnEdit} klauselnSaving={klauselnSaving} saveKlauseln={saveKlauseln} bereitschaft={bereitschaft}/>}
+      {tab==="einstellungen"&&user?.rolle==="admin"&&<EinstellungenTab stammdaten={stammdaten} updateStamm={updateStamm} updateRate={updateRate} user={user} toast={toast} klauseln={klauseln} klauselnEdit={klauselnEdit} setKlauselnEdit={setKlauselnEdit} klauselnSaving={klauselnSaving} saveKlauseln={saveKlauseln} bereitschaft={bereitschaft} reloadStammdaten={reloadStammdaten}/>}
       </main>
       {/* HAMBURGER DRAWER (mobile) */}
       {menuOpen&&<div className="drawer-overlay open" onClick={()=>setMenuOpen(false)}/>}
