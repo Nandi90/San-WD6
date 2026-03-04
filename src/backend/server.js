@@ -366,7 +366,7 @@ body.embed .hdr,body.embed .hdr-accent,body.embed .sub,body.embed .ft{display:no
 body.embed{background:transparent}
 body.embed .ctn{padding:0;max-width:640px;margin:0}
 body.embed .card{box-shadow:none;padding:20px 24px;border:1px solid #e0e0e0;border-radius:6px}
-body.embed .ok-fertig{display:none}
+body.embed .ok-fertig{display:none!important}
 body.embed .ok{border-radius:6px}
 body.embed .sec{font-size:14px}
 body.embed label>span{font-size:11px}
@@ -435,7 +435,7 @@ body.embed .btn{font-size:14px;padding:10px 24px}
     <strong>Vielen Dank f\u00fcr Ihre Anfrage!</strong><br>
     Wir werden uns zeitnah bei Ihnen melden und Ihnen ein Angebot erstellen.
     <div style="display:flex;gap:12px;justify-content:center;margin-top:18px">
-      <a href="${fertigUrl}" class="btn ok-fertig" style="text-decoration:none;display:inline-block;width:auto;padding:10px 24px">Fertig</a>
+      <a href="${fertigUrl}" class="btn ok-fertig" target="_top" style="text-decoration:none;display:inline-block;width:auto;padding:10px 24px">Fertig</a>
       <button class="btn" style="background:#004B91;width:auto;padding:10px 24px" onclick="document.getElementById('ok').style.display='none';document.getElementById('frm').style.display='block';document.getElementById('frm').reset();document.getElementById('dsgvo').checked=false;document.getElementById('sbtn').disabled=false;document.getElementById('sbtn').textContent='Anfrage absenden';if(typeof resizeFrame==='function')resizeFrame();">Neue Anfrage</button>
     </div>
   </div>
