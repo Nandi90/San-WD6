@@ -305,6 +305,8 @@ app.get("/api/health", (req, res) => {
 
 // === Public Anfrage-Formular (kein Auth) ===
 app.get("/anfrage", (req, res) => {
+  // CSP Override: Inline-Script im öffentlichen Formular erlauben
+  res.setHeader("Content-Security-Policy", "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; frame-src 'none'; object-src 'none'");
   const stamm = db.getDb().prepare("SELECT * FROM bereitschaften LIMIT 1").get() || {};
   const ROT = "#E60005";
   const BLAU = "#002F5F";
