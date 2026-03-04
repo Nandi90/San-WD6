@@ -2562,8 +2562,34 @@ function FeedbackButton({user,currentView,toast}){
 // MAIN APP
 // ═══════════════════════════════════════════════════════════════════════════
 const TABS=[{id:"events",label:"Vorgänge",icon:"📁"},{id:"event",label:"Veranstaltung",icon:"📋"},{id:"days",label:"Tage & Analyse",icon:"📊"},{id:"costs",label:"Kosten",icon:"💰"},{id:"pdf",label:"Dokumente",icon:"🖨️"},{id:"kunden",label:"Kunden",icon:"👥"},{id:"anfragen",label:"Anfragen",icon:"📩"},{id:"statistik",label:"Statistik",icon:"📈"},{id:"profil",label:"Mein Profil",icon:"👤"},{id:"einstellungen",label:"Einstellungen",icon:"⚙️",admin:true},{id:"releases",label:"Changelog",icon:"🆕"}];
-const APP_VERSION="v7.5";
-const LATEST_RELEASE={v:"v7.5",d:"04.03.2026",c:[
+const APP_VERSION="v7.6";
+const LATEST_RELEASE={v:"v7.6",d:"04.03.2026",c:[
+"FiBu: Weiterleitung per E-Mail mit Angebots-PDF als Anhang",
+"FiBu: Abfrage Helfer/Fahrzeuge anderer Bereitschaften (BC, Anzahl, Kennzeichen)",
+"FiBu: Freitext-Feld für externe Helfer (THW, ASB etc.) ohne Benachrichtigung",
+"FiBu: Fahrzeuge allgemein erfassbar (Typ + Kennzeichen + optionale BC-Zuordnung)",
+"FiBu: Automatische Benachrichtigung betroffener Bereitschaften per E-Mail",
+"FiBu: Markiert Checkliste 'Weiterleitung an FiBu' + 'Abgeschlossen' automatisch",
+"FiBu: Korrektur-Modus bei erneutem Senden (KORREKTUR-Prefix in Betreff + Nachricht)",
+"FiBu: Erneutes Senden jederzeit möglich (auch nach Abschluss)",
+"FiBu: E-Mail-Adresse in SMTP-Konfiguration konfigurierbar",
+"Kunden: Tabellenansicht statt Karten-Layout mit Checkbox-Mehrfachauswahl",
+"Kunden: Popover-Bearbeitungsmaske öffnet sich über dem Datensatz",
+"Kunden: Name ändern aktualisiert den Kunden statt einen neuen anzulegen",
+"Kunden: Bereitschafts-Zuordnung sichtbar für Admins (farbige BC-Badges)",
+"Kunden: CSV-Import nutzt Backend-Route (Adresse + PLZ/Ort werden korrekt importiert)",
+"Kunden: Batch-Löschung mehrerer Kunden gleichzeitig",
+"Profil: Bereitschaftsdaten (E-Mail, Leiter, Telefon) direkt im Profil sichtbar und editierbar",
+"Einstellungen: Neuer Sub-Tab 'Bereitschaften' – Admin kann alle Bereitschafts-Kontaktdaten pflegen",
+"Einstellungen: Datensynchronisation Profil ↔ Bereitschaften-Tab",
+"Einstellungen: Funkgruppe-Feld aus Bereitschafts-Verwaltung entfernt",
+"E-Mail: 'Von' zeigt immer die Benutzer-E-Mail (nicht Bereitschafts-E-Mail)",
+"Ablehnungsgründe: Anbieter-Eingabefeld bei 'Anderer Anbieter'",
+"Ablehnungsgründe: 'Eigene ABsanitäter' umbenannt zu 'Veranstalter stellt eigene Sanitäter'",
+"Ablehnungsgründe: Neuer Grund 'Kapazität nicht verfügbar'",
+"Session: Sitzungsabbruch bei Keycloak-Timeout behoben (Grace Period statt Destroy)",
+]};
+const RELEASE_V75={v:"v7.5",d:"04.03.2026",c:[
 "Anfragen-Tab: Verwaltung eingehender Anfragen vom öffentlichen Formular",
 "Anfragen: Annehmen → automatisch Vorgang mit Auftragsnr erstellen",
 "Anfragen: Status-Workflow (Neu → Angenommen/Abgelehnt → Archiviert)",
@@ -2576,36 +2602,17 @@ const LATEST_RELEASE={v:"v7.5",d:"04.03.2026",c:[
 "Anfragen: Vorgang-Link klickbar → öffnet direkt den zugehörigen Vorgang",
 "Anfrageformular: PLZ-Feld mit automatischer Bereitschafts-Vorauswahl",
 "Anfrageformular: Angebots-/Rechnungsadresse im Formular erfassbar",
-"Anfragen: Bemerkung des Veranstalters als separate Infobox im Vorgang (nicht mehr unter Angebots-Bemerkung)",
-"Anfragen: Automatische Geocodierung bei Annahme (Karte + what3words sofort verfügbar)",
+"Anfragen: Bemerkung des Veranstalters als separate Infobox im Vorgang",
+"Anfragen: Automatische Geocodierung bei Annahme (Karte + what3words)",
 "Anfrageformular: 18 PLZ im Landkreis ND-SOB → Bereitschafts-Zuordnung",
 "Anfrageformular: iFrame-Embed-Modus (?embed=1) für BRK-Website",
-"Anfrageformular: Transparenter Hintergrund, kein Header/Footer im Embed",
 "Anfrageformular: Auto-Resize des iFrames via postMessage",
-"Anfrageformular: CSP-Fix – Formular sendet jetzt korrekt ab",
 "Angebotsversand: Mail-Dialog komplett überarbeitet",
 "Angebotsversand: Angebotsmappe als Anhang (Deckblatt + Angebot + Vertrag + AAB)",
 "Angebotsversand: Professioneller Standard-Mailtext mit automatischer Fristberechnung",
-"Angebotsversand: Hinweis auf 4-Wochen-Frist und 30%-Aufschlag bei Kurzfristigkeit",
-"Angebotsversand: Erfolgsbestätigung nach Versand",
-"Angebotsversand: Checkliste wird automatisch aktualisiert (Angebot/Vertrag+AAB je nach Anhang)",
+"Angebotsversand: Checkliste wird automatisch aktualisiert nach Versand",
 "Angebotsversand: Vorgang wird nach Versand automatisch gesperrt",
-"Bestätigungsdialoge: Anfragen-Tab nutzt gestylte Modals statt Browser-Dialoge",
 "Anfragen: Badge am Tab zeigt Anzahl neuer Anfragen (Polling alle 60s)",
-"Kunden: Tabellenansicht statt Karten-Layout mit Checkbox-Mehrfachauswahl",
-"Kunden: Popover-Bearbeitungsmaske öffnet sich über dem Datensatz",
-"Kunden: Name ändern aktualisiert den Kunden statt einen neuen anzulegen",
-"Kunden: Bereitschafts-Zuordnung sichtbar für Admins (farbige BC-Badges)",
-"Kunden: CSV-Import nutzt Backend-Route (Adresse + PLZ/Ort werden korrekt importiert)",
-"Kunden: Batch-Löschung mehrerer Kunden gleichzeitig",
-"FiBu: Weiterleitung per E-Mail mit Angebots-PDF als Anhang",
-"FiBu: Abfrage Helfer/Fahrzeuge anderer Bereitschaften (BC, Anzahl, Kennzeichen)",
-"FiBu: Automatische Benachrichtigung betroffener Bereitschaften per E-Mail",
-"FiBu: Markiert Checkliste 'Weiterleitung an FiBu' + 'Abgeschlossen' automatisch",
-"FiBu: E-Mail-Adresse in SMTP-Konfiguration konfigurierbar",
-"Profil: Bereitschaftsdaten (E-Mail, Leiter, Telefon) direkt im Profil sichtbar und editierbar",
-"Einstellungen: Neuer Sub-Tab 'Bereitschaften' – Admin kann alle Bereitschafts-Kontaktdaten pflegen",
-"E-Mail: 'Von' zeigt immer die Benutzer-E-Mail (nicht Bereitschafts-E-Mail)",
 ]};
 const RELEASE_V74={v:"v7.4",d:"04.03.2026",c:[
 "Statistik-Dashboard: Einsätze pro Monat, Status-Verteilung, Bereitschafts-Übersicht",
@@ -3186,6 +3193,7 @@ export default function App(){
             </div>
             {[
               LATEST_RELEASE,
+              RELEASE_V75,
               RELEASE_V74,
               RELEASE_V73,
               {v:"v7.2",d:"03.03.2026",c:[
@@ -3429,7 +3437,7 @@ export default function App(){
           <button onClick={()=>window.location.href="/auth/logout"} style={{width:"100%",padding:"8px 12px",background:C.hellgrau,border:"none",borderRadius:4,fontSize:12,cursor:"pointer",fontFamily:FONT.sans,color:C.dunkelgrau}}>⏻ Abmelden</button>
         </div>
       </div>
-      <footer className="mob-hide" style={{padding:"12px 20px",borderTop:`1px solid ${C.mittelgrau}40`,textAlign:"center",fontSize:10,color:C.dunkelgrau,background:C.weiss}}>BRK Sanitätswachdienst v7.5 · {bereitschaft.name} · {stammdaten.kvName} · {year}</footer>
+      <footer className="mob-hide" style={{padding:"12px 20px",borderTop:`1px solid ${C.mittelgrau}40`,textAlign:"center",fontSize:10,color:C.dunkelgrau,background:C.weiss}}>BRK Sanitätswachdienst v7.6 · {bereitschaft.name} · {stammdaten.kvName} · {year}</footer>
 
       {/* ── Angebotsmappe Modal ──────────────────────────────── */}
       {mailModal&&<MailComposeModal event={event} currentEventId={currentEventId} user={user} stammdaten={stammdaten} dayCalcs={dayCalcs} totalCosts={totalCosts} activeDays={activeDays} toast={toast} onClose={()=>setMailModal(false)} onSent={async(attachType)=>{
