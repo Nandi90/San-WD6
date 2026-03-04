@@ -480,7 +480,7 @@ function AnfragenTab({user,toast,bereitschaften,onOpenVorgang}){
       {filtered.map(a=>{
         const tage=parseTage(a.datum);
         const isNew=a.status==="neu";
-        return <div key={a.id} onClick={()=>{setSelected(a);setShowReassign(false);}} style={{padding:"12px 16px",background:selected?.id===a.id?`${C.mittelblau}10`:"#fff",border:`1px solid ${selected?.id===a.id?C.mittelblau:C.mittelgrau}40`,borderLeft:`4px solid ${STATUS_C[a.status]||"#999"}`,borderRadius:8,marginBottom:6,cursor:"pointer",transition:"all 0.15s"}}>
+        return <div key={a.id} onClick={()=>{setSelected(a);setShowReassign(false);if(a.suggested_bc)setAnnBC(a.suggested_bc);}} style={{padding:"12px 16px",background:selected?.id===a.id?`${C.mittelblau}10`:"#fff",border:`1px solid ${selected?.id===a.id?C.mittelblau:C.mittelgrau}40`,borderLeft:`4px solid ${STATUS_C[a.status]||"#999"}`,borderRadius:8,marginBottom:6,cursor:"pointer",transition:"all 0.15s"}}>
           <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start"}}>
             <div>
               <div style={{fontSize:14,fontWeight:700,color:isNew?C.mittelblau:C.dunkelgrau}}>{a.name||"Ohne Name"}</div>
@@ -511,10 +511,11 @@ function AnfragenTab({user,toast,bereitschaften,onOpenVorgang}){
           <div><span style={{fontWeight:600,color:"#555"}}>Ansprechpartner:</span> {selected.ansprechpartner}</div>
           <div><span style={{fontWeight:600,color:"#555"}}>Telefon:</span> <a href={`tel:${selected.telefon}`} style={{color:C.mittelblau}}>{selected.telefon}</a></div>
           <div><span style={{fontWeight:600,color:"#555"}}>E-Mail:</span> <a href={`mailto:${selected.email}`} style={{color:C.mittelblau}}>{selected.email}</a></div>
-          <div><span style={{fontWeight:600,color:"#555"}}>Ort:</span> {selected.ort||"-"}</div>
+          <div><span style={{fontWeight:600,color:"#555"}}>Ort:</span> {selected.ort||"-"}{selected.plz?` (${selected.plz})`:""}</div>
           <div><span style={{fontWeight:600,color:"#555"}}>Adresse:</span> {selected.adresse||"-"}</div>
           <div><span style={{fontWeight:600,color:"#555"}}>Besucher:</span> {selected.besucher||"-"}</div>
           <div><span style={{fontWeight:600,color:"#555"}}>Art:</span> {selected.art||"-"}</div>
+          {selected.suggested_bc&&<div><span style={{fontWeight:600,color:"#555"}}>Vorgeschlagene BC:</span> <span style={{color:"#e65100",fontWeight:600}}>{(bereitschaften||[]).find(b=>b.code===selected.suggested_bc)?.name||selected.suggested_bc}</span> <span style={{fontSize:10,color:"#888"}}>(PLZ {selected.plz})</span></div>}
           <div style={{gridColumn:"1/-1"}}><span style={{fontWeight:600,color:"#555"}}>Eingegangen:</span> {fDateTime(selected.created_at)}</div>
         </div>
 
@@ -541,6 +542,8 @@ function AnfragenTab({user,toast,bereitschaften,onOpenVorgang}){
             <select value={annBC} onChange={e=>setAnnBC(e.target.value)} style={{padding:"5px 10px",border:`1px solid ${C.mittelgrau}`,borderRadius:5,fontSize:12,fontFamily:FONT.sans}}>
               {(bereitschaften||[]).map(b=><option key={b.code} value={b.code}>{b.name}</option>)}
             </select>
+            {selected.suggested_bc&&annBC===selected.suggested_bc&&<span style={{fontSize:10,color:"#2e7d32",fontWeight:600}}>✓ PLZ-Vorschlag</span>}
+            {selected.suggested_bc&&annBC!==selected.suggested_bc&&<span style={{fontSize:10,color:"#e65100",cursor:"pointer"}} onClick={()=>setAnnBC(selected.suggested_bc)}>↩ PLZ-Vorschlag: {(bereitschaften||[]).find(b=>b.code===selected.suggested_bc)?.short||selected.suggested_bc}</span>}
           </div>
           <div style={{display:"flex",gap:8}}>
             <button onClick={()=>annehmen(selected)} style={{flex:1,padding:"10px 16px",background:"#2e7d32",color:"#fff",border:"none",borderRadius:6,fontSize:13,fontWeight:700,cursor:"pointer",fontFamily:FONT.sans}}>✅ Annehmen & Vorgang erstellen</button>

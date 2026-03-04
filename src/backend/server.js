@@ -304,6 +304,36 @@ app.get("/api/health", (req, res) => {
 // ── Auth Routes (kein Auth nötig) ────────────────────────────────
 
 // === Public Anfrage-Formular (kein Auth) ===
+// PLZ → Bereitschaft Zuordnung (Landkreis Neuburg-Schrobenhausen)
+const PLZ_BC_MAP = {
+  "85123": "BKK",     // Karlskron
+  "86529": "BSOB",    // Schrobenhausen
+  "86561": "BSOB",    // Aresing
+  "86562": "BSOB",    // Berg im Gau
+  "86564": "BSOB",    // Brunnen
+  "86565": "BSOB",    // Gachenbach
+  "86571": "BSOB",    // Langenmosen
+  "86579": "BSOB",    // Waidhofen
+  "86633": "BND",     // Neuburg an der Donau
+  "86643": "BND",     // Rennertshofen
+  "86666": "BBGH",    // Burgheim
+  "86668": "BKAHU",   // Karlshuld
+  "86669": "BKAHU",   // Königsmoos
+  "86673": "BND",     // Bergheim
+  "86676": "BND",     // Ehekirchen
+  "86697": "BND",     // Oberhausen
+  "86701": "BND",     // Rohrenfels
+  "86706": "BWEIG",   // Weichering
+};
+
+// API: PLZ → BC Lookup (für Live-Vorschlag im Formular)
+app.get("/api/plz-bc", (req, res) => {
+  const plz = (req.query.plz || "").trim();
+  const bc = PLZ_BC_MAP[plz] || null;
+  const bereitschaft = bc ? (db.getDb().prepare("SELECT name FROM bereitschaften WHERE code=?").get(bc)?.name || bc) : null;
+  res.json({ plz, bc, bereitschaft });
+});
+
 app.get("/anfrage", (req, res) => {
   const embed = req.query.embed === "1";
   // CSP Override: Inline-Script erlauben + frame-ancestors für Einbettung
@@ -392,6 +422,7 @@ body.embed .btn{font-size:14px;padding:10px 24px}
       <label><span>Adresse / Gel\u00e4nde</span><input name="adresse"></label>
     </div>
     <div class="row">
+      <label><span>PLZ des Veranstaltungsorts</span><input type="text" name="plz" id="plzInput" maxlength="5" pattern="[0-9]{5}" placeholder="z.B. 86633" oninput="checkPLZ(this.value)"><div id="plzHint" style="font-size:10px;margin-top:3px;min-height:16px"></div></label>
       <label><span>Erwartete Besucherzahl</span><input type="number" name="besucher" min="0" placeholder="z.B. 1000"></label>
       <label><span>Art der Veranstaltung</span>
         <select name="art"><option value="">Bitte w\u00e4hlen...</option>
@@ -444,6 +475,15 @@ body.embed .btn{font-size:14px;padding:10px 24px}
 </div>
 <script>
 var dayCount=1;
+var suggestedBC="";
+function checkPLZ(v){
+  var h=document.getElementById("plzHint");
+  if(v.length!==5){h.innerHTML="";suggestedBC="";return;}
+  fetch("/api/plz-bc?plz="+v).then(function(r){return r.json();}).then(function(d){
+    if(d.bereitschaft){h.innerHTML='<span style="color:#2e7d32">\\u2714 '+d.bereitschaft+'</span>';suggestedBC=d.bc;}
+    else{h.innerHTML='<span style="color:#888">PLZ nicht im Kreisverband \\u2013 manuelle Zuweisung</span>';suggestedBC="";}
+  }).catch(function(){h.innerHTML="";suggestedBC="";});
+}
 function toggleMulti(){
   var on=document.getElementById("multiDay").checked;
   document.getElementById("addDayBtn").style.display=on?"block":"none";
@@ -479,6 +519,8 @@ document.getElementById("frm").onsubmit=async function(e){
   var b=document.getElementById("sbtn");b.disabled=true;b.textContent="Wird gesendet...";
   var fd=new FormData(this);var d={};fd.forEach(function(v,k){d[k]=v});
   d.besucher=parseInt(d.besucher)||0;
+  d.plz=d.plz||"";
+  d.suggested_bc=suggestedBC||"";
   d.tage=[];
   for(var i=1;i<=dayCount;i++){
     var dt=d["tag_"+i+"_datum"];
@@ -503,8 +545,8 @@ app.post("/api/anfrage", express.json(), (req, res) => {
   try {
     const { name, ort, adresse, tage, besucher, veranstalter, ansprechpartner, telefon, email, bemerkung, art } = req.body;
     if (!name || !veranstalter || !ansprechpartner || !telefon || !email) return res.status(400).json({ error: "Pflichtfelder fehlen" });
-    db.getDb().prepare("INSERT INTO anfragen (name,ort,adresse,datum,zeit_von,zeit_bis,besucher,veranstalter,ansprechpartner,telefon,email,bemerkung,art) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)")
-      .run(name, ort||"", adresse||"", JSON.stringify(tage||[]), "", "", besucher||0, veranstalter, ansprechpartner, telefon, email, bemerkung||"", art||"");
+    db.getDb().prepare("INSERT INTO anfragen (name,ort,adresse,datum,zeit_von,zeit_bis,besucher,veranstalter,ansprechpartner,telefon,email,bemerkung,art,plz,suggested_bc) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)")
+      .run(name, ort||"", adresse||"", JSON.stringify(tage||[]), "", "", besucher||0, veranstalter, ansprechpartner, telefon, email, bemerkung||"", art||"", req.body.plz||"", req.body.suggested_bc||"");
     res.json({ success: true });
 
     // E-Mail-Benachrichtigung (non-blocking)
