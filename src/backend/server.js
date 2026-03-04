@@ -666,7 +666,7 @@ app.put("/api/anfragen/:id/status", (req, res) => {
 });
 
 // Anfrage annehmen → Vorgang erstellen
-app.post("/api/anfragen/:id/annehmen", (req, res) => {
+app.post("/api/anfragen/:id/annehmen", async (req, res) => {
   if (!req.session?.user) return res.status(401).json({ error: "Nicht authentifiziert" });
   try {
     const anfrage = db.getDb().prepare("SELECT * FROM anfragen WHERE id=?").get(req.params.id);
@@ -722,13 +722,58 @@ app.post("/api/anfragen/:id/annehmen", (req, res) => {
         anrede: "Sehr geehrte Damen und Herren,",
         auflagen: "keine", kfzStellplatz: true, sanitaetsraum: false,
         strom: true, verpflegung: true, pauschalangebot: 0,
-        bemerkung: anfrage.bemerkung || "", coords: null, w3w: "", hausnr: "",
+        bemerkung: "", coords: null, w3w: "", hausnr: "",
+        veranstalterInfo: anfrage.bemerkung || "",
         checklist: {}, ilsEL: "", ilsTelefon: "", ilsFunk: "",
         ilsAbkoemmlich: "", ilsFzg1: "", ilsFzg2: "", ilsFzg3: "", ilsSonstige: "",
         anfrageId: anfrage.id, anfrageDatum: anfrage.created_at
       },
       days
     };
+
+    // Geocoding: Adresse → Koordinaten + w3w
+    if (anfrage.adresse && anfrage.ort) {
+      try {
+        const geoQ = `${anfrage.adresse}, ${anfrage.ort}`;
+        const geoUrl = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(geoQ)}&format=json&addressdetails=1&limit=1&countrycodes=de&accept-language=de`;
+        const geoResp = await fetch(geoUrl, { headers: { "User-Agent": "BRK-SanWD/7.0" } });
+        const geoData = await geoResp.json();
+        if (geoData[0]) {
+          const lat = parseFloat(geoData[0].lat);
+          const lng = parseFloat(geoData[0].lon);
+          vorgang.event.coords = { lat, lng };
+          vorgang.event.hausnr = geoData[0].address?.house_number || "";
+          // w3w
+          const w3wKey = process.env.W3W_API_KEY;
+          if (w3wKey) {
+            try {
+              const wr = await fetch(`https://api.what3words.com/v3/convert-to-3wa?coordinates=${lat},${lng}&language=de&key=${w3wKey}`);
+              const wd = await wr.json();
+              if (wd.words) vorgang.event.w3w = "///" + wd.words;
+            } catch (e) { console.warn("w3w Fehler:", e.message); }
+          }
+          // HERE refinement if available
+          const hereKey = process.env.HERE_API_KEY;
+          if (hereKey && !geoData[0].address?.house_number) {
+            try {
+              const hr = await fetch(`https://geocode.search.hereapi.com/v1/geocode?q=${encodeURIComponent(geoQ)}&apiKey=${encodeURIComponent(hereKey)}&lang=de&in=countryCode:DEU&limit=1`);
+              const hd = await hr.json();
+              if (hd.items?.[0]?.position) {
+                vorgang.event.coords = { lat: hd.items[0].position.lat, lng: hd.items[0].position.lng };
+                vorgang.event.hausnr = hd.items[0].address?.houseNumber || vorgang.event.hausnr;
+                if (w3wKey) {
+                  try {
+                    const wr2 = await fetch(`https://api.what3words.com/v3/convert-to-3wa?coordinates=${hd.items[0].position.lat},${hd.items[0].position.lng}&language=de&key=${w3wKey}`);
+                    const wd2 = await wr2.json();
+                    if (wd2.words) vorgang.event.w3w = "///" + wd2.words;
+                  } catch {}
+                }
+              }
+            } catch (e) { console.warn("HERE Fehler:", e.message); }
+          }
+        }
+      } catch (e) { console.warn("Geocoding Fehler:", e.message); }
+    }
 
     db.getDb().prepare(
       "INSERT INTO vorgaenge (id, bereitschaft_code, year, data, created_by) VALUES (?,?,?,?,?)"

@@ -50,7 +50,7 @@ function getRec(risk){const p=PERSONNEL_TABLE.find(r=>risk>=r.min&&risk<r.max)||
 function calcH(s,e){if(!s||!e)return 0;const[sh,sm]=s.split(":").map(Number);const[eh,em]=e.split(":").map(Number);let d=(eh*60+em)-(sh*60+sm);if(d<=0)d+=1440;return Math.ceil(d/15)*0.25;}
 function calcDay(d,rates,verpfVA){const h=calcH(d.startTime,d.endTime);const risk=calcRisk(d);const rec=getRec(risk.total);const hc=d.oHelfer??rec.helfer,kc=d.oKtw??rec.ktw,rc=d.oRtw??rec.rtw,ac=d.oAerzte??0,gc=d.oGktw??rec.gktw,el=d.oEl??rec.el;const ec=d.oElKfz??rec.elKfz,sc=d.oSeg??0,mc=d.oMtw??0,zc=d.oZelt??0;const tp=el==="im Team"?hc+kc*2+rc*2+gc*2+ac:hc+kc*2+rc*2+gc*2+ac+1;const hfc=el==="im Team"?tp-ac:tp-ac-1;const cH=hfc*h*rates.helfer,cK=kc*rates.ktw+(d.kmKtw||0)*kc*rates.kmKtw,cR=rc*rates.rtw+(d.kmRtw||0)*rc*rates.kmRtw,cA=ac*rates.aerzte,cG=gc*rates.gktw+(d.kmGktw||0)*gc*rates.kmGktw,cE=el==="im Team"?0:h*rates.einsatzleiter,cEK=ec*rates.einsatzleiterKfz+(d.kmElKfz||0)*rates.kmElKfz,cS=sc*rates.segLkw+(d.kmSeg||0)*sc*rates.kmSegLkw,cM=mc*rates.mtw+(d.kmMtw||0)*mc*rates.kmMtw,cZ=zc*rates.zelt;const vB=verpfVA?0:Math.ceil(h/8);const cV=verpfVA?0:vB*tp*rates.verpflegung;return{h,risk,rec,hc,kc,rc,ac,gc,el,ec,sc,mc,zc,tp,hfc,cH,cK,cR,cA,cG,cE,cEK,cS,cM,cZ,cV,total:cH+cK+cR+cA+cG+cE+cEK+cS+cM+cZ+cV,vB};}
 const mkDay=(n)=>({id:n,active:n===1,date:"",startTime:"18:00",endTime:"23:00",auflagen:0,geschlossen:false,flaeche:0,geschlossenFlaeche:false,besucher:1000,besucherFlaeche:0,eventTypeId:11,customFactor:0,prominente:0,polizeiRisiko:false,oHelfer:null,oKtw:null,oRtw:null,oAerzte:null,oGktw:null,oEl:null,oElKfz:null,oSeg:null,oMtw:null,oZelt:null,kmKtw:0,kmRtw:0,kmGktw:0,kmElKfz:0,kmSeg:0,kmMtw:0,fahrzeuge:[]});
-const EMPTY_EVENT={auftragsnr:"",name:"",ort:"",adresse:"",veranstalter:"",ansprechpartner:"",telefon:"",email:"",rechnungsempfaenger:"",reStrasse:"",rePlzOrt:"",anrede:"Sehr geehrte Damen und Herren,",auflagen:"keine",kfzStellplatz:true,sanitaetsraum:false,strom:true,verpflegung:true,pauschalangebot:0,bemerkung:"",coords:null,w3w:"",hausnr:"",checklist:{},ilsEL:"",ilsTelefon:"",ilsFunk:"",ilsAbkoemmlich:"",ilsFzg1:"",ilsFzg2:"",ilsFzg3:"",ilsSonstige:""};
+const EMPTY_EVENT={auftragsnr:"",name:"",ort:"",adresse:"",veranstalter:"",ansprechpartner:"",telefon:"",email:"",rechnungsempfaenger:"",reStrasse:"",rePlzOrt:"",anrede:"Sehr geehrte Damen und Herren,",auflagen:"keine",kfzStellplatz:true,sanitaetsraum:false,strom:true,verpflegung:true,pauschalangebot:0,bemerkung:"",veranstalterInfo:"",coords:null,w3w:"",hausnr:"",checklist:{},ilsEL:"",ilsTelefon:"",ilsFunk:"",ilsAbkoemmlich:"",ilsFzg1:"",ilsFzg2:"",ilsFzg3:"",ilsSonstige:""};
 const f2=(v)=>new Intl.NumberFormat("de-DE",{minimumFractionDigits:2,maximumFractionDigits:2}).format(v);
 const fDate=(d)=>d?new Date(d).toLocaleDateString("de-DE"):"";
 const buildAddrStr=(addr)=>{
@@ -2150,6 +2150,8 @@ const LATEST_RELEASE={v:"v7.5",d:"04.03.2026",c:[
 "Anfragen: Vorgang-Link klickbar → öffnet direkt den zugehörigen Vorgang",
 "Anfrageformular: PLZ-Feld mit automatischer Bereitschafts-Vorauswahl",
 "Anfrageformular: Angebots-/Rechnungsadresse im Formular erfassbar",
+"Anfragen: Bemerkung des Veranstalters als separate Infobox im Vorgang (nicht mehr unter Angebots-Bemerkung)",
+"Anfragen: Automatische Geocodierung bei Annahme (Karte + what3words sofort verfügbar)",
 "Anfrageformular: 18 PLZ im Landkreis ND-SOB → Bereitschafts-Zuordnung",
 "Anfrageformular: iFrame-Embed-Modus (?embed=1) für BRK-Website",
 "Anfrageformular: Transparenter Hintergrund, kein Header/Footer im Embed",
@@ -2561,6 +2563,10 @@ export default function App(){
                   <Inp label="Straße" value={event.reStrasse} onChange={v=>updateEvent("reStrasse",v)}/>
                   <Inp label="PLZ / Ort" value={event.rePlzOrt} onChange={v=>updateEvent("rePlzOrt",v)}/>
                 </div>
+                {event.veranstalterInfo&&<div style={{margin:"10px 0",padding:"10px 14px",background:"#fff3e0",border:"1px solid #ffe0b2",borderRadius:6}}>
+                  <div style={{fontSize:11,fontWeight:700,color:"#e65100",marginBottom:4}}>📋 Info vom Veranstalter (Anfrage)</div>
+                  <div style={{fontSize:12,color:"#333",whiteSpace:"pre-wrap",lineHeight:1.5}}>{event.veranstalterInfo}</div>
+                </div>}
                 <div style={{marginTop:10}}>
                   <label style={{display:"block",fontSize:11,color:C.dunkelgrau,marginBottom:3,fontWeight:600,fontFamily:FONT.sans}}>Bemerkung (Angebot)</label>
                   <textarea value={event.bemerkung||""} onChange={e=>updateEvent("bemerkung",e.target.value)} rows={3} style={{width:"100%",padding:"8px 10px",border:`1px solid ${C.mittelgrau}`,borderRadius:4,fontSize:13,fontFamily:FONT.sans,color:C.schwarz,background:C.weiss,resize:"vertical",boxSizing:"border-box"}} placeholder="Wird im Angebot unter der Kostenaufstellung angezeigt..."/>
