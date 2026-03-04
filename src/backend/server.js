@@ -657,6 +657,15 @@ app.get("/api/anfragen", (req, res) => {
   } catch (e) { console.error("Anfragen laden:", e); res.status(500).json({ error: "Serverfehler" }); }
 });
 
+// Lightweight: Nur Anzahl neuer Anfragen
+app.get("/api/anfragen/count", (req, res) => {
+  if (!req.session?.user) return res.status(401).json({ error: "Nicht authentifiziert" });
+  try {
+    const row = db.getDb().prepare("SELECT COUNT(*) as cnt FROM anfragen WHERE status='neu'").get();
+    res.json({ neu: row?.cnt || 0 });
+  } catch { res.json({ neu: 0 }); }
+});
+
 app.put("/api/anfragen/:id/status", (req, res) => {
   if (!req.session?.user) return res.status(401).json({ error: "Nicht authentifiziert" });
   try {

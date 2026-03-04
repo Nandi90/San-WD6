@@ -2165,6 +2165,7 @@ const LATEST_RELEASE={v:"v7.5",d:"04.03.2026",c:[
 "Angebotsversand: Checkliste wird automatisch aktualisiert (Angebot/Vertrag+AAB je nach Anhang)",
 "Angebotsversand: Vorgang wird nach Versand automatisch gesperrt",
 "Bestätigungsdialoge: Anfragen-Tab nutzt gestylte Modals statt Browser-Dialoge",
+"Anfragen: Badge am Tab zeigt Anzahl neuer Anfragen (Polling alle 60s)",
 ]};
 const RELEASE_V74={v:"v7.4",d:"04.03.2026",c:[
 "Statistik-Dashboard: Einsätze pro Monat, Status-Verteilung, Bereitschafts-Übersicht",
@@ -2285,6 +2286,8 @@ export default function App(){
   const printRef=useRef(null);
 
   const [year,setYear]=useState(new Date().getFullYear());
+  const [anfragenNeu,setAnfragenNeu]=useState(0);
+  useEffect(()=>{if(!user)return;const poll=()=>API.getAnfragenCount().then(d=>setAnfragenNeu(d.neu||0)).catch(()=>{});poll();const iv=setInterval(poll,60000);return()=>clearInterval(iv);},[user,tab]);
   const storagePrefix=useMemo(()=>`sanwd:${user?.bereitschaftCode||BEREITSCHAFTEN[stammdaten.bereitschaftIdx]?.code||"BSOB"}:${year}`,[stammdaten.bereitschaftIdx,year]);
   const kundenKey=useMemo(()=>`sanwd:${BEREITSCHAFTEN[stammdaten.bereitschaftIdx].code}:kunden`,[stammdaten.bereitschaftIdx]);
 
@@ -2433,6 +2436,7 @@ export default function App(){
     <div style={{minHeight:"100vh",background:C.hellgrau,color:C.schwarz,fontFamily:FONT.sans}}>
       <link href="https://fonts.googleapis.com/css2?family=Merriweather:wght@400;700&family=Open+Sans:wght@400;600;700;800&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet"/>
       <style>{`
+        @keyframes pulse{0%,100%{opacity:1}50%{opacity:.6}}
         /* ═══ RESPONSIVE v7 ═══ */
         @media(max-width:768px){
           .rg2,.rg3,.rg21{grid-template-columns:1fr!important}
@@ -2492,7 +2496,7 @@ export default function App(){
           <Btn className="r-abmelden" small variant="ghost" onClick={()=>window.location.href="/auth/logout"}>{mob?"⏻":"Abmelden"}</Btn>
         </div>
       </header>
-      <nav className="top-nav" style={{display:"flex",gap:1,padding:"0 12px",background:C.weiss,borderBottom:`1px solid ${C.mittelgrau}40`,overflowX:"auto"}}>{TABS.filter(t=>!t.admin||user?.rolle==="admin").map(t=>(<button key={t.id} onClick={()=>{if(t.id==="events"){releaseLock();setCurrentEventId(null);setEvent({...EMPTY_EVENT});setDays(Array.from({length:8},(_,i)=>mkDay(i+1)));}setTab(t.id);}} style={{padding:"10px 14px",background:"none",border:"none",color:tab===t.id?C.rot:C.dunkelgrau,fontSize:12,fontWeight:tab===t.id?700:500,cursor:"pointer",display:"flex",alignItems:"center",gap:5,borderBottom:tab===t.id?`2px solid ${C.rot}`:"2px solid transparent",fontFamily:FONT.sans,whiteSpace:"nowrap"}}><span style={{fontSize:13}}>{t.icon}</span> {t.label}</button>))}</nav>
+      <nav className="top-nav" style={{display:"flex",gap:1,padding:"0 12px",background:C.weiss,borderBottom:`1px solid ${C.mittelgrau}40`,overflowX:"auto"}}>{TABS.filter(t=>!t.admin||user?.rolle==="admin").map(t=>(<button key={t.id} onClick={()=>{if(t.id==="events"){releaseLock();setCurrentEventId(null);setEvent({...EMPTY_EVENT});setDays(Array.from({length:8},(_,i)=>mkDay(i+1)));}setTab(t.id);}} style={{padding:"10px 14px",background:"none",border:"none",color:tab===t.id?C.rot:C.dunkelgrau,fontSize:12,fontWeight:tab===t.id?700:500,cursor:"pointer",display:"flex",alignItems:"center",gap:5,borderBottom:tab===t.id?`2px solid ${C.rot}`:"2px solid transparent",fontFamily:FONT.sans,whiteSpace:"nowrap"}}><span style={{fontSize:13}}>{t.icon}</span> {t.label}{t.id==="anfragen"&&anfragenNeu>0&&<span style={{marginLeft:4,background:C.rot,color:"#fff",borderRadius:10,padding:"1px 6px",fontSize:10,fontWeight:700,lineHeight:"16px",minWidth:16,textAlign:"center",display:"inline-block",animation:"pulse 2s infinite"}}>{anfragenNeu}</span>}</button>))}</nav>
 
       <main className="r-main" style={{maxWidth:1100,margin:"0 auto",padding:"16px 14px"}}>
 
@@ -2973,7 +2977,7 @@ export default function App(){
           <button onClick={()=>setMenuOpen(false)} style={{background:"none",border:"none",fontSize:20,cursor:"pointer",color:C.dunkelgrau,lineHeight:1}}>✕</button>
         </div>
         <div style={{flex:1,overflowY:"auto",paddingTop:4}}>
-          {TABS.filter(t=>!t.admin||user?.rolle==="admin").map(t=>(<button key={t.id} className={`drawer-item${tab===t.id?" active":""}`} onClick={()=>{if(t.id==="events"){releaseLock();setCurrentEventId(null);setEvent({...EMPTY_EVENT});setDays(Array.from({length:8},(_,j)=>mkDay(j+1)));}setTab(t.id);setMenuOpen(false);}}><span className="drawer-icon">{t.icon}</span>{t.label}</button>))}
+          {TABS.filter(t=>!t.admin||user?.rolle==="admin").map(t=>(<button key={t.id} className={`drawer-item${tab===t.id?" active":""}`} onClick={()=>{if(t.id==="events"){releaseLock();setCurrentEventId(null);setEvent({...EMPTY_EVENT});setDays(Array.from({length:8},(_,j)=>mkDay(j+1)));}setTab(t.id);setMenuOpen(false);}}><span className="drawer-icon">{t.icon}</span>{t.label}{t.id==="anfragen"&&anfragenNeu>0&&<span style={{marginLeft:"auto",background:C.rot,color:"#fff",borderRadius:10,padding:"1px 7px",fontSize:10,fontWeight:700,minWidth:16,textAlign:"center"}}>{anfragenNeu}</span>}</button>))}
         </div>
         <div style={{padding:"12px 20px",borderTop:`1px solid ${C.hellgrau}`}}>
           <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:10}}>
