@@ -409,6 +409,164 @@ function ConfirmModal({open,title,message,icon,onConfirm,onCancel,confirmText="B
 // ═══════════════════════════════════════════════════════════════════
 // Statistik Dashboard
 // ═══════════════════════════════════════════════════════════════════
+
+// ═══════════════════════════════════════════════════════════════════
+// Anfragen-Verwaltung
+// ═══════════════════════════════════════════════════════════════════
+function AnfragenTab({user,toast,bereitschaften,onOpenVorgang}){
+  const [anfragen,setAnfragen]=useState([]);
+  const [loading,setLoading]=useState(true);
+  const [selected,setSelected]=useState(null);
+  const [filter,setFilter]=useState("alle");
+  const [annBC,setAnnBC]=useState(user?.bereitschaftCode||"BSOB");
+
+  const load=()=>{setLoading(true);API.getAnfragen().then(r=>{setAnfragen(r);setLoading(false);}).catch(e=>{toast(e.message,"error");setLoading(false);});};
+  useEffect(load,[]);
+
+  const STATUS_C={neu:"#1565c0",angenommen:"#2e7d32",abgelehnt:"#c62828",archiviert:"#757575"};
+  const STATUS_L={neu:"Neu",angenommen:"Angenommen",abgelehnt:"Abgelehnt",archiviert:"Archiviert"};
+
+  const filtered=anfragen.filter(a=>filter==="alle"||a.status===filter);
+  const counts={};anfragen.forEach(a=>{counts[a.status]=(counts[a.status]||0)+1;});
+
+  const annehmen=async(a)=>{
+    if(!confirm(`Anfrage "${a.name}" annehmen und Vorgang für ${(bereitschaften||[]).find(b=>b.code===annBC)?.name||annBC} erstellen?`))return;
+    try{
+      const r=await API.anfrageAnnehmen(a.id,annBC);
+      if(r.success){toast(`✅ Vorgang ${r.auftragsnr} erstellt`,"success");load();setSelected(null);
+        if(onOpenVorgang)onOpenVorgang(r.vorgangId);
+      }else toast(r.error||"Fehler","error");
+    }catch(e){toast(e.message,"error");}
+  };
+
+  const ablehnen=async(a)=>{
+    if(!confirm(`Anfrage "${a.name}" wirklich ablehnen?`))return;
+    try{await API.updateAnfrageStatus(a.id,"abgelehnt");toast("Anfrage abgelehnt","success");load();setSelected(null);}catch(e){toast(e.message,"error");}
+  };
+
+  const archivieren=async(a)=>{
+    try{await API.updateAnfrageStatus(a.id,"archiviert");load();setSelected(null);}catch(e){toast(e.message,"error");}
+  };
+
+  const loeschen=async(a)=>{
+    if(!confirm("Anfrage endgültig löschen?"))return;
+    try{await API.deleteAnfrage(a.id);toast("Gelöscht","success");load();setSelected(null);}catch(e){toast(e.message,"error");}
+  };
+
+  const parseTage=(datum)=>{try{const t=JSON.parse(datum||"[]");return Array.isArray(t)?t:[];}catch{return[];}};
+  const fDate=d=>{if(!d)return"-";try{return new Date(d).toLocaleDateString("de-DE",{day:"2-digit",month:"2-digit",year:"numeric"});}catch{return d;}};
+  const fDateTime=d=>{if(!d)return"-";try{return new Date(d).toLocaleString("de-DE",{day:"2-digit",month:"2-digit",year:"numeric",hour:"2-digit",minute:"2-digit"});}catch{return d;}};
+
+  if(loading)return <div style={{padding:40,textAlign:"center",color:C.dunkelgrau}}>Lade Anfragen...</div>;
+
+  return(<div style={{display:"grid",gridTemplateColumns:selected?"1fr 1fr":"1fr",gap:16}}>
+    {/* Liste */}
+    <div>
+      <div style={{display:"flex",gap:6,marginBottom:12,flexWrap:"wrap",alignItems:"center"}}>
+        {["alle","neu","angenommen","abgelehnt","archiviert"].map(f=>{
+          const cnt=f==="alle"?anfragen.length:(counts[f]||0);
+          return <button key={f} onClick={()=>setFilter(f)} style={{padding:"5px 12px",background:filter===f?(STATUS_C[f]||C.rot):"#fff",color:filter===f?"#fff":C.dunkelgrau,border:`1px solid ${filter===f?(STATUS_C[f]||C.rot):C.mittelgrau}`,borderRadius:20,fontSize:11,fontWeight:filter===f?700:500,cursor:"pointer",fontFamily:FONT.sans}}>{STATUS_L[f]||"Alle"} ({cnt})</button>;
+        })}
+        <div style={{flex:1}}/>
+        <button onClick={load} style={{padding:"5px 12px",background:C.hellgrau,border:`1px solid ${C.mittelgrau}`,borderRadius:6,fontSize:11,cursor:"pointer",fontFamily:FONT.sans}}>🔄 Aktualisieren</button>
+      </div>
+
+      {filtered.length===0&&<div style={{padding:40,textAlign:"center",color:C.bgrau}}>
+        <div style={{fontSize:36,marginBottom:8}}>📭</div>
+        <div style={{fontSize:14}}>Keine {filter!=="alle"?STATUS_L[filter]+"n":""} Anfragen</div>
+        <div style={{fontSize:11,marginTop:4}}>Link zum Formular: <a href="/anfrage" target="_blank" style={{color:C.mittelblau}}>/anfrage</a></div>
+      </div>}
+
+      {filtered.map(a=>{
+        const tage=parseTage(a.datum);
+        const isNew=a.status==="neu";
+        return <div key={a.id} onClick={()=>setSelected(a)} style={{padding:"12px 16px",background:selected?.id===a.id?`${C.mittelblau}10`:"#fff",border:`1px solid ${selected?.id===a.id?C.mittelblau:C.mittelgrau}40`,borderLeft:`4px solid ${STATUS_C[a.status]||"#999"}`,borderRadius:8,marginBottom:6,cursor:"pointer",transition:"all 0.15s"}}>
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start"}}>
+            <div>
+              <div style={{fontSize:14,fontWeight:700,color:isNew?C.mittelblau:C.dunkelgrau}}>{a.name||"Ohne Name"}</div>
+              <div style={{fontSize:11,color:C.dunkelgrau,marginTop:2}}>
+                {a.veranstalter} · {a.ort||"-"}{tage.length>0?` · ${tage.length} Tag${tage.length>1?"e":""}`:""}{a.besucher?` · ~${a.besucher} Besucher`:""}
+              </div>
+            </div>
+            <div style={{textAlign:"right"}}>
+              <span style={{display:"inline-block",padding:"2px 8px",borderRadius:10,fontSize:10,fontWeight:600,background:(STATUS_C[a.status]||"#999")+"20",color:STATUS_C[a.status]||"#999"}}>{STATUS_L[a.status]||a.status}</span>
+              <div style={{fontSize:9,color:C.bgrau,marginTop:2}}>{fDateTime(a.created_at)}</div>
+            </div>
+          </div>
+        </div>;
+      })}
+    </div>
+
+    {/* Detail */}
+    {selected&&<div>
+      <Card title={selected.name||"Anfrage"} accent={STATUS_C[selected.status]||C.mittelblau}>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}>
+          <span style={{padding:"3px 10px",borderRadius:12,fontSize:11,fontWeight:700,background:(STATUS_C[selected.status]||"#999")+"20",color:STATUS_C[selected.status]||"#999"}}>{STATUS_L[selected.status]||selected.status}</span>
+          <button onClick={()=>setSelected(null)} style={{background:"none",border:"none",fontSize:18,cursor:"pointer",color:"#999"}}>✕</button>
+        </div>
+
+        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"6px 16px",fontSize:12,marginBottom:14}}>
+          <div><span style={{fontWeight:600,color:"#555"}}>Veranstalter:</span> {selected.veranstalter}</div>
+          <div><span style={{fontWeight:600,color:"#555"}}>Ansprechpartner:</span> {selected.ansprechpartner}</div>
+          <div><span style={{fontWeight:600,color:"#555"}}>Telefon:</span> <a href={`tel:${selected.telefon}`} style={{color:C.mittelblau}}>{selected.telefon}</a></div>
+          <div><span style={{fontWeight:600,color:"#555"}}>E-Mail:</span> <a href={`mailto:${selected.email}`} style={{color:C.mittelblau}}>{selected.email}</a></div>
+          <div><span style={{fontWeight:600,color:"#555"}}>Ort:</span> {selected.ort||"-"}</div>
+          <div><span style={{fontWeight:600,color:"#555"}}>Adresse:</span> {selected.adresse||"-"}</div>
+          <div><span style={{fontWeight:600,color:"#555"}}>Besucher:</span> {selected.besucher||"-"}</div>
+          <div><span style={{fontWeight:600,color:"#555"}}>Art:</span> {selected.art||"-"}</div>
+          <div style={{gridColumn:"1/-1"}}><span style={{fontWeight:600,color:"#555"}}>Eingegangen:</span> {fDateTime(selected.created_at)}</div>
+        </div>
+
+        {/* Tage */}
+        {(()=>{const tage=parseTage(selected.datum);return tage.length>0?<div style={{marginBottom:14}}>
+          <div style={{fontSize:11,fontWeight:600,color:"#555",marginBottom:4}}>Veranstaltungstage:</div>
+          <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
+            {tage.map((t,i)=><div key={i} style={{padding:"6px 12px",background:C.hellgrau,borderRadius:6,fontSize:11}}>
+              <span style={{fontWeight:700}}>{fDate(t.datum)}</span> {t.von||"?"} – {t.bis||"?"}
+            </div>)}
+          </div>
+        </div>:null;})()}
+
+        {selected.bemerkung&&<div style={{marginBottom:14}}>
+          <div style={{fontSize:11,fontWeight:600,color:"#555",marginBottom:4}}>Bemerkung:</div>
+          <div style={{padding:"8px 12px",background:"#f5f5f5",borderRadius:6,fontSize:12,lineHeight:1.5,whiteSpace:"pre-wrap"}}>{selected.bemerkung}</div>
+        </div>}
+
+        {/* Aktionen */}
+        {selected.status==="neu"&&<div style={{borderTop:`1px solid ${C.mittelgrau}40`,paddingTop:14,marginTop:14}}>
+          <div style={{fontSize:12,fontWeight:600,color:"#555",marginBottom:8}}>Anfrage bearbeiten:</div>
+          <div style={{display:"flex",gap:8,alignItems:"center",marginBottom:10}}>
+            <div style={{fontSize:11,color:"#555"}}>Zuweisen an:</div>
+            <select value={annBC} onChange={e=>setAnnBC(e.target.value)} style={{padding:"5px 10px",border:`1px solid ${C.mittelgrau}`,borderRadius:5,fontSize:12,fontFamily:FONT.sans}}>
+              {(bereitschaften||[]).map(b=><option key={b.code} value={b.code}>{b.name}</option>)}
+            </select>
+          </div>
+          <div style={{display:"flex",gap:8}}>
+            <button onClick={()=>annehmen(selected)} style={{flex:1,padding:"10px 16px",background:"#2e7d32",color:"#fff",border:"none",borderRadius:6,fontSize:13,fontWeight:700,cursor:"pointer",fontFamily:FONT.sans}}>✅ Annehmen & Vorgang erstellen</button>
+            <button onClick={()=>ablehnen(selected)} style={{padding:"10px 16px",background:"#fff",color:"#c62828",border:"1px solid #ef9a9a",borderRadius:6,fontSize:13,fontWeight:600,cursor:"pointer",fontFamily:FONT.sans}}>✕ Ablehnen</button>
+          </div>
+        </div>}
+
+        {selected.status==="angenommen"&&<div style={{borderTop:`1px solid ${C.mittelgrau}40`,paddingTop:14,marginTop:14}}>
+          <div style={{padding:"10px 14px",background:"#e8f5e9",borderRadius:6,fontSize:12,color:"#2e7d32",marginBottom:8}}>✅ Diese Anfrage wurde angenommen. Der Vorgang wurde erstellt.</div>
+          <button onClick={()=>archivieren(selected)} style={{padding:"8px 16px",background:C.hellgrau,border:`1px solid ${C.mittelgrau}`,borderRadius:6,fontSize:12,cursor:"pointer",fontFamily:FONT.sans}}>📦 Archivieren</button>
+        </div>}
+
+        {selected.status==="abgelehnt"&&<div style={{borderTop:`1px solid ${C.mittelgrau}40`,paddingTop:14,marginTop:14}}>
+          <div style={{display:"flex",gap:8}}>
+            <button onClick={()=>archivieren(selected)} style={{padding:"8px 16px",background:C.hellgrau,border:`1px solid ${C.mittelgrau}`,borderRadius:6,fontSize:12,cursor:"pointer",fontFamily:FONT.sans}}>📦 Archivieren</button>
+            <button onClick={()=>loeschen(selected)} style={{padding:"8px 16px",background:"#fff",color:"#c62828",border:"1px solid #ef9a9a",borderRadius:6,fontSize:12,cursor:"pointer",fontFamily:FONT.sans}}>🗑️ Endgültig löschen</button>
+          </div>
+        </div>}
+
+        {selected.status==="archiviert"&&<div style={{borderTop:`1px solid ${C.mittelgrau}40`,paddingTop:14,marginTop:14}}>
+          <button onClick={()=>loeschen(selected)} style={{padding:"8px 16px",background:"#fff",color:"#c62828",border:"1px solid #ef9a9a",borderRadius:6,fontSize:12,cursor:"pointer",fontFamily:FONT.sans}}>🗑️ Endgültig löschen</button>
+        </div>}
+      </Card>
+    </div>}
+  </div>);
+}
+
 function StatistikDashboard({user,year:appYear,toast}){
   const [year,setYear]=useState(appYear||new Date().getFullYear());
   const [bc,setBc]=useState("ALL");
@@ -1868,9 +2026,17 @@ function FeedbackButton({user,currentView,toast}){
 // ═══════════════════════════════════════════════════════════════════════════
 // MAIN APP
 // ═══════════════════════════════════════════════════════════════════════════
-const TABS=[{id:"events",label:"Vorgänge",icon:"📁"},{id:"event",label:"Veranstaltung",icon:"📋"},{id:"days",label:"Tage & Analyse",icon:"📊"},{id:"costs",label:"Kosten",icon:"💰"},{id:"pdf",label:"Dokumente",icon:"🖨️"},{id:"kunden",label:"Kunden",icon:"👥"},{id:"statistik",label:"Statistik",icon:"📈"},{id:"profil",label:"Mein Profil",icon:"👤"},{id:"einstellungen",label:"Einstellungen",icon:"⚙️",admin:true},{id:"releases",label:"Changelog",icon:"🆕"}];
-const APP_VERSION="v7.4";
-const LATEST_RELEASE={v:"v7.4",d:"04.03.2026",c:[
+const TABS=[{id:"events",label:"Vorgänge",icon:"📁"},{id:"event",label:"Veranstaltung",icon:"📋"},{id:"days",label:"Tage & Analyse",icon:"📊"},{id:"costs",label:"Kosten",icon:"💰"},{id:"pdf",label:"Dokumente",icon:"🖨️"},{id:"kunden",label:"Kunden",icon:"👥"},{id:"anfragen",label:"Anfragen",icon:"📩"},{id:"statistik",label:"Statistik",icon:"📈"},{id:"profil",label:"Mein Profil",icon:"👤"},{id:"einstellungen",label:"Einstellungen",icon:"⚙️",admin:true},{id:"releases",label:"Changelog",icon:"🆕"}];
+const APP_VERSION="v7.5";
+const LATEST_RELEASE={v:"v7.5",d:"04.03.2026",c:[
+"Anfragen-Tab: Verwaltung eingehender Anfragen vom öffentlichen Formular",
+"Anfragen: Annehmen → automatisch Vorgang mit Auftragsnr erstellen",
+"Anfragen: Status-Workflow (Neu → Angenommen/Abgelehnt → Archiviert)",
+"Anfragen: Zuweisung an Bereitschaft bei Annahme",
+"Anfragen: E-Mail-Benachrichtigung bei neuer Anfrage (wenn SMTP aktiv)",
+"Anfragen: Detail-Ansicht mit Kontaktdaten, Tagen, Bemerkungen",
+]};
+const RELEASE_V74={v:"v7.4",d:"04.03.2026",c:[
 "Statistik-Dashboard: Einsätze pro Monat, Status-Verteilung, Bereitschafts-Übersicht",
 "Statistik: CSV-Export aller Vorgänge, Jahres- und Bereitschafts-Filter",
 "Digitales Einsatzprotokoll: Live-Formular für Einsatztage",
@@ -1931,12 +2097,14 @@ export default function App(){
   const [mappePending,setMappePending]=useState(false);
   const [mappeModal,setMappeModal]=useState(false);
   const [ncEnabled,setNcEnabled]=useState(false);
+  const [bereitschaften,setBereitschaften]=useState([]);
   const [smtpEnabled,setSmtpEnabled]=useState(false);
   const [mailModal,setMailModal]=useState(false);
   const [epLive,setEpLive]=useState(false);
   useEffect(()=>{
     API.json("/api/nextcloud/status").then(r=>setNcEnabled(!!r.configured)).catch(()=>{});
     API.json("/api/config/smtp").then(r=>setSmtpEnabled(r.smtp_enabled==="true")).catch(()=>{});
+    API.json("/api/stammdaten/bereitschaften").then(r=>setBereitschaften(r||[])).catch(()=>{});
   },[]);
   const [mappeDocs,setMappeDocs]=useState({deckblatt:true,angebot:true,vertrag:true,aab:true,gefahren:true});
   const [gefahrenPending,setGefahrenPending]=useState(false);
@@ -2625,6 +2793,8 @@ export default function App(){
           </div>
         </div>
       )}
+      {tab==="anfragen"&&<AnfragenTab user={user} toast={toast} bereitschaften={bereitschaften} onOpenVorgang={(id)=>{setCurrentEventId(id);API.json(`/api/vorgaenge/${year}?bc=ALL`).then(r=>{const v=r.find(v=>v.id===id);if(v){setEvent({...EMPTY_EVENT,...(v.event||{})});setDays(v.days||Array.from({length:8},(_,i)=>mkDay(i+1)));setTab("event");}}).catch(()=>setTab("events"));}}/>}
+
       {tab==="statistik"&&<StatistikDashboard user={user} year={year} toast={toast}/>}
 
       {tab==="profil"&&(<div style={{maxWidth:550}}>
@@ -2672,7 +2842,7 @@ export default function App(){
           <button onClick={()=>window.location.href="/auth/logout"} style={{width:"100%",padding:"8px 12px",background:C.hellgrau,border:"none",borderRadius:4,fontSize:12,cursor:"pointer",fontFamily:FONT.sans,color:C.dunkelgrau}}>⏻ Abmelden</button>
         </div>
       </div>
-      <footer className="mob-hide" style={{padding:"12px 20px",borderTop:`1px solid ${C.mittelgrau}40`,textAlign:"center",fontSize:10,color:C.dunkelgrau,background:C.weiss}}>BRK Sanitätswachdienst v7.4 · {bereitschaft.name} · {stammdaten.kvName} · {year}</footer>
+      <footer className="mob-hide" style={{padding:"12px 20px",borderTop:`1px solid ${C.mittelgrau}40`,textAlign:"center",fontSize:10,color:C.dunkelgrau,background:C.weiss}}>BRK Sanitätswachdienst v7.5 · {bereitschaft.name} · {stammdaten.kvName} · {year}</footer>
 
       {/* ── Angebotsmappe Modal ──────────────────────────────── */}
       {mailModal&&<MailComposeModal event={event} currentEventId={currentEventId} user={user} stammdaten={stammdaten} dayCalcs={dayCalcs} totalCosts={totalCosts} activeDays={activeDays} toast={toast} onClose={()=>setMailModal(false)}/>}

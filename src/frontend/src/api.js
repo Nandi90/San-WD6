@@ -254,6 +254,7 @@ const API = {
   async getStatusLog(id) { return this.json("/api/vorgaenge/"+id+"/status-log"); },
   async getAnfragen() { return this.json("/api/anfragen"); },
   async updateAnfrageStatus(id,status) { return this.json("/api/anfragen/"+id+"/status",{method:"PUT",body:JSON.stringify({status})}); },
+  async anfrageAnnehmen(id, bc) { return this.json(`/api/anfragen/${id}/annehmen`, { method: "POST", body: JSON.stringify({ bereitschaft_code: bc }) }); },
   async deleteAnfrage(id) { return this.json("/api/anfragen/"+id,{method:"DELETE"}); },
   async getEinsatzprotokollPDF(id, dayIdx) {
     const r = await fetch(`/api/pdf/einsatzprotokoll/${id}`, {

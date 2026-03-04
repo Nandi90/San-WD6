@@ -28,6 +28,11 @@ router.get("/me", (req, res) => {
 });
 
 // ── Alle Bereitschaften (Admin) ──────────────────────────────────
+router.get("/bereitschaften", (req, res) => {
+  const rows = getDb().prepare("SELECT code, name, short FROM bereitschaften ORDER BY name").all();
+  res.json(rows);
+});
+
 router.get("/alle", requireAdmin, (req, res) => {
   const rows = getDb().prepare("SELECT code, name, short FROM bereitschaften ORDER BY name").all();
   res.json(rows);

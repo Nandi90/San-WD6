@@ -483,6 +483,34 @@ app.post("/api/anfrage", express.json(), (req, res) => {
     db.getDb().prepare("INSERT INTO anfragen (name,ort,adresse,datum,zeit_von,zeit_bis,besucher,veranstalter,ansprechpartner,telefon,email,bemerkung,art) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)")
       .run(name, ort||"", adresse||"", JSON.stringify(tage||[]), "", "", besucher||0, veranstalter, ansprechpartner, telefon, email, bemerkung||"", art||"");
     res.json({ success: true });
+
+    // E-Mail-Benachrichtigung (non-blocking)
+    setImmediate(async () => {
+      try {
+        if (!smtp.isConfigured()) return;
+        const bereitschaften = db.getDb().prepare("SELECT email FROM bereitschaften WHERE email IS NOT NULL AND email != ''").all();
+        const recipients = bereitschaften.map(b => b.email).filter(Boolean);
+        if (recipients.length === 0) return;
+        await smtp.sendMail({
+          to: recipients.join(", "),
+          subject: `Neue SanWD-Anfrage: ${name} (${ort || ""})`,
+          html: `<h3>Neue Anfrage über das Webformular</h3>
+            <table style="border-collapse:collapse;font-family:Arial,sans-serif;font-size:14px;">
+            <tr><td style="padding:4px 12px;font-weight:bold">Veranstaltung:</td><td>${name}</td></tr>
+            <tr><td style="padding:4px 12px;font-weight:bold">Ort:</td><td>${ort || "-"}</td></tr>
+            <tr><td style="padding:4px 12px;font-weight:bold">Veranstalter:</td><td>${veranstalter}</td></tr>
+            <tr><td style="padding:4px 12px;font-weight:bold">Ansprechpartner:</td><td>${ansprechpartner}</td></tr>
+            <tr><td style="padding:4px 12px;font-weight:bold">Telefon:</td><td>${telefon}</td></tr>
+            <tr><td style="padding:4px 12px;font-weight:bold">E-Mail:</td><td>${email}</td></tr>
+            <tr><td style="padding:4px 12px;font-weight:bold">Besucher:</td><td>${besucher || "-"}</td></tr>
+            <tr><td style="padding:4px 12px;font-weight:bold">Art:</td><td>${art || "-"}</td></tr>
+            <tr><td style="padding:4px 12px;font-weight:bold">Bemerkung:</td><td>${bemerkung || "-"}</td></tr>
+            </table>
+            <p style="margin-top:16px;color:#666;font-size:12px">Diese Anfrage kann in SanWD unter dem Tab "Anfragen" verwaltet werden.</p>`
+        });
+        console.log("Anfrage-Benachrichtigung gesendet an:", recipients.join(", "));
+      } catch(e) { console.error("Anfrage-Mail:", e.message); }
+    });
   } catch (e) { console.error("Anfrage:", e); res.status(500).json({ error: "Serverfehler" }); }
 });
 
@@ -503,6 +531,88 @@ app.put("/api/anfragen/:id/status", (req, res) => {
     db.getDb().prepare("UPDATE anfragen SET status=? WHERE id=?").run(status, req.params.id);
     res.json({ success: true });
   } catch (e) { res.status(500).json({ error: "Serverfehler" }); }
+});
+
+// Anfrage annehmen → Vorgang erstellen
+app.post("/api/anfragen/:id/annehmen", (req, res) => {
+  if (!req.session?.user) return res.status(401).json({ error: "Nicht authentifiziert" });
+  try {
+    const anfrage = db.getDb().prepare("SELECT * FROM anfragen WHERE id=?").get(req.params.id);
+    if (!anfrage) return res.status(404).json({ error: "Anfrage nicht gefunden" });
+
+    const bc = req.body.bereitschaft_code || req.session.user.bereitschaftCode || "BSOB";
+    const year = new Date().getFullYear();
+    const shortYear = String(year).slice(2);
+
+    // Counter holen und incrementen
+    const bereitschaft = db.getDb().prepare("SELECT * FROM bereitschaften WHERE code=?").get(bc) || {};
+    const counterRow = db.getDb().prepare("SELECT next_nr FROM counter WHERE bereitschaft_code=? AND year=?").get(bc, year);
+    const nextNr = counterRow ? counterRow.next_nr : 1;
+    db.getDb().prepare("INSERT INTO counter (bereitschaft_code, year, next_nr) VALUES (?,?,2) ON CONFLICT(bereitschaft_code, year) DO UPDATE SET next_nr = next_nr + 1").run(bc, year);
+
+    const auftragsnr = `${bc}_${shortYear}_${String(nextNr).padStart(3, "0")}`;
+    const vorgangId = `evt-${Date.now()}`;
+
+    // Tage aus Anfrage parsen
+    let tage = [];
+    try { tage = JSON.parse(anfrage.datum || "[]"); } catch { tage = []; }
+    if (!Array.isArray(tage)) tage = [];
+
+    const days = tage.length > 0
+      ? tage.map((t, i) => ({
+          id: i + 1, active: true, date: t.datum || "",
+          startTime: t.von || "18:00", endTime: t.bis || "23:00",
+          auflagen: 0, geschlossen: false, flaeche: 0, geschlossenFlaeche: false,
+          besucher: i === 0 ? (anfrage.besucher || 1000) : 1000,
+          besucherFlaeche: 0, eventTypeId: 11, customFactor: 0, prominente: 0,
+          polizeiRisiko: false, oHelfer: null, oKtw: null, oRtw: null, oAerzte: null,
+          oGktw: null, oEl: null, oElKfz: null, oSeg: null, oMtw: null, oZelt: null,
+          kmKtw: 0, kmRtw: 0, kmGktw: 0, kmElKfz: 0, kmSeg: 0, kmMtw: 0, fahrzeuge: []
+        }))
+      : Array.from({ length: 8 }, (_, i) => ({
+          id: i + 1, active: i === 0, date: "",
+          startTime: anfrage.zeit_von || "18:00", endTime: anfrage.zeit_bis || "23:00",
+          auflagen: 0, geschlossen: false, flaeche: 0, geschlossenFlaeche: false,
+          besucher: 1000, besucherFlaeche: 0, eventTypeId: 11, customFactor: 0,
+          prominente: 0, polizeiRisiko: false, oHelfer: null, oKtw: null, oRtw: null,
+          oAerzte: null, oGktw: null, oEl: null, oElKfz: null, oSeg: null, oMtw: null,
+          oZelt: null, kmKtw: 0, kmRtw: 0, kmGktw: 0, kmElKfz: 0, kmSeg: 0, kmMtw: 0,
+          fahrzeuge: []
+        }));
+
+    const vorgang = {
+      event: {
+        auftragsnr, name: anfrage.name || "", ort: anfrage.ort || "",
+        adresse: anfrage.adresse || "", veranstalter: anfrage.veranstalter || "",
+        ansprechpartner: anfrage.ansprechpartner || "", telefon: anfrage.telefon || "",
+        email: anfrage.email || "", rechnungsempfaenger: anfrage.veranstalter || "",
+        reStrasse: "", rePlzOrt: "",
+        anrede: "Sehr geehrte Damen und Herren,",
+        auflagen: "keine", kfzStellplatz: true, sanitaetsraum: false,
+        strom: true, verpflegung: true, pauschalangebot: 0,
+        bemerkung: anfrage.bemerkung || "", coords: null, w3w: "", hausnr: "",
+        checklist: {}, ilsEL: "", ilsTelefon: "", ilsFunk: "",
+        ilsAbkoemmlich: "", ilsFzg1: "", ilsFzg2: "", ilsFzg3: "", ilsSonstige: "",
+        anfrageId: anfrage.id, anfrageDatum: anfrage.created_at
+      },
+      days
+    };
+
+    db.getDb().prepare(
+      "INSERT INTO vorgaenge (id, bereitschaft_code, year, data, created_by) VALUES (?,?,?,?,?)"
+    ).run(vorgangId, bc, year, JSON.stringify(vorgang), req.session.user.sub);
+
+    // Anfrage-Status updaten
+    db.getDb().prepare("UPDATE anfragen SET status='angenommen' WHERE id=?").run(anfrage.id);
+
+    db.audit(req.session.user, "anfrage_angenommen", "anfrage", String(anfrage.id),
+      `Vorgang ${auftragsnr} erstellt (${vorgangId})`);
+
+    res.json({ success: true, vorgangId, auftragsnr, bc });
+  } catch (e) {
+    console.error("Anfrage annehmen:", e);
+    res.status(500).json({ error: e.message });
+  }
 });
 
 app.delete("/api/anfragen/:id", (req, res) => {
