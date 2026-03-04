@@ -58,6 +58,8 @@ function init() {
   cfgIns.run("smtp_from_name", "BRK Sanitätswachdienst");
   cfgIns.run("smtp_cc_bereitschaft", "true");
   cfgIns.run("smtp_on_behalf", "true");
+  cfgIns.run("smtp_notify_recipients", "");
+  cfgIns.run("smtp_anfrage_confirm", "true");
   cfgIns.run("nextcloud_auth_mode", "service");
   cfgIns.run("nextcloud_service_user", "");
   cfgIns.run("nextcloud_service_password", "");

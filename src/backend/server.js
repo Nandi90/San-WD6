@@ -490,27 +490,75 @@ app.post("/api/anfrage", express.json(), (req, res) => {
     setImmediate(async () => {
       try {
         if (!smtp.isConfigured()) return;
-        const bereitschaften = db.getDb().prepare("SELECT email FROM bereitschaften WHERE email IS NOT NULL AND email != ''").all();
-        const recipients = bereitschaften.map(b => b.email).filter(Boolean);
-        if (recipients.length === 0) return;
-        await smtp.sendMail({
-          to: recipients.join(", "),
-          subject: `Neue SanWD-Anfrage: ${name} (${ort || ""})`,
-          html: `<h3>Neue Anfrage über das Webformular</h3>
-            <table style="border-collapse:collapse;font-family:Arial,sans-serif;font-size:14px;">
-            <tr><td style="padding:4px 12px;font-weight:bold">Veranstaltung:</td><td>${name}</td></tr>
-            <tr><td style="padding:4px 12px;font-weight:bold">Ort:</td><td>${ort || "-"}</td></tr>
-            <tr><td style="padding:4px 12px;font-weight:bold">Veranstalter:</td><td>${veranstalter}</td></tr>
-            <tr><td style="padding:4px 12px;font-weight:bold">Ansprechpartner:</td><td>${ansprechpartner}</td></tr>
-            <tr><td style="padding:4px 12px;font-weight:bold">Telefon:</td><td>${telefon}</td></tr>
-            <tr><td style="padding:4px 12px;font-weight:bold">E-Mail:</td><td>${email}</td></tr>
-            <tr><td style="padding:4px 12px;font-weight:bold">Besucher:</td><td>${besucher || "-"}</td></tr>
-            <tr><td style="padding:4px 12px;font-weight:bold">Art:</td><td>${art || "-"}</td></tr>
-            <tr><td style="padding:4px 12px;font-weight:bold">Bemerkung:</td><td>${bemerkung || "-"}</td></tr>
-            </table>
-            <p style="margin-top:16px;color:#666;font-size:12px">Diese Anfrage kann in SanWD unter dem Tab "Anfragen" verwaltet werden.</p>`
-        });
-        console.log("Anfrage-Benachrichtigung gesendet an:", recipients.join(", "));
+        const { getConfig } = require("./db");
+
+        // 1. Interne Benachrichtigung
+        const cfgRecipients = getConfig("smtp_notify_recipients", "");
+        let recipients = [];
+        if (cfgRecipients.trim()) {
+          recipients = cfgRecipients.split(",").map(e => e.trim()).filter(Boolean);
+        } else {
+          // Fallback: Bereitschafts-E-Mails
+          const bereitschaften = db.getDb().prepare("SELECT email FROM bereitschaften WHERE email IS NOT NULL AND email != ''").all();
+          recipients = bereitschaften.map(b => b.email).filter(Boolean);
+        }
+        if (recipients.length > 0) {
+          await smtp.sendMail({
+            to: recipients.join(", "),
+            subject: `Neue SanWD-Anfrage: ${name} (${ort || ""})`,
+            html: `<div style="font-family:Arial,sans-serif;max-width:600px;">
+              <div style="background:#E60005;color:#fff;padding:16px 24px;border-radius:8px 8px 0 0;">
+                <h2 style="margin:0;font-size:18px;">Neue Anfrage eingegangen</h2>
+              </div>
+              <div style="background:#fff;border:1px solid #ddd;border-top:none;padding:20px 24px;border-radius:0 0 8px 8px;">
+                <table style="border-collapse:collapse;font-size:14px;width:100%;">
+                <tr><td style="padding:6px 12px 6px 0;font-weight:bold;color:#555;white-space:nowrap;">Veranstaltung:</td><td style="padding:6px 0;">${name}</td></tr>
+                <tr><td style="padding:6px 12px 6px 0;font-weight:bold;color:#555;">Ort:</td><td style="padding:6px 0;">${ort || "-"}</td></tr>
+                <tr><td style="padding:6px 12px 6px 0;font-weight:bold;color:#555;">Veranstalter:</td><td style="padding:6px 0;">${veranstalter}</td></tr>
+                <tr><td style="padding:6px 12px 6px 0;font-weight:bold;color:#555;">Ansprechpartner:</td><td style="padding:6px 0;">${ansprechpartner}</td></tr>
+                <tr><td style="padding:6px 12px 6px 0;font-weight:bold;color:#555;">Telefon:</td><td style="padding:6px 0;">${telefon}</td></tr>
+                <tr><td style="padding:6px 12px 6px 0;font-weight:bold;color:#555;">E-Mail:</td><td style="padding:6px 0;">${email}</td></tr>
+                <tr><td style="padding:6px 12px 6px 0;font-weight:bold;color:#555;">Besucher:</td><td style="padding:6px 0;">${besucher || "-"}</td></tr>
+                <tr><td style="padding:6px 12px 6px 0;font-weight:bold;color:#555;">Art:</td><td style="padding:6px 0;">${art || "-"}</td></tr>
+                ${bemerkung ? `<tr><td style="padding:6px 12px 6px 0;font-weight:bold;color:#555;vertical-align:top;">Bemerkung:</td><td style="padding:6px 0;">${bemerkung}</td></tr>` : ""}
+                </table>
+                <p style="margin-top:16px;padding-top:12px;border-top:1px solid #eee;color:#888;font-size:12px;">Diese Anfrage kann in SanWD unter dem Tab „Anfragen" verwaltet werden.</p>
+              </div>
+            </div>`
+          });
+          console.log("Anfrage-Benachrichtigung gesendet an:", recipients.join(", "));
+        }
+
+        // 2. Bestätigungsmail an Anfragenden
+        const sendConfirm = getConfig("smtp_anfrage_confirm", "true");
+        if (sendConfirm === "true" && email) {
+          const fromName = getConfig("smtp_from_name", "BRK Sanitätswachdienst");
+          const kvName = (db.getDb().prepare("SELECT kv_name FROM bereitschaften LIMIT 1").get() || {}).kv_name || "BRK Kreisverband";
+          await smtp.sendMail({
+            to: email,
+            subject: `Ihre Anfrage: ${name} – Eingangsbestätigung`,
+            html: `<div style="font-family:Arial,sans-serif;max-width:600px;">
+              <div style="background:#002F5F;color:#fff;padding:16px 24px;border-radius:8px 8px 0 0;">
+                <h2 style="margin:0;font-size:18px;">${fromName}</h2>
+              </div>
+              <div style="background:#fff;border:1px solid #ddd;border-top:none;padding:24px;border-radius:0 0 8px 8px;">
+                <p>Sehr geehrte/r ${ansprechpartner || "Veranstalter"},</p>
+                <p>vielen Dank für Ihre Anfrage zur sanitätsdienstlichen Absicherung Ihrer Veranstaltung <strong>„${name}"</strong>.</p>
+                <p>Wir haben Ihre Anfrage erhalten und werden uns zeitnah bei Ihnen melden, um die Details zu besprechen und Ihnen ein Angebot zu erstellen.</p>
+                <div style="background:#f5f5f5;border-radius:6px;padding:14px 18px;margin:16px 0;">
+                  <div style="font-size:13px;color:#555;">
+                    <strong>Ihre Angaben:</strong><br/>
+                    Veranstaltung: ${name}<br/>
+                    Ort: ${ort || "-"}<br/>
+                    Kontakt: ${telefon}
+                  </div>
+                </div>
+                <p>Mit freundlichen Grüßen<br/><strong>${fromName}</strong><br/>${kvName}</p>
+              </div>
+            </div>`
+          });
+          console.log("Bestätigungsmail gesendet an:", email);
+        }
       } catch(e) { console.error("Anfrage-Mail:", e.message); }
     });
   } catch (e) { console.error("Anfrage:", e); res.status(500).json({ error: "Serverfehler" }); }
@@ -856,7 +904,7 @@ app.get("/api/config/smtp", requireAuth, (req, res) => {
 app.put("/api/config/smtp", requireAuth, (req, res) => {
   if (req.session.user.rolle !== "admin") return res.status(403).json({ error: "Nur Admin" });
   const { setConfig, audit } = require("./db");
-  const allowed = ["smtp_enabled","smtp_mode","smtp_host","smtp_port","smtp_secure","smtp_user","smtp_password","smtp_from_email","smtp_from_name","smtp_cc_bereitschaft","smtp_on_behalf"];
+  const allowed = ["smtp_enabled","smtp_mode","smtp_host","smtp_port","smtp_secure","smtp_user","smtp_password","smtp_from_email","smtp_from_name","smtp_cc_bereitschaft","smtp_on_behalf","smtp_notify_recipients","smtp_anfrage_confirm"];
   for (const [key, val] of Object.entries(req.body)) {
     if (allowed.includes(key)) {
       if (key === "smtp_password" && val === "***") continue;

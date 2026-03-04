@@ -949,6 +949,20 @@ function SmtpConfig({toast}){
           </label>
         </div>
 
+        <div style={{background:"#fff3e0",borderRadius:6,padding:"14px 14px",marginBottom:12,border:"1px solid #ffe0b2"}}>
+          <div style={{fontSize:12,fontWeight:700,color:"#e65100",marginBottom:10}}>📩 Anfrage-Benachrichtigungen</div>
+          <div style={{marginBottom:10}}>
+            <div style={{fontSize:11,fontWeight:600,color:"#555",marginBottom:3}}>Empfänger bei neuer Anfrage</div>
+            <input value={cfg.smtp_notify_recipients||""} onChange={e=>setCfg(p=>({...p,smtp_notify_recipients:e.target.value}))} placeholder="mail1@brk.de, mail2@brk.de (leer = Bereitschafts-E-Mails)" style={{width:"100%",padding:"7px 10px",border:"1px solid #ccc",borderRadius:5,fontSize:12,fontFamily:FONT.sans}}/>
+            <div style={{fontSize:10,color:"#888",marginTop:3}}>Kommagetrennte E-Mail-Adressen. Wenn leer, werden die E-Mails der Bereitschaften verwendet.</div>
+          </div>
+          <label style={{display:"flex",alignItems:"center",gap:8,fontSize:12,cursor:"pointer"}}>
+            <input type="checkbox" checked={cfg.smtp_anfrage_confirm==="true"} onChange={e=>setCfg(p=>({...p,smtp_anfrage_confirm:e.target.checked?"true":"false"}))} style={{accentColor:"#e65100"}}/>
+            Bestätigungsmail an den Anfragenden senden
+          </label>
+          <div style={{fontSize:10,color:"#888",marginTop:3,marginLeft:26}}>Der Veranstalter erhält automatisch eine Eingangsbestätigung per E-Mail.</div>
+        </div>
+
         <div style={{display:"flex",gap:8}}>
           <button onClick={save} disabled={saving} style={{padding:"8px 20px",background:"#e65100",color:"#fff",border:"none",borderRadius:6,fontSize:13,fontWeight:600,cursor:"pointer",fontFamily:FONT.sans}}>{saving?"Speichern...":"Speichern"}</button>
           <button onClick={doTest} style={{padding:"8px 20px",background:C.hellgrau,border:"1px solid #ccc",borderRadius:6,fontSize:13,cursor:"pointer",fontFamily:FONT.sans}}>Verbindung testen</button>
