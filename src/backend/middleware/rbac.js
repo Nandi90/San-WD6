@@ -14,26 +14,36 @@ function requireAuth(req, res, next) {
   if (!req.session?.user) {
     return res.status(401).json({ error: "Nicht authentifiziert" });
   }
-  // Token-Ablauf pruefen (falls gespeichert)
+  // Token-Ablauf prüfen: Nur wenn KEIN Refresh-Token vorhanden
+  // (mit Refresh-Token wird unten automatisch verlängert)
   if (req.session.tokenExpiry && Date.now() > req.session.tokenExpiry) {
-    req.session.destroy(() => {});
-    return res.status(401).json({ error: "Sitzung abgelaufen - bitte neu anmelden" });
+    if (!req.session.refreshToken) {
+      // Kein Refresh möglich → Session wirklich abgelaufen
+      req.session.destroy(() => {});
+      return res.status(401).json({ error: "Sitzung abgelaufen - bitte neu anmelden" });
+    }
+    // Refresh-Token vorhanden → Versuch im Hintergrund, Request durchlassen
+    refreshKeycloakToken(req.session).catch(e => {
+      console.warn("Token-Refresh fehlgeschlagen:", e.message);
+    });
   }
-  // Periodische Keycloak-Validierung (alle 5 Min)
+  // Periodische Keycloak-Validierung (alle 10 Min statt 5)
   const now = Date.now();
   const lastCheck = req.session._lastAuthCheck || 0;
-  if (now - lastCheck > 300000) {
+  if (now - lastCheck > 600000) {
     req.session._lastAuthCheck = now;
-    // Async Token-Check im Hintergrund
-    validateKeycloakSession(req.session).catch(() => {
-      req.session.destroy(() => {});
+    // Async Token-Refresh im Hintergrund – NICHT session.destroy bei Fehler!
+    refreshKeycloakToken(req.session).catch(e => {
+      console.warn("Periodischer Token-Refresh fehlgeschlagen:", e.message);
+      // Session NICHT zerstören – User kann weiterarbeiten
+      // Erst bei nächstem Login wird Token erneuert
     });
   }
   next();
 }
 
-// Keycloak-Session validieren
-async function validateKeycloakSession(session) {
+// Keycloak-Token erneuern
+async function refreshKeycloakToken(session) {
   if (!session?.tokenEndpoint || !session?.refreshToken) return;
   try {
     const resp = await fetch(session.tokenEndpoint, {
@@ -46,13 +56,16 @@ async function validateKeycloakSession(session) {
         refresh_token: session.refreshToken
       })
     });
-    if (!resp.ok) throw new Error("Token refresh failed");
+    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
     const data = await resp.json();
-    session.refreshToken = data.refresh_token;
+    session.refreshToken = data.refresh_token || session.refreshToken;
     session.accessToken = data.access_token || session.accessToken;
-    session.tokenExpiry = Date.now() + (data.expires_in * 1000);
+    session.tokenExpiry = Date.now() + ((data.expires_in || 300) * 1000);
+    session._lastAuthCheck = Date.now();
   } catch(e) {
-    console.log("Keycloak Session ungueltig:", e.message);
+    console.log("Keycloak Token-Refresh:", e.message);
+    // Token-Expiry großzügig verlängern damit nicht sofort 401 kommt
+    session.tokenExpiry = Date.now() + 3600000; // +1h Kulanz
     throw e;
   }
 }

@@ -176,7 +176,9 @@ router.get("/callback", async (req, res) => {
     };
 
     // Token-Infos fuer Session-Validierung
-    req.session.tokenExpiry = tokenSet.expires_at ? tokenSet.expires_at * 1000 : Date.now() + 300000;
+    // Token-Expiry: Großzügig setzen, Refresh-Token übernimmt die Verlängerung
+    // Access-Token läuft nach 5 Min ab, aber Refresh-Token hält die Session am Leben
+    req.session.tokenExpiry = Date.now() + 3600000; // 1h initial, wird per Refresh verlängert
     req.session.refreshToken = tokenSet.refresh_token || "";
     req.session.accessToken = tokenSet.access_token || "";
     req.session.tokenEndpoint = client.issuer?.metadata?.token_endpoint || "";

@@ -5,6 +5,9 @@
  */
 
 const API = {
+  _sessionExpired: false,
+  _onSessionExpired: null, // Callback für UI-Benachrichtigung
+
   async _fetch(url, opts = {}) {
     const res = await fetch(url, {
       credentials: "include",
@@ -12,9 +15,15 @@ const API = {
       ...opts,
     });
     if (res.status === 401) {
-      window.location.href = "/auth/login";
-      throw new Error("Nicht authentifiziert");
+      // Nicht sofort redirect – nur Flag setzen
+      if (!this._sessionExpired) {
+        this._sessionExpired = true;
+        if (this._onSessionExpired) this._onSessionExpired();
+      }
+      throw new Error("Sitzung abgelaufen");
     }
+    // Bei erfolgreichem Request: Session ist OK
+    this._sessionExpired = false;
     if (!res.ok) {
       const err = await res.json().catch(() => ({ error: res.statusText }));
       throw new Error(err.error || "API Fehler");

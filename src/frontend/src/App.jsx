@@ -2200,6 +2200,8 @@ const RELEASE_V72={v:"v7.2",d:"03.03.2026",c:[
 export default function App(){
   const [user,setUser]=useState(null);
   const [authLoading,setAuthLoading]=useState(true);
+  const [sessionExpired,setSessionExpired]=useState(false);
+  useEffect(()=>{API._onSessionExpired=()=>setSessionExpired(true);return()=>{API._onSessionExpired=null;};},[]);
   useEffect(()=>{API.getStatus().then(d=>{if(d.authenticated){const bc=d.user.bereitschaftCode;const bIdx=BEREITSCHAFTEN.findIndex(b=>b.code===bc);const u={sub:d.user.sub,name:d.user.name,email:d.user.email,bereitschaftCode:bc,bereitschaftIdx:bIdx>=0?bIdx:0,bereitschaft:(d.user.bereitschaft&&d.user.bereitschaft.name)||bc||"",rolle:d.user.rolle,telefon:"",mobil:"",titel:""};setUser(u);API.getProfile().then(p=>{if(p)setUser(prev=>({...prev,telefon:p.telefon||prev.telefon,mobil:p.mobil||prev.mobil,titel:p.titel||prev.titel,email:p.email||prev.email,ort:p.ort||prev.ort||'',signatur:p.unterschrift||prev.signatur||''}));}).catch(()=>{});}}).catch(()=>{}).finally(()=>setAuthLoading(false));},[]);
   const [tab,setTab]=useState("events");
   const [stammdaten,setStammdaten]=useState(DEFAULT_STAMMDATEN);
@@ -3012,6 +3014,11 @@ export default function App(){
       <FeedbackButton user={user} currentView={tab} toast={toast}/>
       <ToastContainer toasts={toasts} onDismiss={dismissToast}/>
       <ConfirmDialog open={!!confirmDlg} title={confirmDlg?.title} message={confirmDlg?.message} confirmLabel={confirmDlg?.confirmLabel} cancelLabel={confirmDlg?.cancelLabel} variant={confirmDlg?.variant} onConfirm={handleConfirm} onCancel={handleCancel}/>
+      {sessionExpired&&<div style={{position:"fixed",top:0,left:0,right:0,zIndex:99999,background:"#c62828",color:"#fff",padding:"12px 20px",textAlign:"center",fontSize:14,fontWeight:600,fontFamily:FONT.sans,boxShadow:"0 2px 12px #0004",display:"flex",alignItems:"center",justifyContent:"center",gap:12}}>
+        <span>⚠️ Ihre Sitzung ist abgelaufen.</span>
+        <button onClick={()=>window.location.href="/auth/login"} style={{padding:"6px 18px",background:"#fff",color:"#c62828",border:"none",borderRadius:4,fontWeight:700,cursor:"pointer",fontSize:13,fontFamily:FONT.sans}}>Neu anmelden</button>
+        <button onClick={()=>setSessionExpired(false)} style={{padding:"4px 10px",background:"transparent",color:"#fff",border:"1px solid #fff8",borderRadius:4,cursor:"pointer",fontSize:11,fontFamily:FONT.sans}}>Später</button>
+      </div>}
       {showWhatsNew&&<WhatsNewBanner release={LATEST_RELEASE} onDismiss={dismissWhatsNew} onChangelog={()=>setTab("releases")}/>}
       {/* KOMPETENZ-OVERRIDE POPUP */}
       {showKompModal&&(()=>{const maxTP=Math.max(...dayCalcs.map(d=>d.tp),0);const auth=getSignAuthority(maxTP);const userMax=getUserMaxStufe(user?.rolle);return(
