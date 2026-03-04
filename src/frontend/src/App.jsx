@@ -1042,7 +1042,7 @@ function MailComposeModal({event:ev, currentEventId, user, stammdaten, dayCalcs,
         <div style={{marginBottom:12}}>
           <div style={{fontSize:11,fontWeight:600,color:"#555",marginBottom:4}}>PDF-Anhang</div>
           <div style={{display:"flex",flexDirection:"column",gap:4}}>
-            {[{v:"mappe",l:"📦 Angebotsmappe",d:"Angebot + Vertrag + AAB"},{v:"angebot",l:"📄 Nur Angebot",d:"Einzelnes Angebots-PDF"},{v:"none",l:"📭 Kein Anhang",d:"Nur Text-E-Mail"}].map(o=>(
+            {[{v:"mappe",l:"📦 Angebotsmappe",d:"Deckblatt + Angebot + Vertrag + AAB"},{v:"angebot",l:"📄 Nur Angebot",d:"Einzelnes Angebots-PDF"},{v:"none",l:"📭 Kein Anhang",d:"Nur Text-E-Mail"}].map(o=>(
               <label key={o.v} style={{display:"flex",alignItems:"center",gap:10,padding:"8px 12px",background:attachPdf===o.v?"#fff3e0":"#fafafa",border:`1px solid ${attachPdf===o.v?"#e65100":"#e0e0e0"}`,borderRadius:6,cursor:"pointer",transition:"all 0.15s"}} onClick={()=>setAttachPdf(o.v)}>
                 <div style={{width:16,height:16,borderRadius:8,border:`2px solid ${attachPdf===o.v?"#e65100":"#bbb"}`,display:"flex",alignItems:"center",justifyContent:"center"}}>
                   {attachPdf===o.v&&<div style={{width:8,height:8,borderRadius:4,background:"#e65100"}}/>}

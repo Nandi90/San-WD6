@@ -959,24 +959,49 @@ app.post("/api/mail/send/:id", requireAuth, async (req, res) => {
         }
         
         if (attachPdf === "mappe") {
-          // Angebotsmappe: Angebot + Vertrag + AAB (ohne Gefahrenanalyse)
-          const docs = [];
-          docs.push(await BrowserPool.renderPDF(buildAngebotHTML(ev, req.body.dayCalcs || [], req.body.totalCosts || 0, req.body.activeDays || vorgang.days || [], stamm, kosten, user), { marginTop: "20mm", marginLeft: "12mm" }));
-          try { docs.push(await BrowserPool.renderPDF(buildVertragHTML(vorgang, stamm, user))); } catch {}
-          try { docs.push(await BrowserPool.renderPDF(buildAABHTML(stamm, row.bereitschaft_code, klauselnAAB, ev.auftragsnr || ""))); } catch {}
-          
-          // Merge mit pdf-lib
-          const { PDFDocument } = require("pdf-lib");
-          const merged = await PDFDocument.create();
-          for (const buf of docs) {
-            try {
-              const src = await PDFDocument.load(buf);
-              const pages = await merged.copyPages(src, src.getPageIndices());
-              pages.forEach(p => merged.addPage(p));
-            } catch {}
-          }
-          const mergedBuf = Buffer.from(await merged.save());
-          attachments.push({ filename: `${nr}_Angebotsmappe.pdf`, content: mergedBuf, contentType: "application/pdf" });
+          // Angebotsmappe: Deckblatt → Angebot → Vertrag → AAB
+          const includeDocs = { deckblatt: true, angebot: true, vertrag: true, aab: true, gefahren: false };
+          const deckblattHTML = buildDeckblattHTML(ev, req.body.activeDays || vorgang.days || [], stamm, user, includeDocs);
+          const angebotHTML = buildAngebotHTML(ev, req.body.dayCalcs || [], req.body.totalCosts || 0, req.body.activeDays || vorgang.days || [], stamm, kosten, user);
+          const vertragHTML = buildVertragHTML(vorgang, stamm, user);
+          const aabHTML = buildAABHTML(stamm, row.bereitschaft_code, klauselnAAB, ev.auftragsnr || "");
+
+          const extractBody = (html) => { const m = html.match(/<body[^>]*>([\s\S]*)<\/body>/i); return m ? m[1] : html; };
+
+          const combinedHTML = `<!DOCTYPE html><html lang="de"><head><meta charset="utf-8"><style>
+            *{box-sizing:border-box}body{margin:0;font-family:Arial,Helvetica,sans-serif;font-size:10pt;color:#000}
+            @media print{body{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+              .page-break{page-break-before:always;break-before:page}
+              .no-break{page-break-inside:avoid!important;break-inside:avoid!important}
+              tr{page-break-inside:avoid;break-inside:avoid}
+            }
+            .doc-header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px;padding-bottom:6px;border-bottom:2px solid #c0392b}
+            .doc-header-left{display:flex;align-items:center;gap:8px}
+            .doc-header-org{font-size:8pt;color:#555;margin-top:3px}
+            .doc-header-right{text-align:right;font-size:8pt;color:#555}
+            .doc-header-right strong{color:#000}
+            .doc-title{font-size:11pt;font-weight:bold;text-align:center;color:#c0392b;margin:12px 0 4px}
+            .doc-subtitle{font-size:13pt;font-weight:bold;text-align:center;margin:0 0 16px}
+            .section{font-weight:bold;margin-top:12px;margin-bottom:4px;padding-left:3px;border-left:3px solid #c0392b;page-break-after:avoid;break-after:avoid}
+            .p{margin-bottom:6px}
+            .avoid{page-break-inside:avoid}
+            table{width:100%;border-collapse:collapse;font-size:9pt;margin-bottom:6px}
+            .info-table td{padding:2px 0;vertical-align:top}
+            .info-table td:first-child{width:155px;color:#555}
+            .party-block{background:#f5f5f5;border-left:3px solid #c0392b;padding:8px 10px;margin-bottom:10px;line-height:1.65}
+            .party-label{text-align:right;font-style:italic;color:#555;font-size:8.5pt;margin-top:4px}
+            .sig-table{width:100%;margin-top:24px;border-collapse:collapse}
+            .sig-cell{width:45%;text-align:center;vertical-align:bottom;padding:0 8px}
+            .sig-line{border-top:1px solid #000;padding-top:4px;font-size:8pt;margin-top:4px}
+          </style></head><body>
+            <div class="mappe-section">${extractBody(deckblattHTML)}</div>
+            <div class="mappe-section page-break">${extractBody(angebotHTML)}</div>
+            <div class="mappe-section page-break">${extractBody(vertragHTML)}</div>
+            <div class="mappe-section page-break">${extractBody(aabHTML)}</div>
+          </body></html>`;
+
+          const pdf = await BrowserPool.renderPDF(combinedHTML, { marginTop: "18mm", marginLeft: "12mm", marginBottom: "20mm" });
+          attachments.push({ filename: `${nr}_Angebotsmappe.pdf`, content: pdf, contentType: "application/pdf" });
         }
       } catch(e) {
         console.error("PDF für Mail:", e);
