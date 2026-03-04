@@ -2271,7 +2271,7 @@ function buildAngebotHTML(ev, dayCalcs, totalCosts, activeDays, stamm, kosten, u
   const tMtw = dayCalcs.reduce((s,d)=>s+(d.mc||0),0);
   const tHrs = dayCalcs.reduce((s,d)=>s+(d.h||0),0);
   const tTP = dayCalcs.reduce((s,d)=>s+(d.tp||0),0);
-  const isPauschal = ev.pauschalangebot && ev.pauschalangebot > 0;
+  const isPauschal = !!ev.pauschalAktiv || (ev.pauschalangebot && ev.pauschalangebot > 0);
   const endPreis = isPauschal ? parseFloat(ev.pauschalangebot) : totalCosts;
 
   // rates aus stammdaten (dayCalcs haben bereits die berechneten Kosten)
