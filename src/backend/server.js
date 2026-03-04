@@ -1232,16 +1232,13 @@ app.post("/api/mail/fibu/:id", requireAuth, async (req, res) => {
 
     // Haupt-Mail an FiBu
     const htmlBody = body.split("\n").map(l => l.trim() ? `<p>${l}</p>` : "<p>&nbsp;</p>").join("");
-    const fromEmail = stamm.email || require("./db").getConfig("smtp_from_email", "");
-    const fromName = require("./db").getConfig("smtp_from_name", "BRK Sanitätswachdienst");
 
     const result = await smtp.sendMail({
-      from: `"${fromName}" <${fromEmail}>`,
       to,
       subject,
       html: htmlBody,
-      replyTo: user.email || stamm.email || fromEmail,
-      cc: stamm.email || undefined,
+      onBehalf: user.email ? `"${user.name}" <${user.email}>` : null,
+      ccBereitschaft: stamm.email || null,
       attachments
     });
 
@@ -1278,11 +1275,10 @@ app.post("/api/mail/fibu/:id", requireAuth, async (req, res) => {
 
         try {
           await smtp.sendMail({
-            from: `"${fromName}" <${fromEmail}>`,
             to: bcRow.email,
             subject: `FiBu-Abrechnung: ${ev.name || ""} (${ev.auftragsnr || ""}) – Eure Helfer/Fahrzeuge`,
             html: bcNotifyHTML,
-            replyTo: user.email || stamm.email || fromEmail
+            onBehalf: user.email ? `"${user.name}" <${user.email}>` : null
           });
           notifiedBCs.push(bcRow.name);
         } catch (e) { console.warn("BC-Notify:", bcCode, e.message); }

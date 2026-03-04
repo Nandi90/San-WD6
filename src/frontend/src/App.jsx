@@ -737,7 +737,7 @@ function StatistikDashboard({user,year:appYear,toast}){
 
 function EinstellungenTab({stammdaten,updateStamm,updateRate,user,toast,klauseln,klauselnEdit,setKlauselnEdit,klauselnSaving,saveKlauseln,bereitschaft}){
   const [sub,setSub]=useState("org");
-  const subs=[{id:"org",label:"Organisation",icon:"🏢"},{id:"kosten",label:"Kostensätze",icon:"💰"},{id:"klauseln",label:"Textvorlagen",icon:"📝"},{id:"nextcloud",label:"Nextcloud",icon:"☁️"},{id:"email",label:"E-Mail",icon:"✉️"}];
+  const subs=[{id:"org",label:"Organisation",icon:"🏢"},{id:"bereitschaften",label:"Bereitschaften",icon:"🏥"},{id:"kosten",label:"Kostensätze",icon:"💰"},{id:"klauseln",label:"Textvorlagen",icon:"📝"},{id:"nextcloud",label:"Nextcloud",icon:"☁️"},{id:"email",label:"E-Mail",icon:"✉️"}];
   return(<div>
     <div style={{display:"flex",gap:4,marginBottom:16,flexWrap:"wrap"}}>
       {subs.map(s=><button key={s.id} onClick={()=>setSub(s.id)} style={{padding:"7px 14px",background:sub===s.id?C.rot:"#fff",color:sub===s.id?"#fff":C.dunkelgrau,border:`1px solid ${sub===s.id?C.rot:C.mittelgrau}`,borderRadius:6,fontSize:12,fontWeight:sub===s.id?700:500,cursor:"pointer",fontFamily:FONT.sans,display:"flex",alignItems:"center",gap:5}}><span style={{fontSize:13}}>{s.icon}</span>{s.label}</button>)}
@@ -758,8 +758,12 @@ function EinstellungenTab({stammdaten,updateStamm,updateRate,user,toast,klauseln
           </div>
         </div>
       </Card>
-      <Card title="Bereitschaftsleitung" accent={C.mittelblau}><Inp label="Bereitschaftsleiter" value={stammdaten.bereitschaftsleiter} onChange={v=>updateStamm("bereitschaftsleiter",v)}/><Inp label="Telefon" value={stammdaten.telefon} onChange={v=>updateStamm("telefon",v)}/><Inp label="Fax" value={stammdaten.fax} onChange={v=>updateStamm("fax",v)}/><Inp label="Mobil" value={stammdaten.mobil} onChange={v=>updateStamm("mobil",v)}/><Inp label="E-Mail" value={stammdaten.email} onChange={v=>updateStamm("email",v)}/><Inp label="Funkgruppe" value={stammdaten.funkgruppe} onChange={v=>updateStamm("funkgruppe",v)}/></Card>
+      <div style={{padding:"14px 16px",background:"#e8eaf6",borderRadius:8,border:"1px solid #c5cae9",marginTop:8}}>
+        <div style={{fontSize:12,color:"#3949ab"}}>🏥 <strong>Bereitschaftsdaten</strong> (Leiter, E-Mail, Telefon) werden jetzt im Tab <button onClick={()=>setSub("bereitschaften")} style={{background:"none",border:"none",color:C.mittelblau,fontWeight:700,cursor:"pointer",textDecoration:"underline",fontSize:12,fontFamily:FONT.sans,padding:0}}>Bereitschaften</button> verwaltet.</div>
+      </div>
     </div>}
+
+    {sub==="bereitschaften"&&<BereitschaftenAdmin toast={toast}/>}
 
     {sub==="kosten"&&<div style={{maxWidth:600}}>
       <Card title="Kostensätze (EUR)" accent="#d4920a"><div className="rg2" style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"0 10px"}}>{[["Helfer (€/Std)","helfer"],["KTW","ktw"],["RTW","rtw"],["GKTW","gktw"],["EL (€/Std)","einsatzleiter"],["EL-KFZ","einsatzleiterKfz"],["SEG-LKW","segLkw"],["MTW","mtw"],["Zelt","zelt"],["Verpfl. (€/P/8h)","verpflegung"]].map(([l,k])=><Inp key={k} small label={l} type="number" min={0} step={0.5} value={stammdaten.rates[k]} onChange={v=>updateRate(k,v)}/>)}</div></Card>
@@ -1046,6 +1050,122 @@ function SmtpConfig({toast}){
 // ═══════════════════════════════════════════════════════════════════
 // Mail Compose Modal
 // ═══════════════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════════════════════
+// BEREITSCHAFTEN ADMIN (Einstellungen Tab)
+// ═══════════════════════════════════════════════════════════════════════════
+function BereitschaftenAdmin({toast}){
+  const [bcs,setBcs]=useState([]);
+  const [loading,setLoading]=useState(true);
+  const [editBC,setEditBC]=useState(null);
+  const [saving,setSaving]=useState(false);
+
+  useEffect(()=>{loadBCs();},[]);
+  const loadBCs=async()=>{try{const r=await API.getAllBereitschaftenDetails();setBcs(r);}catch(e){toast("Fehler: "+e.message,"error");}finally{setLoading(false);}};
+
+  const save=async()=>{
+    if(!editBC)return;
+    setSaving(true);
+    try{
+      const r=await API.updateBereitschaftAdmin(editBC.code,{leiter_name:editBC.leiter_name||"",leiter_title:editBC.leiter_title||"",telefon:editBC.telefon||"",fax:editBC.fax||"",mobil:editBC.mobil||"",email:editBC.email||"",funkgruppe:editBC.funkgruppe||""});
+      if(r?.success){toast(`${editBC.name} gespeichert`,"success");setBcs(p=>p.map(b=>b.code===editBC.code?{...b,...editBC}:b));setEditBC(null);}
+      else toast("Fehler","error");
+    }catch(e){toast(e.message,"error");}
+    finally{setSaving(false);}
+  };
+
+  if(loading)return <div style={{textAlign:"center",padding:40,color:C.dunkelgrau}}>Lade Bereitschaften...</div>;
+
+  return(<div style={{maxWidth:700}}>
+    <Card title="🏥 Bereitschaften verwalten" accent={C.mittelblau} sub="Kontaktdaten aller Bereitschaften bearbeiten">
+      <div style={{fontSize:12,color:C.dunkelgrau,marginBottom:12}}>Die E-Mail-Adresse wird für Angebotsversand (CC), FiBu-Benachrichtigungen und Anfrage-Weiterleitung verwendet.</div>
+      <table style={{width:"100%",borderCollapse:"collapse",fontSize:12}}>
+        <thead><tr style={{borderBottom:`2px solid ${C.mittelgrau}40`}}>
+          <th style={{textAlign:"left",padding:"6px 8px",fontWeight:600,color:C.dunkelgrau}}>Bereitschaft</th>
+          <th style={{textAlign:"left",padding:"6px 8px",fontWeight:600,color:C.dunkelgrau}}>Leiter</th>
+          <th style={{textAlign:"left",padding:"6px 8px",fontWeight:600,color:C.dunkelgrau}}>E-Mail</th>
+          <th style={{textAlign:"left",padding:"6px 8px",fontWeight:600,color:C.dunkelgrau}}>Telefon</th>
+          <th style={{padding:"6px 4px",width:40}}></th>
+        </tr></thead>
+        <tbody>{bcs.map(b=><tr key={b.code} style={{borderBottom:`1px solid ${C.hellgrau}`}} onDoubleClick={()=>setEditBC({...b})}>
+          <td style={{padding:"8px 8px",fontWeight:600}}>{b.short||b.code}</td>
+          <td style={{padding:"8px 8px"}}>{b.leiter_name||"–"}</td>
+          <td style={{padding:"8px 8px",color:b.email?"inherit":C.rot,fontWeight:b.email?400:600}}>{b.email||"⚠️ Fehlt!"}</td>
+          <td style={{padding:"8px 8px"}}>{b.telefon||"–"}</td>
+          <td style={{padding:"8px 4px"}}><button onClick={()=>setEditBC({...b})} style={{background:"none",border:"none",cursor:"pointer",fontSize:14}} title="Bearbeiten">✏️</button></td>
+        </tr>)}</tbody>
+      </table>
+    </Card>
+
+    {/* Edit Modal */}
+    {editBC&&<div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.5)",backdropFilter:"blur(3px)",zIndex:9999,display:"flex",alignItems:"center",justifyContent:"center"}} onClick={()=>setEditBC(null)}>
+      <div style={{background:"#fff",borderRadius:12,maxWidth:520,width:"92%",maxHeight:"85vh",overflowY:"auto",boxShadow:"0 20px 60px rgba(0,0,0,0.3)"}} onClick={e=>e.stopPropagation()}>
+        <div style={{padding:"16px 22px",borderBottom:"1px solid #f0f0f0",display:"flex",alignItems:"center",justifyContent:"space-between"}}>
+          <div style={{display:"flex",alignItems:"center",gap:10}}>
+            <span style={{fontSize:20}}>🏥</span>
+            <div><div style={{fontSize:15,fontWeight:700}}>{editBC.name}</div><div style={{fontSize:11,color:C.dunkelgrau}}>Code: {editBC.code}</div></div>
+          </div>
+          <button onClick={()=>setEditBC(null)} style={{background:"none",border:"none",fontSize:18,cursor:"pointer",color:"#999"}}>✕</button>
+        </div>
+        <div style={{padding:"18px 22px"}}>
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"0 14px"}} className="rg2">
+            <Inp label="Bereitschaftsleiter" value={editBC.leiter_name||""} onChange={v=>setEditBC(p=>({...p,leiter_name:v}))}/>
+            <Inp label="Funktion/Titel" value={editBC.leiter_title||""} onChange={v=>setEditBC(p=>({...p,leiter_title:v}))}/>
+            <Inp label="Telefon" value={editBC.telefon||""} onChange={v=>setEditBC(p=>({...p,telefon:v}))}/>
+            <Inp label="Fax" value={editBC.fax||""} onChange={v=>setEditBC(p=>({...p,fax:v}))}/>
+            <Inp label="Mobil" value={editBC.mobil||""} onChange={v=>setEditBC(p=>({...p,mobil:v}))}/>
+            <Inp label="Funkgruppe" value={editBC.funkgruppe||""} onChange={v=>setEditBC(p=>({...p,funkgruppe:v}))}/>
+          </div>
+          <div style={{marginTop:4,padding:"12px 14px",background:"#e8eaf6",borderRadius:6,border:"1px solid #c5cae9"}}>
+            <Inp label="E-Mail der Bereitschaft *" value={editBC.email||""} onChange={v=>setEditBC(p=>({...p,email:v}))} placeholder="bereitschaft@brk.de"/>
+            <div style={{fontSize:10,color:"#3949ab",marginTop:2}}>Wird als CC beim Angebotsversand, für FiBu-Benachrichtigungen und Anfrage-Weiterleitung verwendet.</div>
+          </div>
+          <div style={{display:"flex",gap:8,justifyContent:"flex-end",marginTop:16}}>
+            <button onClick={()=>setEditBC(null)} style={{padding:"8px 18px",background:"#fff",border:"1px solid #d0d0d0",borderRadius:6,fontSize:12,fontWeight:600,cursor:"pointer",color:"#555",fontFamily:FONT.sans}}>Abbrechen</button>
+            <button onClick={save} disabled={saving} style={{padding:"8px 22px",background:C.mittelblau,color:"#fff",border:"none",borderRadius:6,fontSize:12,fontWeight:700,cursor:saving?"default":"pointer",fontFamily:FONT.sans}}>{saving?"Speichert...":"Speichern"}</button>
+          </div>
+        </div>
+      </div>
+    </div>}
+  </div>);
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// BEREITSCHAFT PROFIL CARD (Mein Profil Tab)
+// ═══════════════════════════════════════════════════════════════════════════
+function BereitschaftProfilCard({stammdaten,updateStamm,user,toast,bereitschaft}){
+  const canEdit=user?.rolle==="admin"||user?.rolle==="bl";
+  const [saving,setSaving]=useState(false);
+  const save=async()=>{
+    setSaving(true);
+    try{
+      const data={leiter_name:stammdaten.bereitschaftsleiter||"",leiter_title:stammdaten.bereitschaftsleiterTitle||"",telefon:stammdaten.telefon||"",fax:stammdaten.fax||"",mobil:stammdaten.mobil||"",email:stammdaten.email||"",funkgruppe:stammdaten.funkgruppe||""};
+      const r=user?.rolle==="admin"?await API.saveStammdaten({...data,kv_name:stammdaten.kvName,kgf:stammdaten.kgf,kv_adresse:stammdaten.kvAdresse,kv_plz_ort:stammdaten.kvPlzOrt}):await API.saveBereitschaftsleiter(data);
+      if(r?.success)toast("Bereitschaftsdaten gespeichert","success");else toast("Fehler","error");
+    }catch(e){toast(e.message,"error");}
+    finally{setSaving(false);}
+  };
+  const noop=()=>{};
+  return(<Card title={`🏥 Meine Bereitschaft – ${bereitschaft?.name||""}`} accent={C.mittelblau} sub="Kontaktdaten der Bereitschaft (für Dokumente & E-Mail-Versand)">
+    <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"0 16px"}} className="rg2">
+      <div style={{gridColumn:"1/-1"}}><Inp label="Bereitschaft" value={bereitschaft?.name||""} disabled onChange={noop}/></div>
+      <Inp label="Bereitschaftsleiter" value={stammdaten.bereitschaftsleiter||""} onChange={canEdit?v=>updateStamm("bereitschaftsleiter",v):noop} disabled={!canEdit}/>
+      <Inp label="Funktion/Titel" value={stammdaten.bereitschaftsleiterTitle||""} onChange={canEdit?v=>updateStamm("bereitschaftsleiterTitle",v):noop} disabled={!canEdit}/>
+      <Inp label="Telefon" value={stammdaten.telefon||""} onChange={canEdit?v=>updateStamm("telefon",v):noop} disabled={!canEdit}/>
+      <Inp label="Fax" value={stammdaten.fax||""} onChange={canEdit?v=>updateStamm("fax",v):noop} disabled={!canEdit}/>
+      <Inp label="Mobil" value={stammdaten.mobil||""} onChange={canEdit?v=>updateStamm("mobil",v):noop} disabled={!canEdit}/>
+      <Inp label="Funkgruppe" value={stammdaten.funkgruppe||""} onChange={canEdit?v=>updateStamm("funkgruppe",v):noop} disabled={!canEdit}/>
+    </div>
+    <div style={{marginTop:4}}>
+      <Inp label="E-Mail der Bereitschaft *" value={stammdaten.email||""} onChange={canEdit?v=>updateStamm("email",v):noop} disabled={!canEdit} placeholder="bereitschaft@brk.de"/>
+      <div style={{fontSize:10,color:C.dunkelgrau,marginTop:2}}>Diese E-Mail wird als CC bei Angebotsversand und für FiBu-Benachrichtigungen verwendet.</div>
+    </div>
+    {canEdit&&<div style={{marginTop:10}}>
+      <Btn small variant="success" onClick={save} disabled={saving}>{saving?"Speichern...":"Bereitschaftsdaten speichern"}</Btn>
+    </div>}
+    {!canEdit&&<div style={{marginTop:8,fontSize:10,color:C.bgrau}}>Kontaktdaten können nur von Bereitschaftsleitung oder Admin geändert werden.</div>}
+  </Card>);
+}
+
 function MailComposeModal({event:ev, currentEventId, user, stammdaten, dayCalcs, totalCosts, activeDays, toast, onClose, onSent}){
   const anrede=ev?.anrede||"Sehr geehrte Damen und Herren,";
   const absender=user?.name||"";
@@ -1152,9 +1272,8 @@ function MailComposeModal({event:ev, currentEventId, user, stammdaten, dayCalcs,
         {/* Info-Footer */}
         <div style={{background:"#f5f5f5",borderRadius:6,padding:"10px 14px",marginBottom:16,fontSize:11,color:C.dunkelgrau}}>
           <div style={{display:"flex",gap:16,flexWrap:"wrap"}}>
-            <div><span style={{fontWeight:600}}>Von:</span> {stammdaten?.email||"(SMTP Absender)"}</div>
-            {user?.email&&<div><span style={{fontWeight:600}}>Reply-To:</span> {user.email}</div>}
-            {stammdaten?.email&&<div><span style={{fontWeight:600}}>CC:</span> {stammdaten.email}</div>}
+            <div><span style={{fontWeight:600}}>Von:</span> {user?.email||stammdaten?.email||"(SMTP Absender)"}</div>
+            {stammdaten?.email&&user?.email&&user.email!==stammdaten.email&&<div><span style={{fontWeight:600}}>CC:</span> {stammdaten.email}</div>}
           </div>
         </div>
 
@@ -1441,8 +1560,8 @@ function FiBuModal({currentEventId,event:ev,user,stammdaten,dayCalcs,totalCosts,
         <div style={{background:"#f5f5f5",borderRadius:6,padding:"10px 14px",marginBottom:16,fontSize:11,color:C.dunkelgrau}}>
           <div style={{display:"flex",gap:16,flexWrap:"wrap"}}>
             <div>📎 <span style={{fontWeight:600}}>Anhang:</span> Angebot (PDF)</div>
-            <div><span style={{fontWeight:600}}>Von:</span> {stammdaten?.email||"(SMTP)"}</div>
-            <div><span style={{fontWeight:600}}>CC:</span> {stammdaten?.email||"eigene BC"}</div>
+            <div><span style={{fontWeight:600}}>Von:</span> {user?.email||"(Benutzer-E-Mail)"}</div>
+            {stammdaten?.email&&<div><span style={{fontWeight:600}}>CC:</span> {stammdaten.email}</div>}
           </div>
         </div>
 
@@ -2480,6 +2599,9 @@ const LATEST_RELEASE={v:"v7.5",d:"04.03.2026",c:[
 "FiBu: Automatische Benachrichtigung betroffener Bereitschaften per E-Mail",
 "FiBu: Markiert Checkliste 'Weiterleitung an FiBu' + 'Abgeschlossen' automatisch",
 "FiBu: E-Mail-Adresse in SMTP-Konfiguration konfigurierbar",
+"Profil: Bereitschaftsdaten (E-Mail, Leiter, Telefon) direkt im Profil sichtbar und editierbar",
+"Einstellungen: Neuer Sub-Tab 'Bereitschaften' – Admin kann alle Bereitschafts-Kontaktdaten pflegen",
+"E-Mail: 'Von' zeigt immer die Benutzer-E-Mail (nicht Bereitschafts-E-Mail)",
 ]};
 const RELEASE_V74={v:"v7.4",d:"04.03.2026",c:[
 "Statistik-Dashboard: Einsätze pro Monat, Status-Verteilung, Bereitschafts-Übersicht",
@@ -3276,6 +3398,7 @@ export default function App(){
               <Btn small variant="success" onClick={async()=>{try{const r=await API.saveProfile({telefon:user.telefon||"",mobil:user.mobil||"",titel:user.titel||"",email:user.email||"",ort:user.ort||"",signatur:user.signatur||""});if(r&&r.success){toast("Profil gespeichert","success");}else{toast("Fehler beim Speichern","error");}}catch(e){toast(e.message,"error");}}}>Profil speichern</Btn>
               <div style={{fontSize:10,color:C.bgrau,marginTop:4}}>Diese Daten erscheinen als Unterzeichner im Angebot</div>
             </Card>
+            <BereitschaftProfilCard stammdaten={stammdaten} updateStamm={updateStamm} user={user} toast={toast} bereitschaft={bereitschaft}/>
         </div>)}
 
       {tab==="einstellungen"&&user?.rolle==="admin"&&<EinstellungenTab stammdaten={stammdaten} updateStamm={updateStamm} updateRate={updateRate} user={user} toast={toast} klauseln={klauseln} klauselnEdit={klauselnEdit} setKlauselnEdit={setKlauselnEdit} klauselnSaving={klauselnSaving} saveKlauseln={saveKlauseln} bereitschaft={bereitschaft}/>}

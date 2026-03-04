@@ -33,6 +33,26 @@ router.get("/bereitschaften", (req, res) => {
   res.json(rows);
 });
 
+// ── Alle Bereitschaften mit vollen Details (Admin) ───────────────
+router.get("/bereitschaften/details", requireAdmin, (req, res) => {
+  const rows = getDb().prepare("SELECT code, name, short, leiter_name, leiter_title, telefon, fax, mobil, email, funkgruppe, kv_name, kgf, kv_adresse, kv_plz_ort FROM bereitschaften ORDER BY name").all();
+  res.json(rows);
+});
+
+// ── Einzelne Bereitschaft aktualisieren (Admin) ──────────────────
+router.put("/bereitschaften/:code", requireAdmin, (req, res) => {
+  const { code } = req.params;
+  const { leiter_name, leiter_title, telefon, fax, mobil, email, funkgruppe } = req.body;
+  getDb().prepare(`
+    UPDATE bereitschaften SET
+      leiter_name=?, leiter_title=?, telefon=?, fax=?, mobil=?, email=?, funkgruppe=?,
+      updated_at=datetime('now')
+    WHERE code = ?
+  `).run(leiter_name||"", leiter_title||"", telefon||"", fax||"", mobil||"", email||"", funkgruppe||"", code);
+  audit(req.session.user, "update", "bereitschaft", code, JSON.stringify({ email }));
+  res.json({ success: true });
+});
+
 router.get("/alle", requireAdmin, (req, res) => {
   const rows = getDb().prepare("SELECT code, name, short FROM bereitschaften ORDER BY name").all();
   res.json(rows);

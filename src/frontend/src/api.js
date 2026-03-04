@@ -50,6 +50,12 @@ const API = {
     const r = await fetch("/api/stammdaten/bereitschaftsleiter", {method:"PUT",headers:{"Content-Type":"application/json"},body:JSON.stringify(data),credentials:"include"});
     return r.json();
   },
+  async getAllBereitschaftenDetails() {
+    return this.json("/api/stammdaten/bereitschaften/details");
+  },
+  async updateBereitschaftAdmin(code, data) {
+    return this.json(`/api/stammdaten/bereitschaften/${code}`, { method: "PUT", body: JSON.stringify(data) });
+  },
   async saveStammdaten(data) {
     return this.json("/api/stammdaten", { method: "PUT", body: JSON.stringify(data) });
   },
