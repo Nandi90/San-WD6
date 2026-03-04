@@ -2130,7 +2130,9 @@ const RELEASE_V74={v:"v7.4",d:"04.03.2026",c:[
 "Statistik-Dashboard: Einsätze pro Monat, Status-Verteilung, Bereitschafts-Übersicht",
 "Statistik: CSV-Export aller Vorgänge, Jahres- und Bereitschafts-Filter",
 "Digitales Einsatzprotokoll: Live-Formular für Einsatztage",
-"Einsatzprotokoll: Patienten-Dokumentation (Diagnose, Maßnahmen, Transport)",
+"Einsatzprotokoll: Einsatzzahlen (Behandelt, Bagatelle, Transport) mit berechneter Gesamtsumme",
+"Einsatzprotokoll: Einsatztagebuch mit chronologischen Einträgen",
+"Einsatzprotokoll: Einsatzkräfte, Fahrzeuge, Zeiten erfassen",
 "Einsatzprotokoll: Auto-Speicherung alle 30 Sekunden",
 "Einsatzprotokoll: Wechsel zwischen PDF-Druck und Live-Modus",
 ]};
@@ -2692,6 +2694,9 @@ export default function App(){
               <div><div style={{fontWeight:700,fontSize:16}}>SanWD Changelog</div><div style={{fontSize:11,opacity:0.85}}>Versionshistorie und Änderungen</div></div>
             </div>
             {[
+              LATEST_RELEASE,
+              RELEASE_V74,
+              RELEASE_V73,
               {v:"v7.2",d:"03.03.2026",c:[
                 "Angebotsmappe: Dokument-Auswahl per Modal statt zwei Buttons – Deckblatt, Angebot, Vertrag, AAB und Gefahrenanalyse frei kombinierbar",
                 "Deckblatt Anlagen-Liste dynamisch: zeigt nur die tatsächlich gewählten Dokumente mit korrekter Nummerierung",

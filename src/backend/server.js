@@ -600,7 +600,7 @@ app.post("/api/anfragen/:id/annehmen", (req, res) => {
     const nextNr = counterRow ? counterRow.next_nr : 1;
     db.getDb().prepare("INSERT INTO counter (bereitschaft_code, year, next_nr) VALUES (?,?,2) ON CONFLICT(bereitschaft_code, year) DO UPDATE SET next_nr = next_nr + 1").run(bc, year);
 
-    const auftragsnr = `${bc}_${shortYear}_${String(nextNr).padStart(3, "0")}`;
+    const auftragsnr = `${bc} ${shortYear}/${String(nextNr).padStart(3, "0")}`;
     const vorgangId = `evt-${Date.now()}`;
 
     // Tage aus Anfrage parsen
