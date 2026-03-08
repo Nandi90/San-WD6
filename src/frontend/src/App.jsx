@@ -1411,7 +1411,8 @@ function FiBuModal({currentEventId,event:ev,user,stammdaten,dayCalcs,totalCosts,
     return lines.length?"\n\nEingesetzte Fahrzeuge:\n"+lines.join("\n"):"";
   };
 
-  const bodyText=`Sehr geehrte Damen und Herren,\n${isKorrektur?"\n⚠️ ACHTUNG KORREKTUR – Diese Abrechnung ersetzt die vorherige Weiterleitung.\n":""}\nanbei die ${isKorrektur?"korrigierte ":""}Abrechnung für den Sanitätswachdienst der Veranstaltung „${ev?.name||""}" (${ev?.auftragsnr||""}).\n\nVeranstalter: ${ev?.veranstalter||""}\nDatum: ${activeDays?.filter(d=>d.date).map(d=>new Date(d.date).toLocaleDateString("de-DE")).join(", ")||""}\nGesamtkosten: ${totalCosts?new Intl.NumberFormat("de-DE",{minimumFractionDigits:2}).format(totalCosts)+" €":""}${helferSummary()}${fzgSummary()}\n\nDas Angebot liegt als PDF bei.\n\nMit freundlichen Grüßen\n${absender}\n${ownBC.name} · ${orgName}`;
+  const effectiveCosts=(!!ev?.pauschalAktiv||(parseFloat(ev?.pauschalangebot||0)>0))?parseFloat(ev?.pauschalangebot||0):totalCosts;
+  const bodyText=`Sehr geehrte Damen und Herren,\n${isKorrektur?"\n⚠️ ACHTUNG KORREKTUR – Diese Abrechnung ersetzt die vorherige Weiterleitung.\n":""}\nanbei die ${isKorrektur?"korrigierte ":""}Abrechnung für den Sanitätswachdienst der Veranstaltung „${ev?.name||""}" (${ev?.auftragsnr||""}).\n\nVeranstalter: ${ev?.veranstalter||""}\nDatum: ${activeDays?.filter(d=>d.date).map(d=>new Date(d.date).toLocaleDateString("de-DE")).join(", ")||""}\nGesamtkosten: ${effectiveCosts?new Intl.NumberFormat("de-DE",{minimumFractionDigits:2}).format(effectiveCosts)+" €":""}${helferSummary()}${fzgSummary()}\n\nDas Angebot liegt als PDF bei.\n\nMit freundlichen Grüßen\n${absender}\n${ownBC.name} · ${orgName}`;
 
   const [body,setBody]=useState("");
   useEffect(()=>{setBody(bodyText);},[hasFremdHelfer,hasFzg,fremdHelfer,fahrzeuge,externeHelfer]);
