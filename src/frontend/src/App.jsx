@@ -403,6 +403,51 @@ function ConfirmModal({open,title,message,icon,onConfirm,onCancel,confirmText="B
 // ═══════════════════════════════════════════════════════════════════
 
 // ═══════════════════════════════════════════════════════════════════
+// Zammad Config (Admin)
+// ═══════════════════════════════════════════════════════════════════
+function ZammadConfig({toast}){
+  const [cfg,setCfg]=React.useState({zammad_enabled:"false",zammad_url:"",zammad_token:"",zammad_group_id:"8"});
+  const [saving,setSaving]=React.useState(false);
+  const [testing,setTesting]=React.useState(false);
+  const [testResult,setTestResult]=React.useState(null);
+  React.useEffect(()=>{API.getZammadConfig().then(d=>setCfg(c=>({...c,...d}))).catch(()=>{});},[]);
+  const save=async()=>{setSaving(true);try{await API.saveZammadConfig(cfg);toast("Zammad Einstellungen gespeichert","success");}catch(e){toast(e.message,"error");}finally{setSaving(false);}};
+  const test=async()=>{setTesting(true);setTestResult(null);try{const r=await API.testZammad();setTestResult(r);}catch(e){setTestResult({ok:false,error:e.message});}finally{setTesting(false);}};
+  const inp={width:"100%",padding:"8px 12px",border:"1px solid #ccc",borderRadius:6,fontSize:13,fontFamily:FONT.sans};
+  return(
+    <div style={{maxWidth:600}}>
+      <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:16}}>
+        <div style={{width:42,height:24,borderRadius:12,background:cfg.zammad_enabled==="true"?"#e65100":"#ccc",position:"relative",transition:"0.2s",cursor:"pointer"}} onClick={()=>setCfg(p=>({...p,zammad_enabled:p.zammad_enabled==="true"?"false":"true"}))}>
+          <div style={{width:20,height:20,borderRadius:10,background:"#fff",position:"absolute",top:2,left:cfg.zammad_enabled==="true"?20:2,transition:"0.2s",boxShadow:"0 1px 3px rgba(0,0,0,0.3)"}}/>
+        </div>
+        <span style={{fontSize:14,fontWeight:600}}>Zammad Feedback-Integration {cfg.zammad_enabled==="true"?"aktiv":"deaktiviert"}</span>
+      </div>
+      <div style={{background:"#fff3e0",borderRadius:8,padding:"10px 14px",fontSize:12,color:"#bf360c",marginBottom:16}}>
+        Tickets werden über den Feedback-Button (🐛/💡) direkt in Zammad erstellt. Der API-Token wird verschlüsselt in der Datenbank gespeichert.
+      </div>
+      <div style={{marginBottom:12}}>
+        <label style={{display:"block",fontSize:12,fontWeight:600,color:"#555",marginBottom:4}}>Zammad URL</label>
+        <input value={cfg.zammad_url||""} onChange={e=>setCfg(p=>({...p,zammad_url:e.target.value}))} placeholder="https://support.brkndsob.org" style={inp}/>
+      </div>
+      <div style={{marginBottom:12}}>
+        <label style={{display:"block",fontSize:12,fontWeight:600,color:"#555",marginBottom:4}}>API Token <span style={{fontWeight:400,color:"#888"}}>(Profil → Token-Zugang → Berechtigung: ticket.agent)</span></label>
+        <input type="password" value={cfg.zammad_token||""} onChange={e=>setCfg(p=>({...p,zammad_token:e.target.value}))} placeholder="Token eingeben…" style={inp}/>
+      </div>
+      <div style={{marginBottom:16}}>
+        <label style={{display:"block",fontSize:12,fontWeight:600,color:"#555",marginBottom:4}}>Ticket-Gruppe ID</label>
+        <input value={cfg.zammad_group_id||"8"} onChange={e=>setCfg(p=>({...p,zammad_group_id:e.target.value}))} placeholder="8" style={{...inp,width:120}}/>
+        <span style={{fontSize:11,color:"#888",marginLeft:8}}>Zammad → Admin → Gruppen → ID in der URL</span>
+      </div>
+      {testResult&&<div style={{marginBottom:12,padding:"8px 12px",borderRadius:6,background:testResult.ok?"#e8f5e9":"#ffebee",color:testResult.ok?"#2e7d32":"#c62828",fontSize:12}}>{testResult.ok?"✅ "+testResult.message:"❌ "+testResult.error}</div>}
+      <div style={{display:"flex",gap:8}}>
+        <button onClick={save} disabled={saving} style={{padding:"8px 20px",background:"#e65100",color:"#fff",border:"none",borderRadius:6,fontSize:13,fontWeight:600,cursor:saving?"not-allowed":"pointer"}}>{saving?"Speichern…":"Speichern"}</button>
+        <button onClick={test} disabled={testing} style={{padding:"8px 16px",background:"#fff",color:"#e65100",border:"1px solid #e65100",borderRadius:6,fontSize:13,fontWeight:600,cursor:testing?"not-allowed":"pointer"}}>{testing?"Teste…":"Verbindung testen"}</button>
+      </div>
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════
 // Einstellungen Tab (Admin) mit Sub-Tabs
 // ═══════════════════════════════════════════════════════════════════
 
@@ -737,7 +782,7 @@ function StatistikDashboard({user,year:appYear,toast}){
 
 function EinstellungenTab({stammdaten,updateStamm,updateRate,user,toast,klauseln,klauselnEdit,setKlauselnEdit,klauselnSaving,saveKlauseln,bereitschaft,reloadStammdaten}){
   const [sub,setSub]=useState("org");
-  const subs=[{id:"org",label:"Organisation",icon:"🏢"},{id:"bereitschaften",label:"Bereitschaften",icon:"🏥"},{id:"kosten",label:"Kostensätze",icon:"💰"},{id:"klauseln",label:"Textvorlagen",icon:"📝"},{id:"nextcloud",label:"Nextcloud",icon:"☁️"},{id:"email",label:"E-Mail",icon:"✉️"}];
+  const subs=[{id:"org",label:"Organisation",icon:"🏢"},{id:"bereitschaften",label:"Bereitschaften",icon:"🏥"},{id:"kosten",label:"Kostensätze",icon:"💰"},{id:"klauseln",label:"Textvorlagen",icon:"📝"},{id:"nextcloud",label:"Nextcloud",icon:"☁️"},{id:"email",label:"E-Mail",icon:"✉️"},{id:"zammad",label:"Zammad",icon:"🎫"}];
   return(<div>
     <div style={{display:"flex",gap:4,marginBottom:16,flexWrap:"wrap"}}>
       {subs.map(s=><button key={s.id} onClick={()=>setSub(s.id)} style={{padding:"7px 14px",background:sub===s.id?C.rot:"#fff",color:sub===s.id?"#fff":C.dunkelgrau,border:`1px solid ${sub===s.id?C.rot:C.mittelgrau}`,borderRadius:6,fontSize:12,fontWeight:sub===s.id?700:500,cursor:"pointer",fontFamily:FONT.sans,display:"flex",alignItems:"center",gap:5}}><span style={{fontSize:13}}>{s.icon}</span>{s.label}</button>)}
@@ -793,6 +838,7 @@ function EinstellungenTab({stammdaten,updateStamm,updateRate,user,toast,klauseln
 
     {sub==="nextcloud"&&<NextcloudConfig toast={toast}/>}
     {sub==="email"&&<SmtpConfig toast={toast}/>}
+    {sub==="zammad"&&<ZammadConfig toast={toast}/>}
   </div>);
 }
 

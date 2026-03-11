@@ -922,9 +922,11 @@ app.use("/api/klauseln", klauselnRouter);
 app.post("/api/feedback", requireAuth, async (req, res) => {
   const { kategorie, betreff, beschreibung, ansicht, browser } = req.body;
   if (!betreff || !beschreibung) return res.status(400).json({ error: "Betreff und Beschreibung erforderlich" });
-  const zUrl = process.env.ZAMMAD_URL;
-  const zToken = process.env.ZAMMAD_TOKEN;
-  if (!zUrl || !zToken) return res.status(501).json({ error: "Zammad nicht konfiguriert" });
+  const { getConfig } = require("./db");
+  const zEnabled = getConfig("zammad_enabled");
+  const zUrl = (zEnabled === "true") ? getConfig("zammad_url") : null;
+  const zToken = (zEnabled === "true") ? getConfig("zammad_token") : null;
+  if (!zUrl || !zToken) return res.status(501).json({ error: "Zammad nicht konfiguriert oder deaktiviert" });
   try {
     const user = req.session.user || {};
     const tag = kategorie === "bug" ? "bug" : "feature";
@@ -943,7 +945,7 @@ ${beschreibung}`;
       headers: { "Content-Type": "application/json", "Authorization": "Token " + zToken },
       body: JSON.stringify({
         title: "[SanWD " + (kategorie === "bug" ? "Bug" : "Feature") + "] " + betreff,
-        group_id: 8,
+        group_id: parseInt(getConfig("zammad_group_id") || "8"),
         customer_id: "guess:" + (user.email || "sanwd@brkndsob.org"),
         priority_id: prioId,
         tags: "sanwd," + tag,
@@ -1322,6 +1324,52 @@ app.post("/api/config/nextcloud/test", requireAuth, async (req, res) => {
 });
 
 
+
+// ═══════════════════════════════════════════════════════════════════
+// Zammad Config (Admin)
+// ═══════════════════════════════════════════════════════════════════
+app.get("/api/config/zammad", requireAuth, (req, res) => {
+  if (req.session.user.rolle !== "admin") return res.status(403).json({ error: "Nur Admin" });
+  const { getAllConfig } = require("./db");
+  const rows = getAllConfig("zammad_");
+  const cfg = {};
+  rows.forEach(r => { cfg[r.key] = r.key === "zammad_token" ? (r.value ? "***" : "") : r.value; });
+  res.json(cfg);
+});
+
+app.put("/api/config/zammad", requireAuth, (req, res) => {
+  if (req.session.user.rolle !== "admin") return res.status(403).json({ error: "Nur Admin" });
+  const { setConfig, audit } = require("./db");
+  const allowed = ["zammad_enabled", "zammad_url", "zammad_token", "zammad_group_id"];
+  for (const [key, val] of Object.entries(req.body)) {
+    if (allowed.includes(key)) {
+      if (key === "zammad_token" && val === "***") continue;
+      setConfig(key, String(val));
+    }
+  }
+  audit(req.session.user, "config_update", "zammad", null, JSON.stringify({...req.body, zammad_token: "***"}));
+  res.json({ ok: true });
+});
+
+app.post("/api/config/zammad/test", requireAuth, async (req, res) => {
+  if (req.session.user.rolle !== "admin") return res.status(403).json({ error: "Nur Admin" });
+  const { getConfig } = require("./db");
+  const zUrl = getConfig("zammad_url");
+  const zToken = getConfig("zammad_token");
+  if (!zUrl || !zToken) return res.json({ ok: false, error: "URL oder Token nicht konfiguriert" });
+  try {
+    const r = await fetch(zUrl + "/api/v1/groups", {
+      headers: { "Authorization": "Token " + zToken }
+    });
+    if (!r.ok) return res.json({ ok: false, error: "HTTP " + r.status });
+    const groups = await r.json();
+    const groupId = parseInt(getConfig("zammad_group_id") || "8");
+    const group = groups.find(g => g.id === groupId);
+    res.json({ ok: true, message: `Verbindung OK – Gruppe: ${group ? group.name : "ID " + groupId + " (nicht gefunden)"}` });
+  } catch(e) {
+    res.json({ ok: false, error: e.message });
+  }
+});
 
 app.post("/api/pdf/vertrag/:id", requireAuth, async (req, res) => {
   // puppeteer via BrowserPool

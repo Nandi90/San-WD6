@@ -104,6 +104,10 @@ function init() {
   cfgIns.run("nextcloud_auth_mode", "service");
   cfgIns.run("nextcloud_service_user", "");
   cfgIns.run("nextcloud_service_password", "");
+  cfgIns.run("zammad_enabled", "false");
+  cfgIns.run("zammad_url", "https://support.brkndsob.org");
+  cfgIns.run("zammad_token", "");
+  cfgIns.run("zammad_group_id", "8");
 
   console.log("✅ Datenbank initialisiert:", DB_PATH);
 }
