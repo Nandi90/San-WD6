@@ -45,6 +45,11 @@ function requireAuth(req, res, next) {
 // Keycloak-Token erneuern
 async function refreshKeycloakToken(session) {
   if (!session?.tokenEndpoint || !session?.refreshToken) return;
+
+  // Verhindert parallele Refresh-Versuche (Race Condition bei Token-Rotation)
+  if (session._refreshInProgress) return;
+  session._refreshInProgress = true;
+
   try {
     const resp = await fetch(session.tokenEndpoint, {
       method: "POST",
@@ -56,7 +61,20 @@ async function refreshKeycloakToken(session) {
         refresh_token: session.refreshToken
       })
     });
-    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+
+    if (!resp.ok) {
+      if (resp.status === 400) {
+        // Refresh-Token ungültig/abgelaufen/bereits verbraucht → nicht weiter retrien
+        console.warn("Keycloak Token-Refresh: HTTP 400 – Refresh-Token ungültig, wird gecleart");
+        session.refreshToken = null;
+        session.accessToken = null;
+        // _lastAuthCheck weit in die Zukunft setzen damit keine weiteren Versuche folgen
+        session._lastAuthCheck = Date.now() + 86400000;
+        session.tokenExpiry = Date.now() + 3600000; // 1h Kulanz für laufende Arbeit
+      }
+      throw new Error(`HTTP ${resp.status}`);
+    }
+
     const data = await resp.json();
     session.refreshToken = data.refresh_token || session.refreshToken;
     session.accessToken = data.access_token || session.accessToken;
@@ -64,9 +82,14 @@ async function refreshKeycloakToken(session) {
     session._lastAuthCheck = Date.now();
   } catch(e) {
     console.log("Keycloak Token-Refresh:", e.message);
-    // Token-Expiry großzügig verlängern damit nicht sofort 401 kommt
-    session.tokenExpiry = Date.now() + 3600000; // +1h Kulanz
+    if (!session.refreshToken) {
+      // Bereits gecleart (HTTP 400) – kein weiteres Verlängern nötig
+    } else {
+      session.tokenExpiry = Date.now() + 3600000; // +1h Kulanz bei anderen Fehlern
+    }
     throw e;
+  } finally {
+    session._refreshInProgress = false;
   }
 }
 
