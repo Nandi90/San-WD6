@@ -57,6 +57,25 @@ router.get("/audit", (req, res) => {
   res.json(rows);
 });
 
+// ── OIDC Status (read-only) ──────────────────────────────────────
+router.get("/oidc-status", (req, res) => {
+  const issuer = process.env.OIDC_ISSUER || "";
+  const clientId = process.env.OIDC_CLIENT_ID || "";
+  const redirectUri = process.env.OIDC_REDIRECT_URI || "";
+  res.json({
+    issuer,
+    clientId,
+    redirectUri,
+    configured: !!(issuer && clientId),
+    // Session-Infos des anfragenden Admins (zeigt ob Token frisch ist)
+    sessionTokenExpiry: req.session?.tokenExpiry
+      ? new Date(req.session.tokenExpiry).toISOString()
+      : null,
+    sessionHasRefreshToken: !!(req.session?.refreshToken),
+    sessionHasAccessToken: !!(req.session?.accessToken),
+  });
+});
+
 // ── Dashboard Stats ──────────────────────────────────────────────
 router.get("/stats", (req, res) => {
   const db = getDb();

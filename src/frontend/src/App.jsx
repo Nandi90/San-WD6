@@ -447,6 +447,47 @@ function ZammadConfig({toast}){
   );
 }
 
+// ── OIDC / Keycloak Status (Admin, read-only) ────────────────────
+function OidcStatus({toast}){
+  const [info,setInfo]=React.useState(null);
+  const [loading,setLoading]=React.useState(true);
+  React.useEffect(()=>{
+    API.json("/api/admin/oidc-status")
+      .then(d=>setInfo(d)).catch(()=>toast("OIDC-Status konnte nicht geladen werden","error"))
+      .finally(()=>setLoading(false));
+  },[]);
+  const Row=({label,value,ok,mono})=>(
+    <div style={{display:"flex",alignItems:"flex-start",padding:"8px 0",borderBottom:`1px solid ${C.mittelgrau}30`}}>
+      <div style={{width:180,flexShrink:0,fontSize:12,fontWeight:600,color:C.dunkelgrau}}>{label}</div>
+      <div style={{flex:1,fontSize:12,fontFamily:mono?"monospace":"inherit",color:C.schwarz,wordBreak:"break-all"}}>{value}</div>
+      {ok!==undefined&&<div style={{marginLeft:8,fontSize:11,fontWeight:700,color:ok?"#388e3c":"#c62828",flexShrink:0}}>{ok?"✓ OK":"✗ Fehlt"}</div>}
+    </div>
+  );
+  if(loading)return <div style={{padding:24,textAlign:"center",color:C.bgrau}}>Lädt…</div>;
+  if(!info)return null;
+  const expiry=info.sessionTokenExpiry?new Date(info.sessionTokenExpiry):null;
+  const tokenOk=expiry&&expiry>new Date();
+  return(
+    <div style={{maxWidth:640}}>
+      <Card title="🔐 Keycloak / OIDC Konfiguration" accent={C.mittelblau} sub="Schreibgeschützt – Werte kommen aus Kubernetes Secrets">
+        <Row label="Status" value={info.configured?"Aktiv":"Nicht konfiguriert"} ok={info.configured}/>
+        <Row label="Issuer URL" value={info.issuer||"—"} mono/>
+        <Row label="Client ID" value={info.clientId||"—"} mono/>
+        <Row label="Redirect URI" value={info.redirectUri||"—"} mono/>
+      </Card>
+      <Card title="🎫 Aktuelle Admin-Session" accent={C.dunkelblau} sub="Token-Status deines aktuellen Logins">
+        <Row label="Access Token" value={info.sessionHasAccessToken?"Vorhanden":"Fehlt"} ok={info.sessionHasAccessToken}/>
+        <Row label="Refresh Token" value={info.sessionHasRefreshToken?"Vorhanden (aktiv)":"Fehlt / gecleart"} ok={info.sessionHasRefreshToken}/>
+        <Row label="Token gültig bis" value={expiry?expiry.toLocaleString("de-DE"):"—"} ok={tokenOk}/>
+      </Card>
+      <div style={{padding:"10px 14px",background:"#e3f2fd",borderRadius:6,border:"1px solid #90caf9",fontSize:11,color:"#1565c0",marginTop:4}}>
+        ℹ️ OIDC-Parameter (Issuer, Client-Secret) werden als Kubernetes-Secret <code>sanwd-secrets</code> verwaltet und sind hier nicht änderbar.
+        Bei Token-Problemen: Pod-Neustart erzwingt neuen Login für alle aktiven Sessions.
+      </div>
+    </div>
+  );
+}
+
 // ═══════════════════════════════════════════════════════════════════
 // Einstellungen Tab (Admin) mit Sub-Tabs
 // ═══════════════════════════════════════════════════════════════════
@@ -782,7 +823,7 @@ function StatistikDashboard({user,year:appYear,toast}){
 
 function EinstellungenTab({stammdaten,updateStamm,updateRate,user,toast,klauseln,klauselnEdit,setKlauselnEdit,klauselnSaving,saveKlauseln,bereitschaft,reloadStammdaten}){
   const [sub,setSub]=useState("org");
-  const subs=[{id:"org",label:"Organisation",icon:"🏢"},{id:"bereitschaften",label:"Bereitschaften",icon:"🏥"},{id:"kosten",label:"Kostensätze",icon:"💰"},{id:"klauseln",label:"Textvorlagen",icon:"📝"},{id:"nextcloud",label:"Nextcloud",icon:"☁️"},{id:"email",label:"E-Mail",icon:"✉️"},{id:"zammad",label:"Zammad",icon:"🎫"}];
+  const subs=[{id:"org",label:"Organisation",icon:"🏢"},{id:"bereitschaften",label:"Bereitschaften",icon:"🏥"},{id:"kosten",label:"Kostensätze",icon:"💰"},{id:"klauseln",label:"Textvorlagen",icon:"📝"},{id:"nextcloud",label:"Nextcloud",icon:"☁️"},{id:"email",label:"E-Mail",icon:"✉️"},{id:"zammad",label:"Zammad",icon:"🎫"},{id:"oidc",label:"Keycloak/OIDC",icon:"🔐"}];
   return(<div>
     <div style={{display:"flex",gap:4,marginBottom:16,flexWrap:"wrap"}}>
       {subs.map(s=><button key={s.id} onClick={()=>setSub(s.id)} style={{padding:"7px 14px",background:sub===s.id?C.rot:"#fff",color:sub===s.id?"#fff":C.dunkelgrau,border:`1px solid ${sub===s.id?C.rot:C.mittelgrau}`,borderRadius:6,fontSize:12,fontWeight:sub===s.id?700:500,cursor:"pointer",fontFamily:FONT.sans,display:"flex",alignItems:"center",gap:5}}><span style={{fontSize:13}}>{s.icon}</span>{s.label}</button>)}
@@ -839,6 +880,7 @@ function EinstellungenTab({stammdaten,updateStamm,updateRate,user,toast,klauseln
     {sub==="nextcloud"&&<NextcloudConfig toast={toast}/>}
     {sub==="email"&&<SmtpConfig toast={toast}/>}
     {sub==="zammad"&&<ZammadConfig toast={toast}/>}
+    {sub==="oidc"&&<OidcStatus toast={toast}/>}
   </div>);
 }
 
