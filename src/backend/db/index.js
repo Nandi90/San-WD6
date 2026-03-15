@@ -112,6 +112,22 @@ function init() {
   cfgIns.run("kgf", "");
   cfgIns.run("kv_adresse", "");
   cfgIns.run("kv_plz_ort", "");
+  cfgIns.run("kosten_helfer", "14");
+  cfgIns.run("kosten_ktw", "125");
+  cfgIns.run("kosten_rtw", "155");
+  cfgIns.run("kosten_gktw", "105");
+  cfgIns.run("kosten_einsatzleiter", "14");
+  cfgIns.run("kosten_einsatzleiter_kfz", "155");
+  cfgIns.run("kosten_seg_lkw", "125");
+  cfgIns.run("kosten_mtw", "50");
+  cfgIns.run("kosten_zelt", "60");
+  cfgIns.run("kosten_km_ktw", "0.4");
+  cfgIns.run("kosten_km_rtw", "0.4");
+  cfgIns.run("kosten_km_gktw", "0.4");
+  cfgIns.run("kosten_km_el_kfz", "0.6");
+  cfgIns.run("kosten_km_seg_lkw", "0.6");
+  cfgIns.run("kosten_km_mtw", "0.4");
+  cfgIns.run("kosten_verpflegung", "17");
 
   console.log("✅ Datenbank initialisiert:", DB_PATH);
 }
@@ -294,6 +310,18 @@ function migrate() {
       if (first.kgf) ins.run("kgf", first.kgf);
       if (first.kv_adresse) ins.run("kv_adresse", first.kv_adresse);
       if (first.kv_plz_ort) ins.run("kv_plz_ort", first.kv_plz_ort);
+    }
+  } catch(e) {}
+
+  // Kostensätze aus kostensaetze-Tabelle in app_config migrieren (einmalig)
+  try {
+    const k = db.prepare("SELECT * FROM kostensaetze LIMIT 1").get();
+    if (k) {
+      const ins = db.prepare("INSERT OR IGNORE INTO app_config (key, value) VALUES (?, ?)");
+      const fields = ["helfer","ktw","rtw","gktw","einsatzleiter","einsatzleiter_kfz",
+                      "seg_lkw","mtw","zelt","km_ktw","km_rtw","km_gktw",
+                      "km_el_kfz","km_seg_lkw","km_mtw","verpflegung"];
+      fields.forEach(f => { if (k[f] != null) ins.run("kosten_" + f, String(k[f])); });
     }
   } catch(e) {}
   db.exec(`CREATE TABLE IF NOT EXISTS anfragen (

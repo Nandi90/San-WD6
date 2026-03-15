@@ -18,8 +18,12 @@ router.use(requireAuth);
 router.get("/me", (req, res) => {
   const bc = getBereitschaftCode(req);
   const bereitschaft = getDb().prepare("SELECT * FROM bereitschaften WHERE code = ?").get(bc);
-  const kosten = getDb().prepare("SELECT * FROM kostensaetze WHERE bereitschaft_code = ?").get(bc);
   if (!bereitschaft) return res.status(404).json({ error: "Bereitschaft nicht gefunden" });
+  const fields = ["helfer","ktw","rtw","gktw","einsatzleiter","einsatzleiter_kfz",
+                  "seg_lkw","mtw","zelt","km_ktw","km_rtw","km_gktw",
+                  "km_el_kfz","km_seg_lkw","km_mtw","verpflegung"];
+  const kostensaetze = {};
+  fields.forEach(f => { kostensaetze[f] = parseFloat(getConfig("kosten_" + f) || 0); });
   res.json({
     ...bereitschaft,
     // KV-Felder kommen global aus app_config
@@ -28,7 +32,7 @@ router.get("/me", (req, res) => {
     kv_adresse: getConfig("kv_adresse") || "",
     kv_plz_ort: getConfig("kv_plz_ort") || "",
     logo: bereitschaft.logo ? `/api/stammdaten/logo` : null,
-    kostensaetze: kosten,
+    kostensaetze,
   });
 });
 
@@ -89,20 +93,12 @@ router.put("/", requireAdmin, (req, res) => {
 
 // ── Kostensätze aktualisieren ────────────────────────────────────
 router.put("/kostensaetze", requireAdmin, (req, res) => {
-  const bc = getBereitschaftCode(req);
   const k = req.body;
-
-  getDb().prepare(`
-    UPDATE kostensaetze SET
-      helfer=?, ktw=?, rtw=?, gktw=?, einsatzleiter=?, einsatzleiter_kfz=?,
-      seg_lkw=?, mtw=?, zelt=?, km_ktw=?, km_rtw=?, km_gktw=?,
-      km_el_kfz=?, km_seg_lkw=?, km_mtw=?, verpflegung=?, updated_at=datetime('now')
-    WHERE bereitschaft_code = ?
-  `).run(k.helfer, k.ktw, k.rtw, k.gktw, k.einsatzleiter, k.einsatzleiter_kfz,
-         k.seg_lkw, k.mtw, k.zelt, k.km_ktw, k.km_rtw, k.km_gktw,
-         k.km_el_kfz, k.km_seg_lkw, k.km_mtw, k.verpflegung, bc);
-
-  audit(req.session.user, "update", "kostensaetze", bc);
+  const fields = ["helfer","ktw","rtw","gktw","einsatzleiter","einsatzleiter_kfz",
+                  "seg_lkw","mtw","zelt","km_ktw","km_rtw","km_gktw",
+                  "km_el_kfz","km_seg_lkw","km_mtw","verpflegung"];
+  fields.forEach(f => { if (k[f] != null) setConfig("kosten_" + f, String(k[f])); });
+  audit(req.session.user, "update", "kostensaetze", "global");
   res.json({ success: true });
 });
 

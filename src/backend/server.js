@@ -1117,7 +1117,7 @@ app.post("/api/mail/send/:id", requireAuth, async (req, res) => {
       try {
         const user = db.prepare("SELECT name, titel, ort, email, telefon, mobil, unterschrift FROM users WHERE sub=?").get(req.session.user.sub) || {};
         const klauselnAAB = db.prepare("SELECT id, titel, inhalt, reihenfolge FROM klauseln WHERE dokument='aab' ORDER BY reihenfolge").all();
-        const kosten = db.prepare("SELECT * FROM kostensaetze WHERE bereitschaft_code=?").get(row.bereitschaft_code) || {};
+        const kosten = getGlobalKosten();
         const nr = (ev.auftragsnr || "").replace(/[^a-zA-Z0-9_-]/g, "_");
         
         if (attachPdf === "angebot") {
@@ -1218,7 +1218,7 @@ app.post("/api/mail/fibu/:id", requireAuth, async (req, res) => {
     const ev = vorgang.event || {};
     const stamm = dbi.prepare("SELECT * FROM bereitschaften WHERE code=?").get(row.bereitschaft_code) || {};
     const user = dbi.prepare("SELECT name, titel, ort, email, telefon, mobil FROM users WHERE sub=?").get(req.session.user.sub) || {};
-    const kosten = dbi.prepare("SELECT * FROM kostensaetze WHERE bereitschaft_code=?").get(row.bereitschaft_code) || {};
+    const kosten = getGlobalKosten();
 
     const { to, subject, body, fremdHelfer, fremdFahrzeuge, dayCalcs, totalCosts, activeDays } = req.body;
     if (!to) return res.status(400).json({ error: "FiBu-E-Mail fehlt" });
@@ -1381,7 +1381,7 @@ app.post("/api/pdf/vertrag/:id", requireAuth, async (req, res) => {
     const vorgang = JSON.parse(row.data);
     const bc = row.bereitschaft_code || req.session.user.bereitschaftCode;
     const stamm = db.prepare("SELECT * FROM bereitschaften WHERE code=?").get(bc) || {};
-    const kosten = db.prepare("SELECT * FROM kostensaetze WHERE bereitschaft_code=?").get(bc) || {};
+    const kosten = getGlobalKosten();
     const user = db.prepare("SELECT name, titel, ort, email, telefon, mobil, unterschrift FROM users WHERE sub=?").get(req.session.user.sub) || {};
     const html = buildVertragHTML(vorgang, stamm, user);
     const browser = await BrowserPool.get();
@@ -1663,7 +1663,7 @@ app.post("/api/pdf/angebot/:id", requireAuth, async (req, res) => {
     const vorgang = JSON.parse(row.data);
     const bc = row.bereitschaft_code || req.session.user.bereitschaftCode;
     const stamm = db.prepare("SELECT * FROM bereitschaften WHERE code=?").get(bc) || {};
-    const kosten = db.prepare("SELECT * FROM kostensaetze WHERE bereitschaft_code=?").get(bc) || {};
+    const kosten = getGlobalKosten();
     const user = db.prepare("SELECT name, titel, ort, email, telefon, mobil, unterschrift FROM users WHERE sub=?").get(req.session.user.sub) || {};
     const { dayCalcs, totalCosts, activeDays } = req.body;
     const html = buildAngebotHTML(vorgang.event || {}, dayCalcs || [], totalCosts || 0, activeDays || [], stamm, kosten, user);
@@ -1997,7 +1997,7 @@ app.post("/api/pdf/angebot/:id", requireAuth, async (req, res) => {
     const vorgang = JSON.parse(row.data);
     const bc = row.bereitschaft_code || req.session.user.bereitschaftCode;
     const stamm = db.prepare("SELECT * FROM bereitschaften WHERE code=?").get(bc) || {};
-    const kosten = db.prepare("SELECT * FROM kostensaetze WHERE bereitschaft_code=?").get(bc) || {};
+    const kosten = getGlobalKosten();
     const user = db.prepare("SELECT name, titel, ort, email, telefon, mobil, unterschrift FROM users WHERE sub=?").get(req.session.user.sub) || {};
     const { dayCalcs, totalCosts, activeDays } = req.body;
     const html = buildAngebotHTML(vorgang.event || {}, dayCalcs || [], totalCosts || 0, activeDays || [], stamm, kosten, user);
@@ -2297,6 +2297,17 @@ function buildDeckblattHTML(ev, activeDays, stamm, user, includeDocs) {
   </body></html>`;
 }
 
+
+// ── Globale Kostensätze aus app_config ───────────────────────────
+function getGlobalKosten() {
+  const { getConfig } = require("./db");
+  const fields = ["helfer","ktw","rtw","gktw","einsatzleiter","einsatzleiter_kfz",
+                  "seg_lkw","mtw","zelt","km_ktw","km_rtw","km_gktw",
+                  "km_el_kfz","km_seg_lkw","km_mtw","verpflegung"];
+  const k = {};
+  fields.forEach(f => { k[f] = parseFloat(getConfig("kosten_" + f) || 0); });
+  return k;
+}
 function buildAngebotHTML(ev, dayCalcs, totalCosts, activeDays, stamm, kosten, user) {
   const ROT = "#c0392b";
   const esc = s => (s||"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
