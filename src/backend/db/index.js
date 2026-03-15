@@ -324,6 +324,20 @@ function migrate() {
       fields.forEach(f => { if (k[f] != null) ins.run("kosten_" + f, String(k[f])); });
     }
   } catch(e) {}
+
+  // Sicherstellen dass Kostensatz-Defaults korrekt sind (0-Werte durch Defaults ersetzen)
+  const kostenDefaults = {
+    kosten_helfer:"14", kosten_ktw:"125", kosten_rtw:"155", kosten_gktw:"105",
+    kosten_einsatzleiter:"14", kosten_einsatzleiter_kfz:"155", kosten_seg_lkw:"125",
+    kosten_mtw:"50", kosten_zelt:"60",
+    kosten_km_ktw:"0.4", kosten_km_rtw:"0.4", kosten_km_gktw:"0.4",
+    kosten_km_el_kfz:"0.6", kosten_km_seg_lkw:"0.6", kosten_km_mtw:"0.4",
+    kosten_verpflegung:"17"
+  };
+  try {
+    const upd = db.prepare("UPDATE app_config SET value=? WHERE key=? AND (value='0' OR value='0.0' OR value='')");
+    Object.entries(kostenDefaults).forEach(([k,v]) => upd.run(v, k));
+  } catch(e) {}
   db.exec(`CREATE TABLE IF NOT EXISTS anfragen (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     name TEXT NOT NULL, ort TEXT, adresse TEXT, datum TEXT,
