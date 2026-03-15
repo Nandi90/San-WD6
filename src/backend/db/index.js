@@ -120,7 +120,7 @@ function migrate() {
       name TEXT NOT NULL,
       short TEXT NOT NULL,
       kv_name TEXT DEFAULT 'Kreisverband Neuburg-Schrobenhausen',
-      kgf TEXT DEFAULT 'Robert Augustin',
+      kgf TEXT DEFAULT '',
       kv_adresse TEXT DEFAULT 'Karl Konrad Str. 3',
       kv_plz_ort TEXT DEFAULT '86633 Neuburg',
       leiter_name TEXT DEFAULT '',
@@ -276,6 +276,10 @@ function migrate() {
 
   try { db.exec("ALTER TABLE bereitschaften ADD COLUMN datenschutz_url TEXT DEFAULT ''"); } catch(e) {}
   try { db.exec("ALTER TABLE bereitschaften ADD COLUMN fertig_url TEXT DEFAULT ''"); } catch(e) {}
+
+  // Hardcoded Standardwerte bereinigen
+  try { db.exec("UPDATE bereitschaften SET kgf = '' WHERE kgf = 'Robert Augustin'"); } catch(e) {}
+  try { db.exec("UPDATE bereitschaften SET kv_name = '' WHERE kv_name = 'Kreisverband Neuburg-Schrobenhausen'"); } catch(e) {}
   db.exec(`CREATE TABLE IF NOT EXISTS anfragen (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     name TEXT NOT NULL, ort TEXT, adresse TEXT, datum TEXT,

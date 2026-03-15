@@ -1418,7 +1418,7 @@ function buildVertragHTML(vorgang, stamm, user) {
   const ort = esc(user.ort || "");
   const today = new Date().toLocaleDateString("de-DE");
   const unterzeichner = esc(user.name || stamm.leiter_name || "");
-  const titel = esc(user.titel || stamm.leiter_nameTitle || "Bereitschaftsleiter");
+  const titel = esc(user.titel || stamm.leiter_title || "Bereitschaftsleiter");
   const kvName = esc(stamm.kv_name || "");
   const kgf = esc(stamm.kgf || "");
   const kvAdresse = esc(stamm.kv_adresse || "");
