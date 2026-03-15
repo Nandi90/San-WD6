@@ -1,7 +1,7 @@
 const express = require("express");
 const multer = require("multer");
 const router = express.Router();
-const { getDb, audit } = require("../db");
+const { getDb, audit, getConfig, setConfig, getAllConfig } = require("../db");
 const { requireAuth, requireBL, requireAdmin, getBereitschaftCode } = require("../middleware/rbac");
 
 const upload = multer({
@@ -22,6 +22,11 @@ router.get("/me", (req, res) => {
   if (!bereitschaft) return res.status(404).json({ error: "Bereitschaft nicht gefunden" });
   res.json({
     ...bereitschaft,
+    // KV-Felder kommen global aus app_config
+    kv_name: getConfig("kv_name") || "",
+    kgf: getConfig("kgf") || "",
+    kv_adresse: getConfig("kv_adresse") || "",
+    kv_plz_ort: getConfig("kv_plz_ort") || "",
     logo: bereitschaft.logo ? `/api/stammdaten/logo` : null,
     kostensaetze: kosten,
   });
@@ -64,13 +69,19 @@ router.put("/", requireAdmin, (req, res) => {
   const { leiter_name, leiter_title, telefon, fax, mobil, email, funkgruppe,
           kv_name, kgf, kv_adresse, kv_plz_ort } = req.body;
 
+  // Bereitschafts-spezifische Felder
   getDb().prepare(`
     UPDATE bereitschaften SET
       leiter_name=?, leiter_title=?, telefon=?, fax=?, mobil=?, email=?, funkgruppe=?,
-      kv_name=?, kgf=?, kv_adresse=?, kv_plz_ort=?, updated_at=datetime('now')
+      updated_at=datetime('now')
     WHERE code = ?
-  `).run(leiter_name, leiter_title, telefon, fax, mobil, email, funkgruppe,
-         kv_name, kgf, kv_adresse, kv_plz_ort, bc);
+  `).run(leiter_name, leiter_title, telefon, fax, mobil, email, funkgruppe, bc);
+
+  // KV-Felder global in app_config speichern
+  if (kv_name !== undefined) setConfig("kv_name", String(kv_name));
+  if (kgf !== undefined) setConfig("kgf", String(kgf));
+  if (kv_adresse !== undefined) setConfig("kv_adresse", String(kv_adresse));
+  if (kv_plz_ort !== undefined) setConfig("kv_plz_ort", String(kv_plz_ort));
 
   audit(req.session.user, "update", "bereitschaft", bc, req.body);
   res.json({ success: true });

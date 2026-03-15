@@ -108,6 +108,10 @@ function init() {
   cfgIns.run("zammad_url", "https://support.brkndsob.org");
   cfgIns.run("zammad_token", "");
   cfgIns.run("zammad_group_id", "8");
+  cfgIns.run("kv_name", "");
+  cfgIns.run("kgf", "");
+  cfgIns.run("kv_adresse", "");
+  cfgIns.run("kv_plz_ort", "");
 
   console.log("✅ Datenbank initialisiert:", DB_PATH);
 }
@@ -280,6 +284,18 @@ function migrate() {
   // Hardcoded Standardwerte bereinigen
   try { db.exec("UPDATE bereitschaften SET kgf = '' WHERE kgf = 'Robert Augustin'"); } catch(e) {}
   try { db.exec("UPDATE bereitschaften SET kv_name = '' WHERE kv_name = 'Kreisverband Neuburg-Schrobenhausen'"); } catch(e) {}
+
+  // KV-Felder aus bereitschaften in app_config migrieren (einmalig, bestehende Werte nicht überschreiben)
+  try {
+    const first = db.prepare("SELECT kv_name, kgf, kv_adresse, kv_plz_ort FROM bereitschaften WHERE kgf != '' OR kv_name != '' OR kv_adresse != '' LIMIT 1").get();
+    if (first) {
+      const ins = db.prepare("INSERT OR IGNORE INTO app_config (key, value) VALUES (?, ?)");
+      if (first.kv_name) ins.run("kv_name", first.kv_name);
+      if (first.kgf) ins.run("kgf", first.kgf);
+      if (first.kv_adresse) ins.run("kv_adresse", first.kv_adresse);
+      if (first.kv_plz_ort) ins.run("kv_plz_ort", first.kv_plz_ort);
+    }
+  } catch(e) {}
   db.exec(`CREATE TABLE IF NOT EXISTS anfragen (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     name TEXT NOT NULL, ort TEXT, adresse TEXT, datum TEXT,

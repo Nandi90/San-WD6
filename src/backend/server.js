@@ -346,7 +346,7 @@ app.get("/anfrage", (req, res) => {
   const stamm = db.getDb().prepare("SELECT * FROM bereitschaften LIMIT 1").get() || {};
   const ROT = "#E60005";
   const BLAU = "#002F5F";
-  const kvName = stamm.kv_name || "BRK Kreisverband Neuburg-Schrobenhausen";
+  const kvName = require('./db').getConfig('kv_name') || "";
   const fertigUrl = stamm.fertig_url || "https://www.kvndsob.brk.de/ehrenamt.html";
   const dsUrl = stamm.datenschutz_url || "https://www.kvndsob.brk.de/footer-menue-deutsch/service/datenschutz-1.html";
   let logoTag = '<svg width="48" height="48" viewBox="0 0 100 100" fill="none"><rect x="35" y="5" width="30" height="90" rx="2" fill="' + ROT + '"/><rect x="5" y="35" width="90" height="30" rx="2" fill="' + ROT + '"/></svg>';
@@ -605,7 +605,7 @@ app.post("/api/anfrage", express.json(), (req, res) => {
         const sendConfirm = getConfig("smtp_anfrage_confirm", "true");
         if (sendConfirm === "true" && email) {
           const fromName = getConfig("smtp_from_name", "BRK Sanitätswachdienst");
-          const kvName = (db.getDb().prepare("SELECT kv_name FROM bereitschaften LIMIT 1").get() || {}).kv_name || "BRK Kreisverband";
+          const kvName = require('./db').getConfig('kv_name') || "BRK Kreisverband";
           await smtp.sendMail({
             to: email,
             subject: `Ihre Anfrage: ${name} – Eingangsbestätigung`,
@@ -1420,10 +1420,10 @@ function buildVertragHTML(vorgang, stamm, user) {
   const today = new Date().toLocaleDateString("de-DE");
   const unterzeichner = esc(user.name || stamm.leiter_name || "");
   const titel = esc(user.titel || stamm.leiter_title || "Bereitschaftsleiter");
-  const kvName = esc(stamm.kv_name || "");
-  const kgf = esc(stamm.kgf || "");
-  const kvAdresse = esc(stamm.kv_adresse || "");
-  const kvPlzOrt = esc(stamm.kv_plz_ort || "");
+  const kvName = esc(require('./db').getConfig('kv_name') || "");
+  const kgf = esc(require('./db').getConfig('kgf') || "");
+  const kvAdresse = esc(require('./db').getConfig('kv_adresse') || "");
+  const kvPlzOrt = esc(require('./db').getConfig('kv_plz_ort') || "");
 
   const logoB64 = stamm.logo ? Buffer.from(stamm.logo).toString("base64") : null;
   const logoHtml = logoB64
@@ -2138,7 +2138,7 @@ function buildGefahrenHTML(ev, activeDays, dayCalcs, stamm) {
   const ROT = "#c0392b";
   const esc = s => (s||"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
   const fDate = s => s ? new Date(s).toLocaleDateString("de-DE") : "";
-  const kvName = (stamm.kv_name || "").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+  const kvName = (require('./db').getConfig('kv_name') || "").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
   const berName = (stamm.name || "").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
   const logoB64 = stamm.logo ? Buffer.from(stamm.logo).toString("base64") : null;
   const logoHtml = logoB64 ? `<img src="data:image/png;base64,${logoB64}" style="height:40px;width:auto">` : `<span style="color:${ROT};font-size:16pt;font-weight:bold">+</span>`;
@@ -2231,7 +2231,7 @@ function buildDeckblattHTML(ev, activeDays, stamm, user, includeDocs) {
   const fDate = s => s ? new Date(s).toLocaleDateString("de-DE") : "";
   const ROT = "#c0392b";
   const berName = esc(stamm.name || "");
-  const kvName = esc(stamm.kv_name || "");
+  const kvName = esc(require('./db').getConfig('kv_name') || "");
   const logoB64 = stamm.logo ? Buffer.from(stamm.logo).toString("base64") : null;
   const logoHtml = logoB64
     ? `<img src="data:image/png;base64,${logoB64}" style="height:90px;width:auto;display:block;margin:0 auto 12px">`
@@ -2489,7 +2489,7 @@ function buildAngebotHTML(ev, dayCalcs, totalCosts, activeDays, stamm, kosten, u
 function buildAABHTML(stamm, bereitschaftCode, klauseln, auftragsnr) {
   const ROT = "#c0392b";
   const esc = s => (s||"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
-  const kvName = esc(stamm.kv_name || "");
+  const kvName = esc(require('./db').getConfig('kv_name') || "");
   const logoB64 = stamm.logo ? Buffer.from(stamm.logo).toString("base64") : null;
   const logoHtml = logoB64 ? `<img src="data:image/png;base64,${logoB64}" style="height:28px;width:auto">` : `<span style="color:${ROT};font-weight:bold">✚</span>`;
 
