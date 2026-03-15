@@ -32,7 +32,13 @@ const BrowserPool = (() => {
   let _browser = null;
   let _launching = null;
   const CHROMIUM = process.env.CHROMIUM_PATH || "/usr/bin/chromium-browser";
-  const ARGS = ["--no-sandbox","--disable-setuid-sandbox","--disable-dev-shm-usage","--disable-gpu","--disable-extensions","--disable-translate"];
+  const ARGS = [
+    "--no-sandbox", "--disable-setuid-sandbox", "--disable-dev-shm-usage",
+    "--disable-extensions", "--disable-translate",
+    "--font-render-hinting=none",
+    "--force-color-profile=srgb",
+    "--disable-lcd-text"
+  ];
 
   async function get() {
     if (_browser && _browser.isConnected()) return _browser;
@@ -53,7 +59,8 @@ const BrowserPool = (() => {
     const browser = await get();
     const page = await browser.newPage();
     try {
-      await page.setContent(html, { waitUntil: "domcontentloaded" });
+      await page.setViewport({ width: 1240, height: 1754, deviceScaleFactor: 2 });
+      await page.setContent(html, { waitUntil: "networkidle0" });
       const pdf = await page.pdf({
         format: "A4",
         margin: { top: opts.marginTop || "15mm", right: "12mm", bottom: "20mm", left: opts.marginLeft || "12mm" },
@@ -841,6 +848,16 @@ app.delete("/api/anfragen/:id", (req, res) => {
 
 app.use("/auth", authRouter);
 
+// ── Öffentlicher Logo-Endpunkt (kein Auth, für Login-Screen) ────
+app.get("/public/logo", (req, res) => {
+  const db = require("./db").getDb();
+  const row = db.prepare("SELECT logo FROM bereitschaften WHERE logo IS NOT NULL LIMIT 1").get();
+  if (!row || !row.logo) return res.status(404).send();
+  res.set("Content-Type", "image/png");
+  res.set("Cache-Control", "public, max-age=3600");
+  res.send(row.logo);
+});
+
 // ── API Routes (Auth + RBAC) ─────────────────────────────────────
 app.use("/api/vorgaenge", vorgaengeRouter);
 app.use("/api/kunden", kundenRouter);
@@ -1386,7 +1403,8 @@ app.post("/api/pdf/vertrag/:id", requireAuth, async (req, res) => {
     const html = buildVertragHTML(vorgang, stamm, user);
     const browser = await BrowserPool.get();
     const page = await browser.newPage();
-    await page.setContent(html, { waitUntil: "domcontentloaded" });
+    await page.setViewport({ width: 1240, height: 1754, deviceScaleFactor: 2 });
+    await page.setContent(html, { waitUntil: "networkidle0" });
     const pdf = await page.pdf({
       format: "A4",
       margin: { top: "15mm", right: "12mm", bottom: "20mm", left: "12mm" },
