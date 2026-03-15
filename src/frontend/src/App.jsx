@@ -2505,7 +2505,7 @@ function PapierkorbTab({user,bereitschaft,allBereitschaften,stammdaten,onRestore
   );
 }
 
-function VorgaengeListe({bereitschaftCode,user,onLoad,onNew,onCopy,bereitschaft,allBereitschaften,onFilterChange,toast,showConfirm}){
+function VorgaengeListe({bereitschaftCode,user,onLoad,onNew,onCopy,bereitschaft,allBereitschaften,onFilterChange,toast,showConfirm,stammdaten}){
   const [showPapierkorb,setShowPapierkorb]=useState(false);
   const [papierkorbKey,setPapierkorbKey]=useState(0);
   const thisYear=new Date().getFullYear();
@@ -3043,7 +3043,7 @@ export default function App(){
       <main className="r-main" style={{maxWidth:1100,margin:"0 auto",padding:"16px 14px"}}>
 
         {/* VORGÄNGE + ARCHIV */}
-        {tab==="events"&&<VorgaengeListe bereitschaftCode={BEREITSCHAFTEN[stammdaten.bereitschaftIdx].code} user={user} onLoad={loadEvent} onNew={newEvent} onCopy={copyEvent} bereitschaft={bereitschaft} allBereitschaften={BEREITSCHAFTEN} toast={toast} showConfirm={showConfirm}/>}
+        {tab==="events"&&<VorgaengeListe bereitschaftCode={BEREITSCHAFTEN[stammdaten.bereitschaftIdx].code} user={user} onLoad={loadEvent} onNew={newEvent} onCopy={copyEvent} bereitschaft={bereitschaft} allBereitschaften={BEREITSCHAFTEN} toast={toast} showConfirm={showConfirm} stammdaten={stammdaten}/>}
 
         {/* VERANSTALTUNG */}
         {tab==="event"&&(<div>
