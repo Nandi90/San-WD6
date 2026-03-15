@@ -2099,6 +2099,7 @@ function AngebotPDF({event,dayCalcs,totalCosts,stammdaten,activeDays,bereitschaf
   const tElKfz=dayCalcs.reduce((s,d)=>s+d.ec,0);
   const tSeg=dayCalcs.reduce((s,d)=>s+d.sc,0);
   const tMtw=dayCalcs.reduce((s,d)=>s+d.mc,0);
+  const tZelt=dayCalcs.reduce((s,d)=>s+d.zc,0);
   const tHrs=dayCalcs.reduce((s,d)=>s+d.h,0);
   const tTP=dayCalcs.reduce((s,d)=>s+d.tp,0);
   const tHelferPers=dayCalcs.reduce((s,d)=>s+d.hc,0);
@@ -2116,6 +2117,7 @@ function AngebotPDF({event,dayCalcs,totalCosts,stammdaten,activeDays,bereitschaf
     tGktw>0&&{pos:"GKTW",anz:tGktw,pers:null,km:null,hrs:null,rate:rates.gktw,summe:dayCalcs.reduce((s,d)=>s+(d.cG||0),0)},
     tSeg>0&&{pos:"SEG-LKW",anz:tSeg,pers:null,km:null,hrs:null,rate:rates.segLkw,summe:dayCalcs.reduce((s,d)=>s+(d.cS||0),0)},
     tMtw>0&&{pos:"MTW",anz:tMtw,pers:null,km:null,hrs:null,rate:rates.mtw,summe:dayCalcs.reduce((s,d)=>s+(d.cM||0),0)},
+    tZelt>0&&{pos:"Zelt",anz:tZelt,pers:null,km:null,hrs:null,rate:rates.zelt,summe:dayCalcs.reduce((s,d)=>s+(d.cZ||0),0)},
     {pos:"Einsatzkräfte",anz:null,pers:tHelferPers,km:null,hrs:null,rate:null,summe:null,isSpacer:true},
     {pos:"Summe Einsatzkräfte",anz:null,pers:tTP,km:null,hrs:tHrs,rate:rates.helfer,summe:dayCalcs.reduce((s,d)=>s+(d.cH||0),0),isBold:true},
     !event.verpflegung&&dayCalcs.reduce((s,d)=>s+(d.cV||0),0)>0&&{pos:"Verpflegungspauschale",anz:null,pers:tTP,km:null,hrs:null,rate:rates.verpflegung,summe:dayCalcs.reduce((s,d)=>s+(d.cV||0),0)},
@@ -2520,7 +2522,7 @@ function VorgaengeListe({bereitschaftCode,user,onLoad,onNew,onCopy,bereitschaft,
   const years=[thisYear+1];for(let y=thisYear;y>=2025;y--)years.push(y);
   const isArchive=viewYear<thisYear;
   const isVorplanung=viewYear>thisYear;
-  const totalBetrag=events.reduce((s,ev)=>{const e=ev.event;if(!e)return s;if(e.checklist?.angebotAbgelehnt)return s;if(!!e.pauschalAktiv||(e.pauschalangebot&&parseFloat(e.pauschalangebot)>0))return s+parseFloat(e.pauschalangebot||0);const dc=(ev.days||[]).filter(d=>d.active);let t=0;try{dc.forEach(d=>{const c=calcDay(d,DEFAULT_STAMMDATEN.rates,e.verpflegung);t+=c.total;});}catch(e){console.error("Fehler:",e);}return s+t;},0);
+  const totalBetrag=events.reduce((s,ev)=>{const e=ev.event;if(!e)return s;if(e.checklist?.angebotAbgelehnt)return s;if(!!e.pauschalAktiv||(e.pauschalangebot&&parseFloat(e.pauschalangebot)>0))return s+parseFloat(e.pauschalangebot||0);const dc=(ev.days||[]).filter(d=>d.active);let t=0;try{dc.forEach(d=>{const c=calcDay(d,stammdaten.rates,e.verpflegung);t+=c.total;});}catch(e){console.error("Fehler:",e);}return s+t;},0);
 
   return(<div>
     {/* Year tabs */}
@@ -2546,7 +2548,7 @@ function VorgaengeListe({bereitschaftCode,user,onLoad,onNew,onCopy,bereitschaft,
     {(<Card title={`Angebote/Rechnungen ${viewYear}`} accent={C.mittelblau} sub={`Gesamt: ${f2(totalBetrag)} €`}>
       <div style={{overflowX:"auto"}}><table style={{width:"100%",borderCollapse:"collapse",fontSize:11}}>
         <thead><tr style={{background:C.hellgrau}}>{[{l:"Lfd.Nr."},{l:"Datum"},{l:"Ansprechpartner",hide:true},{l:"Veranstaltung"},{l:"Kunde",hide:true},{l:"AG",hide:true},{l:"Akz."},{l:"☁️",hide:true},{l:"RG",hide:true},{l:"Betrag",right:true},{l:"Status"},{l:""}].map((h,hi)=><th key={hi} className={h.hide?"mob-hide":""} style={{padding:"6px 8px",textAlign:h.right?"right":"left",borderBottom:`2px solid ${C.mittelgrau}40`,fontSize:10,color:C.dunkelgrau,whiteSpace:"nowrap"}}>{h.l}</th>)}</tr></thead>
-        <tbody>{events.filter(ev=>{if(!searchQ)return true;const q=searchQ.toLowerCase();const e=ev.event||{};return(e.name||"").toLowerCase().includes(q)||(e.auftragsnr||"").toLowerCase().includes(q)||(e.veranstalter||"").toLowerCase().includes(q)||(e.rechnungsempfaenger||"").toLowerCase().includes(q)||(e.ansprechpartner||"").toLowerCase().includes(q)||(e.ort||"").toLowerCase().includes(q);}).sort((a,b)=>{const na=a.event?.auftragsnr||"";const nb=b.event?.auftragsnr||"";return nb.localeCompare(na,undefined,{numeric:true});}).map((ev,i)=>{const e=ev.event||{};const cl=e.checklist||{};const dc=(ev.days||[]).filter(d=>d.active);const firstDate=dc[0]?.date;let betrag=0;if(!!e.pauschalAktiv||(e.pauschalangebot&&parseFloat(e.pauschalangebot)>0)){betrag=parseFloat(e.pauschalangebot||0);}else{try{dc.forEach(d=>{betrag+=calcDay(d,DEFAULT_STAMMDATEN.rates,e.verpflegung).total;});}catch(e){console.error("Fehler:",e);}}
+        <tbody>{events.filter(ev=>{if(!searchQ)return true;const q=searchQ.toLowerCase();const e=ev.event||{};return(e.name||"").toLowerCase().includes(q)||(e.auftragsnr||"").toLowerCase().includes(q)||(e.veranstalter||"").toLowerCase().includes(q)||(e.rechnungsempfaenger||"").toLowerCase().includes(q)||(e.ansprechpartner||"").toLowerCase().includes(q)||(e.ort||"").toLowerCase().includes(q);}).sort((a,b)=>{const na=a.event?.auftragsnr||"";const nb=b.event?.auftragsnr||"";return nb.localeCompare(na,undefined,{numeric:true});}).map((ev,i)=>{const e=ev.event||{};const cl=e.checklist||{};const dc=(ev.days||[]).filter(d=>d.active);const firstDate=dc[0]?.date;let betrag=0;if(!!e.pauschalAktiv||(e.pauschalangebot&&parseFloat(e.pauschalangebot)>0)){betrag=parseFloat(e.pauschalangebot||0);}else{try{dc.forEach(d=>{betrag+=calcDay(d,stammdaten.rates,e.verpflegung).total;});}catch(e){console.error("Fehler:",e);}}
           const isAbgelehnt=!!cl.angebotAbgelehnt;const isAkzeptiert=!!cl.angebotSigniertVorliegend;
           return(<tr key={i} style={{borderBottom:`1px solid ${C.hellgrau}`,cursor:"pointer",opacity:isAbgelehnt?0.5:1,textDecoration:isAbgelehnt?"line-through":"none"}} onClick={()=>isArchive?onCopy(ev):onLoad(ev)}>
             <td style={{padding:"5px 8px",fontWeight:600,color:C.rot,fontFamily:FONT.mono,whiteSpace:"nowrap"}}>{e.auftragsnr||"n/a"}</td>
