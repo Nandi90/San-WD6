@@ -1376,11 +1376,12 @@ app.post("/api/pdf/vertrag/:id", requireAuth, async (req, res) => {
   const { id } = req.params;
   try {
     const db = require("./db").getDb();
-    const row = db.prepare("SELECT data FROM vorgaenge WHERE id=?").get(id);
+    const row = db.prepare("SELECT data, bereitschaft_code FROM vorgaenge WHERE id=?").get(id);
     if (!row) return res.status(404).json({ error: "Vorgang nicht gefunden" });
     const vorgang = JSON.parse(row.data);
-    const stamm = db.prepare("SELECT * FROM bereitschaften WHERE code=?").get(req.session.user.bereitschaftCode) || {};
-    const kosten = db.prepare("SELECT * FROM kostensaetze WHERE bereitschaft_code=?").get(req.session.user.bereitschaftCode) || {};
+    const bc = row.bereitschaft_code || req.session.user.bereitschaftCode;
+    const stamm = db.prepare("SELECT * FROM bereitschaften WHERE code=?").get(bc) || {};
+    const kosten = db.prepare("SELECT * FROM kostensaetze WHERE bereitschaft_code=?").get(bc) || {};
     const user = db.prepare("SELECT name, titel, ort, email, telefon, mobil, unterschrift FROM users WHERE sub=?").get(req.session.user.sub) || {};
     const html = buildVertragHTML(vorgang, stamm, user);
     const browser = await BrowserPool.get();
@@ -1631,10 +1632,11 @@ app.post("/api/pdf/gefahren/:id", requireAuth, async (req, res) => {
   // puppeteer via BrowserPool
   try {
     const db = require("./db").getDb();
-    const row = db.prepare("SELECT data FROM vorgaenge WHERE id=?").get(req.params.id);
+    const row = db.prepare("SELECT data, bereitschaft_code FROM vorgaenge WHERE id=?").get(req.params.id);
     if (!row) return res.status(404).json({ error: "Vorgang nicht gefunden" });
     const vorgang = JSON.parse(row.data);
-    const stamm = db.prepare("SELECT * FROM bereitschaften WHERE code=?").get(req.session.user.bereitschaftCode) || {};
+    const bc = row.bereitschaft_code || req.session.user.bereitschaftCode;
+    const stamm = db.prepare("SELECT * FROM bereitschaften WHERE code=?").get(bc) || {};
     const { dayCalcs, activeDays } = req.body;
     if (!dayCalcs || !dayCalcs.length) return res.status(400).json({ error: "Keine Tage vorhanden" });
     const html = buildGefahrenHTML(vorgang.event || {}, activeDays || [], dayCalcs, stamm);
@@ -1656,11 +1658,12 @@ app.post("/api/pdf/angebot/:id", requireAuth, async (req, res) => {
   // puppeteer via BrowserPool
   try {
     const db = require("./db").getDb();
-    const row = db.prepare("SELECT data FROM vorgaenge WHERE id=?").get(req.params.id);
+    const row = db.prepare("SELECT data, bereitschaft_code FROM vorgaenge WHERE id=?").get(req.params.id);
     if (!row) return res.status(404).json({ error: "Vorgang nicht gefunden" });
     const vorgang = JSON.parse(row.data);
-    const stamm = db.prepare("SELECT * FROM bereitschaften WHERE code=?").get(req.session.user.bereitschaftCode) || {};
-    const kosten = db.prepare("SELECT * FROM kostensaetze WHERE bereitschaft_code=?").get(req.session.user.bereitschaftCode) || {};
+    const bc = row.bereitschaft_code || req.session.user.bereitschaftCode;
+    const stamm = db.prepare("SELECT * FROM bereitschaften WHERE code=?").get(bc) || {};
+    const kosten = db.prepare("SELECT * FROM kostensaetze WHERE bereitschaft_code=?").get(bc) || {};
     const user = db.prepare("SELECT name, titel, ort, email, telefon, mobil, unterschrift FROM users WHERE sub=?").get(req.session.user.sub) || {};
     const { dayCalcs, totalCosts, activeDays } = req.body;
     const html = buildAngebotHTML(vorgang.event || {}, dayCalcs || [], totalCosts || 0, activeDays || [], stamm, kosten, user);
@@ -1682,11 +1685,11 @@ app.post("/api/pdf/aab/:id", requireAuth, async (req, res) => {
   // puppeteer via BrowserPool
   try {
     const db = require("./db").getDb();
-    const row = db.prepare("SELECT data FROM vorgaenge WHERE id=?").get(req.params.id);
+    const row = db.prepare("SELECT data, bereitschaft_code FROM vorgaenge WHERE id=?").get(req.params.id);
     const vorgang = row ? JSON.parse(row.data) : {};
-    const stamm = db.prepare("SELECT * FROM bereitschaften WHERE code=?").get(req.session.user.bereitschaftCode) || {};
+    const stamm = db.prepare("SELECT * FROM bereitschaften WHERE code=?").get(bc) || {};
     const klauseln = db.prepare("SELECT id, titel, inhalt, reihenfolge FROM klauseln WHERE dokument='aab' ORDER BY reihenfolge").all();
-    const html = buildAABHTML(stamm, req.session.user.bereitschaftCode, klauseln, vorgang.event?.auftragsnr||'');
+    const html = buildAABHTML(stamm, bc, klauseln, vorgang.event?.auftragsnr||'');
 
 
     const pdf = await BrowserPool.renderPDF(html, { marginTop: "20mm", marginLeft: "12mm", header: `<div style="width:100%;padding:2mm 12mm 0;font-family:Arial,sans-serif;font-size:7.5pt;color:#888;display:flex;justify-content:space-between"><span>Allgemeine Auftragsbedingungen</span><span>${(vorgang.event?.auftragsnr||"").replace(/"/g,"&quot;")}</span></div>`, footer: `<div style="width:100%;padding:0 12mm;font-family:Arial,sans-serif;font-size:7pt;color:#999;display:flex;justify-content:space-between;border-top:0.5px solid #ddd;padding-top:2mm"><span>Allgemeine Auftragsbedingungen · Anlage 3 zur Vereinbarung SanWD</span><span>${(vorgang.event?.auftragsnr||"").replace(/"/g,"&quot;")}</span><span>Seite <span class="pageNumber"></span>/<span class="totalPages"></span></span></div>` });
@@ -1706,10 +1709,11 @@ app.post("/api/pdf/mappe/:id", requireAuth, async (req, res) => {
   // pdf-lib nicht mehr noetig - Single-Render
   try {
     const db = require("./db").getDb();
-    const row = db.prepare("SELECT data FROM vorgaenge WHERE id=?").get(req.params.id);
+    const row = db.prepare("SELECT data, bereitschaft_code FROM vorgaenge WHERE id=?").get(req.params.id);
     if (!row) return res.status(404).json({ error: "Vorgang nicht gefunden" });
     const vorgang = JSON.parse(row.data);
-    const stamm = db.prepare("SELECT * FROM bereitschaften WHERE code=?").get(req.session.user.bereitschaftCode) || {};
+    const bc = row.bereitschaft_code || req.session.user.bereitschaftCode;
+    const stamm = db.prepare("SELECT * FROM bereitschaften WHERE code=?").get(bc) || {};
     const user = db.prepare("SELECT name, titel, ort, email, telefon, mobil, unterschrift FROM users WHERE sub=?").get(req.session.user.sub) || {};
     const klauselnAAB = db.prepare("SELECT id, titel, inhalt, reihenfolge FROM klauseln WHERE dokument='aab' ORDER BY reihenfolge").all();
     const { dayCalcs, totalCosts, activeDays } = req.body;
@@ -1740,7 +1744,7 @@ app.post("/api/pdf/mappe/:id", requireAuth, async (req, res) => {
     const deckblattHTML = buildDeckblattHTML(vorgang.event || {}, activeDays || [], stamm, user, include);
     const angebotHTML = buildAngebotHTML(vorgang.event || {}, dayCalcs || [], totalCosts || 0, activeDays || [], stamm, {}, user);
     const vertragHTML = buildVertragHTML(vorgang, stamm, user);
-    const aabHTML = buildAABHTML(stamm, req.session.user.bereitschaftCode, klauselnAAB, vorgang.event?.auftragsnr||'');
+    const aabHTML = buildAABHTML(stamm, bc, klauselnAAB, vorgang.event?.auftragsnr||'');
     const gefahrenHTML = (include.gefahren && dayCalcs && dayCalcs.length > 0) ? buildGefahrenHTML(vorgang.event || {}, activeDays || [], dayCalcs, stamm) : null;
 
     // Body-Inhalt aus jedem HTML extrahieren
@@ -1988,11 +1992,12 @@ app.post("/api/pdf/angebot/:id", requireAuth, async (req, res) => {
   // puppeteer via BrowserPool
   try {
     const db = require("./db").getDb();
-    const row = db.prepare("SELECT data FROM vorgaenge WHERE id=?").get(req.params.id);
+    const row = db.prepare("SELECT data, bereitschaft_code FROM vorgaenge WHERE id=?").get(req.params.id);
     if (!row) return res.status(404).json({ error: "Vorgang nicht gefunden" });
     const vorgang = JSON.parse(row.data);
-    const stamm = db.prepare("SELECT * FROM bereitschaften WHERE code=?").get(req.session.user.bereitschaftCode) || {};
-    const kosten = db.prepare("SELECT * FROM kostensaetze WHERE bereitschaft_code=?").get(req.session.user.bereitschaftCode) || {};
+    const bc = row.bereitschaft_code || req.session.user.bereitschaftCode;
+    const stamm = db.prepare("SELECT * FROM bereitschaften WHERE code=?").get(bc) || {};
+    const kosten = db.prepare("SELECT * FROM kostensaetze WHERE bereitschaft_code=?").get(bc) || {};
     const user = db.prepare("SELECT name, titel, ort, email, telefon, mobil, unterschrift FROM users WHERE sub=?").get(req.session.user.sub) || {};
     const { dayCalcs, totalCosts, activeDays } = req.body;
     const html = buildAngebotHTML(vorgang.event || {}, dayCalcs || [], totalCosts || 0, activeDays || [], stamm, kosten, user);
@@ -2013,11 +2018,11 @@ app.post("/api/pdf/aab/:id", requireAuth, async (req, res) => {
   // puppeteer via BrowserPool
   try {
     const db = require("./db").getDb();
-    const row = db.prepare("SELECT data FROM vorgaenge WHERE id=?").get(req.params.id);
+    const row = db.prepare("SELECT data, bereitschaft_code FROM vorgaenge WHERE id=?").get(req.params.id);
     const vorgang = row ? JSON.parse(row.data) : {};
-    const stamm = db.prepare("SELECT * FROM bereitschaften WHERE code=?").get(req.session.user.bereitschaftCode) || {};
+    const stamm = db.prepare("SELECT * FROM bereitschaften WHERE code=?").get(bc) || {};
     const klauseln = db.prepare("SELECT id, titel, inhalt, reihenfolge FROM klauseln WHERE dokument='aab' ORDER BY reihenfolge").all();
-    const html = buildAABHTML(stamm, req.session.user.bereitschaftCode, klauseln, vorgang.event?.auftragsnr||'');
+    const html = buildAABHTML(stamm, bc, klauseln, vorgang.event?.auftragsnr||'');
 
 
     const pdf = await BrowserPool.renderPDF(html, { marginTop: "20mm", marginLeft: "12mm", header: `<div style="width:100%;padding:2mm 12mm 0;font-family:Arial,sans-serif;font-size:7.5pt;color:#888;display:flex;justify-content:space-between"><span>Allgemeine Auftragsbedingungen</span><span>${(vorgang.event?.auftragsnr||"").replace(/"/g,"&quot;")}</span></div>`, footer: `<div style="width:100%;padding:0 12mm;font-family:Arial,sans-serif;font-size:7pt;color:#999;display:flex;justify-content:space-between;border-top:0.5px solid #ddd;padding-top:2mm"><span>Allgemeine Auftragsbedingungen · Anlage 3 zur Vereinbarung SanWD</span><span>${(vorgang.event?.auftragsnr||"").replace(/"/g,"&quot;")}</span><span>Seite <span class="pageNumber"></span>/<span class="totalPages"></span></span></div>` });
@@ -2036,10 +2041,11 @@ app.post("/api/pdf/mappe/:id", requireAuth, async (req, res) => {
   // pdf-lib nicht mehr noetig - Single-Render
   try {
     const db = require("./db").getDb();
-    const row = db.prepare("SELECT data FROM vorgaenge WHERE id=?").get(req.params.id);
+    const row = db.prepare("SELECT data, bereitschaft_code FROM vorgaenge WHERE id=?").get(req.params.id);
     if (!row) return res.status(404).json({ error: "Vorgang nicht gefunden" });
     const vorgang = JSON.parse(row.data);
-    const stamm = db.prepare("SELECT * FROM bereitschaften WHERE code=?").get(req.session.user.bereitschaftCode) || {};
+    const bc = row.bereitschaft_code || req.session.user.bereitschaftCode;
+    const stamm = db.prepare("SELECT * FROM bereitschaften WHERE code=?").get(bc) || {};
     const user = db.prepare("SELECT name, titel, ort, email, telefon, mobil, unterschrift FROM users WHERE sub=?").get(req.session.user.sub) || {};
     const klauselnAAB = db.prepare("SELECT id, titel, inhalt, reihenfolge FROM klauseln WHERE dokument='aab' ORDER BY reihenfolge").all();
     const { dayCalcs, totalCosts, activeDays } = req.body;
@@ -2070,7 +2076,7 @@ app.post("/api/pdf/mappe/:id", requireAuth, async (req, res) => {
     const deckblattHTML = buildDeckblattHTML(vorgang.event || {}, activeDays || [], stamm, user, include);
     const angebotHTML = buildAngebotHTML(vorgang.event || {}, dayCalcs || [], totalCosts || 0, activeDays || [], stamm, {}, user);
     const vertragHTML = buildVertragHTML(vorgang, stamm, user);
-    const aabHTML = buildAABHTML(stamm, req.session.user.bereitschaftCode, klauselnAAB, vorgang.event?.auftragsnr||'');
+    const aabHTML = buildAABHTML(stamm, bc, klauselnAAB, vorgang.event?.auftragsnr||'');
     const gefahrenHTML = (include.gefahren && dayCalcs && dayCalcs.length > 0) ? buildGefahrenHTML(vorgang.event || {}, activeDays || [], dayCalcs, stamm) : null;
 
     // Body-Inhalt aus jedem HTML extrahieren
