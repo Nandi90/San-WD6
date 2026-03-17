@@ -359,7 +359,7 @@ app.get("/anfrage", (req, res) => {
   let logoTag = '<svg width="48" height="48" viewBox="0 0 100 100" fill="none"><rect x="35" y="5" width="30" height="90" rx="2" fill="' + ROT + '"/><rect x="5" y="35" width="90" height="30" rx="2" fill="' + ROT + '"/></svg>';
   if (stamm.logo) {
     try {
-      const b64 = Buffer.from(stamm.logo).toString("base64");
+      const b64 = Buffer.isBuffer(stamm.logo) ? stamm.logo.toString("base64") : Buffer.from(stamm.logo).toString("base64");
       logoTag = '<img src="data:image/png;base64,' + b64 + '" style="height:56px;width:auto">';
     } catch(e) {}
   }
@@ -1142,7 +1142,7 @@ app.post("/api/mail/send/:id", requireAuth, async (req, res) => {
         const nr = (ev.auftragsnr || "").replace(/[^a-zA-Z0-9_-]/g, "_");
         
         if (attachPdf === "angebot") {
-          const html = buildAngebotHTML(ev, req.body.dayCalcs || [], req.body.totalCosts || 0, req.body.activeDays || vorgang.days || [], stamm, kosten, user);
+          const html = buildAngebotHTML(ev, req.body.dayCalcs || [], req.body.totalCosts || 0, (req.body.activeDays && req.body.activeDays.length > 0 ? req.body.activeDays : (vorgang.days||[]).filter(d=>d.active!==false)), stamm, kosten, user);
           const pdf = await BrowserPool.renderPDF(html, { marginTop: "20mm", marginLeft: "12mm" });
           attachments.push({ filename: `${nr}_Angebot.pdf`, content: pdf, contentType: "application/pdf" });
         }
@@ -1150,8 +1150,8 @@ app.post("/api/mail/send/:id", requireAuth, async (req, res) => {
         if (attachPdf === "mappe") {
           // Angebotsmappe: Deckblatt → Angebot → Vertrag → AAB
           const includeDocs = { deckblatt: true, angebot: true, vertrag: true, aab: true, gefahren: false };
-          const deckblattHTML = buildDeckblattHTML(ev, req.body.activeDays || vorgang.days || [], stamm, user, includeDocs);
-          const angebotHTML = buildAngebotHTML(ev, req.body.dayCalcs || [], req.body.totalCosts || 0, req.body.activeDays || vorgang.days || [], stamm, kosten, user);
+          const deckblattHTML = buildDeckblattHTML(ev, (req.body.activeDays && req.body.activeDays.length > 0 ? req.body.activeDays : (vorgang.days||[]).filter(d=>d.active!==false)), stamm, user, includeDocs);
+          const angebotHTML = buildAngebotHTML(ev, req.body.dayCalcs || [], req.body.totalCosts || 0, (req.body.activeDays && req.body.activeDays.length > 0 ? req.body.activeDays : (vorgang.days||[]).filter(d=>d.active!==false)), stamm, kosten, user);
           const vertragHTML = buildVertragHTML(vorgang, stamm, user);
           const aabHTML = buildAABHTML(stamm, row.bereitschaft_code, klauselnAAB, ev.auftragsnr || "");
 
@@ -1241,7 +1241,7 @@ app.post("/api/mail/fibu/:id", requireAuth, async (req, res) => {
     const user = dbi.prepare("SELECT name, titel, ort, email, telefon, mobil FROM users WHERE sub=?").get(req.session.user.sub) || {};
     const kosten = getGlobalKosten();
 
-    const { to, subject, body, fremdHelfer, fremdFahrzeuge, dayCalcs, totalCosts, activeDays } = req.body;
+    const { to, subject, body, fremdHelfer, fremdFahrzeuge, dayCalcs, totalCosts, activeDays: _activeDaysF } = req.body;
     if (!to) return res.status(400).json({ error: "FiBu-E-Mail fehlt" });
 
     // Angebot-PDF generieren
@@ -1449,7 +1449,7 @@ function buildVertragHTML(vorgang, stamm, user) {
   const kvAdresse = esc(require('./db').getConfig('kv_adresse') || "");
   const kvPlzOrt = esc(require('./db').getConfig('kv_plz_ort') || "");
 
-  const logoB64 = stamm.logo ? Buffer.from(stamm.logo).toString("base64") : null;
+  const logoB64 = stamm.logo ? (Buffer.isBuffer(stamm.logo) ? stamm.logo.toString("base64") : Buffer.from(stamm.logo).toString("base64")) : null;
   const logoHtml = logoB64
     ? `<img src="data:image/png;base64,${logoB64}" style="height:36px;width:auto;vertical-align:middle">`
     : `<span style="color:${ROT};font-weight:bold;font-size:18pt;vertical-align:middle">✚</span>`;
@@ -1691,7 +1691,8 @@ app.post("/api/pdf/angebot/:id", requireAuth, async (req, res) => {
     // PDF zeigt immer den Ersteller des Vorgangs, nicht den aktuell eingeloggten User
     const pdfUserSub = row.created_by || req.session.user.sub;
     const user = db.prepare("SELECT name, titel, ort, email, telefon, mobil, unterschrift FROM users WHERE sub=?").get(pdfUserSub) || {};
-    const { dayCalcs, totalCosts, activeDays } = req.body;
+    const { dayCalcs, totalCosts, activeDays: _activeDaysA } = req.body;
+    const activeDays = (_activeDaysA && _activeDaysA.length > 0) ? _activeDaysA : (vorgang.days||[]).filter(d=>d.active!==false);
     const html = buildAngebotHTML(vorgang.event || {}, dayCalcs || [], totalCosts || 0, activeDays || [], stamm, kosten, user);
 
 
@@ -1744,7 +1745,8 @@ app.post("/api/pdf/mappe/:id", requireAuth, async (req, res) => {
     const pdfUserSub = row.created_by || req.session.user.sub;
     const user = db.prepare("SELECT name, titel, ort, email, telefon, mobil, unterschrift FROM users WHERE sub=?").get(pdfUserSub) || {};
     const klauselnAAB = db.prepare("SELECT id, titel, inhalt, reihenfolge FROM klauseln WHERE dokument='aab' ORDER BY reihenfolge").all();
-    const { dayCalcs, totalCosts, activeDays } = req.body;
+    const { dayCalcs, totalCosts, activeDays: _activeDays } = req.body;
+    const activeDays = (_activeDays && _activeDays.length > 0) ? _activeDays : (vorgang.days||[]).filter(d=>d.active!==false);
 
     const browser = await BrowserPool.get();
     const footerTpl = `<div style="width:100%;padding:0 12mm;font-family:Arial,sans-serif;font-size:7pt;color:#999;display:flex;justify-content:space-between;border-top:0.5px solid #ddd;padding-top:2mm"><span>Angebotsmappe · BRK Sanitätswachdienst</span><span>${(vorgang.event?.auftragsnr||"").replace(/"/g,"&quot;")}</span><span>Seite <span class="pageNumber"></span>/<span class="totalPages"></span></span></div>`;
@@ -1869,7 +1871,7 @@ function buildEinsatzprotokollHTML(vorgang, stamm, dayIdx) {
   // Logo aus bereitschaften.logo (Binary → Base64)
   let logoImg;
   if (stamm.logo) {
-    const b64 = Buffer.from(stamm.logo).toString("base64");
+    const b64 = Buffer.isBuffer(stamm.logo) ? stamm.logo.toString("base64") : Buffer.from(stamm.logo).toString("base64");
     logoImg = `<img src="data:image/png;base64,${b64}" style="max-width:200px;max-height:90px;object-fit:contain;" />`;
   } else {
     logoImg = `<div style="font-weight:bold;font-size:16px;text-align:center;">BRK<br/>Bereitschaft</div>`;
@@ -2027,8 +2029,9 @@ app.post("/api/pdf/angebot/:id", requireAuth, async (req, res) => {
     const stamm = db.prepare("SELECT * FROM bereitschaften WHERE code=?").get(bc) || {};
     const kosten = getGlobalKosten();
     const user = db.prepare("SELECT name, titel, ort, email, telefon, mobil, unterschrift FROM users WHERE sub=?").get(req.session.user.sub) || {};
-    const { dayCalcs, totalCosts, activeDays } = req.body;
-    const html = buildAngebotHTML(vorgang.event || {}, dayCalcs || [], totalCosts || 0, activeDays || [], stamm, kosten, user);
+    const { dayCalcs, totalCosts, activeDays: _activeDaysA2 } = req.body;
+    const activeDays = (_activeDaysA2 && _activeDaysA2.length > 0) ? _activeDaysA2 : (vorgang.days||[]).filter(d=>d.active!==false);
+    const html = buildAngebotHTML(vorgang.event || {}, dayCalcs || [], totalCosts || 0, activeDays, stamm, kosten, user);
 
 
     const pdf = await BrowserPool.renderPDF(html, { marginTop: "20mm", marginLeft: "12mm", header: `<div style="width:100%;padding:2mm 12mm 0;font-family:Arial,sans-serif;font-size:7.5pt;color:#888;display:flex;justify-content:space-between"><span>Fortsetzung Angebot</span><span>${(vorgang.event?.auftragsnr||"").replace(/"/g,"&quot;")}</span></div>`, footer: `<div style="width:100%;padding:0 12mm;font-family:Arial,sans-serif;font-size:7pt;color:#999;display:flex;justify-content:space-between;border-top:0.5px solid #ddd;padding-top:2mm"><span>BRK Sanitätswachdienst · Kostenaufstellung</span><span>${(vorgang.event?.auftragsnr||"").replace(/"/g,"&quot;")}</span><span>Seite <span class="pageNumber"></span>/<span class="totalPages"></span></span></div>` });
@@ -2074,9 +2077,11 @@ app.post("/api/pdf/mappe/:id", requireAuth, async (req, res) => {
     const vorgang = JSON.parse(row.data);
     const bc = row.bereitschaft_code || req.session.user.bereitschaftCode;
     const stamm = db.prepare("SELECT * FROM bereitschaften WHERE code=?").get(bc) || {};
-    const user = db.prepare("SELECT name, titel, ort, email, telefon, mobil, unterschrift FROM users WHERE sub=?").get(req.session.user.sub) || {};
+    const pdfUserSub = row.created_by || req.session.user.sub;
+    const user = db.prepare("SELECT name, titel, ort, email, telefon, mobil, unterschrift FROM users WHERE sub=?").get(pdfUserSub) || {};
     const klauselnAAB = db.prepare("SELECT id, titel, inhalt, reihenfolge FROM klauseln WHERE dokument='aab' ORDER BY reihenfolge").all();
-    const { dayCalcs, totalCosts, activeDays } = req.body;
+    const { dayCalcs, totalCosts, activeDays: _activeDays } = req.body;
+    const activeDays = (_activeDays && _activeDays.length > 0) ? _activeDays : (vorgang.days||[]).filter(d=>d.active!==false);
 
     const browser = await BrowserPool.get();
     const footerTpl = `<div style="width:100%;padding:0 12mm;font-family:Arial,sans-serif;font-size:7pt;color:#999;display:flex;justify-content:space-between;border-top:0.5px solid #ddd;padding-top:2mm"><span>Angebotsmappe · BRK Sanitätswachdienst</span><span>${(vorgang.event?.auftragsnr||"").replace(/"/g,"&quot;")}</span><span>Seite <span class="pageNumber"></span>/<span class="totalPages"></span></span></div>`;
@@ -2168,7 +2173,7 @@ function buildGefahrenHTML(ev, activeDays, dayCalcs, stamm) {
   const fDate = s => s ? new Date(s).toLocaleDateString("de-DE") : "";
   const kvName = (require('./db').getConfig('kv_name') || "").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
   const berName = (stamm.name || "").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
-  const logoB64 = stamm.logo ? Buffer.from(stamm.logo).toString("base64") : null;
+  const logoB64 = stamm.logo ? (Buffer.isBuffer(stamm.logo) ? stamm.logo.toString("base64") : Buffer.from(stamm.logo).toString("base64")) : null;
   const logoHtml = logoB64 ? `<img src="data:image/png;base64,${logoB64}" style="height:40px;width:auto">` : `<span style="color:${ROT};font-size:16pt;font-weight:bold">+</span>`;
 
   const pages = (activeDays||[]).map((day, i) => {
@@ -2260,7 +2265,7 @@ function buildDeckblattHTML(ev, activeDays, stamm, user, includeDocs) {
   const ROT = "#c0392b";
   const berName = esc(stamm.name || "");
   const kvName = esc(require('./db').getConfig('kv_name') || "");
-  const logoB64 = stamm.logo ? Buffer.from(stamm.logo).toString("base64") : null;
+  const logoB64 = stamm.logo ? (Buffer.isBuffer(stamm.logo) ? stamm.logo.toString("base64") : Buffer.from(stamm.logo).toString("base64")) : null;
   const logoHtml = logoB64
     ? `<img src="data:image/png;base64,${logoB64}" style="height:90px;width:auto;display:block;margin:0 auto 12px">`
     : `<div style="font-size:48pt;color:${ROT};text-align:center;margin-bottom:12px">&#10010;</div>`;
@@ -2352,7 +2357,7 @@ function buildAngebotHTML(ev, dayCalcs, totalCosts, activeDays, stamm, kosten, u
   const ortName = esc(user?.ort || (stamm.name||"").replace(/^Bereitschaft\s*/i,"").trim() || "");
   const berName = esc(stamm.name || "");
 
-  const logoB64 = stamm.logo ? Buffer.from(stamm.logo).toString("base64") : null;
+  const logoB64 = stamm.logo ? (Buffer.isBuffer(stamm.logo) ? stamm.logo.toString("base64") : Buffer.from(stamm.logo).toString("base64")) : null;
   const logoHtml = logoB64 ? `<img src="data:image/png;base64,${logoB64}" style="height:55px;width:auto;display:block;margin-bottom:4px">` : "";
 
   const tKtw = dayCalcs.reduce((s,d)=>s+(d.kc||0),0);
@@ -2529,7 +2534,7 @@ function buildAABHTML(stamm, bereitschaftCode, klauseln, auftragsnr) {
   const ROT = "#c0392b";
   const esc = s => (s||"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
   const kvName = esc(require('./db').getConfig('kv_name') || "");
-  const logoB64 = stamm.logo ? Buffer.from(stamm.logo).toString("base64") : null;
+  const logoB64 = stamm.logo ? (Buffer.isBuffer(stamm.logo) ? stamm.logo.toString("base64") : Buffer.from(stamm.logo).toString("base64")) : null;
   const logoHtml = logoB64 ? `<img src="data:image/png;base64,${logoB64}" style="height:28px;width:auto">` : `<span style="color:${ROT};font-weight:bold">✚</span>`;
 
   const sektionen = klauseln.map(k => {
