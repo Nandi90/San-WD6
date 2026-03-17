@@ -877,7 +877,9 @@ app.post("/api/pdf/sync/:id", requireAuth, async (req, res) => {
     vorgang.bereitschaft_code = row.bereitschaft_code;
     const ev = vorgang.event || {};
     const stamm = db.prepare("SELECT * FROM bereitschaften WHERE code=?").get(row.bereitschaft_code || req.session.user.bereitschaftCode) || {};
-    const user = db.prepare("SELECT name, titel, ort, email, telefon, mobil, unterschrift FROM users WHERE sub=?").get(req.session.user.sub) || {};
+    // PDF zeigt immer den Ersteller des Vorgangs
+    const syncPdfUserSub = row.created_by || req.session.user.sub;
+    const user = db.prepare("SELECT name, titel, ort, email, telefon, mobil, unterschrift FROM users WHERE sub=?").get(syncPdfUserSub) || {};
     const klauselnAAB = db.prepare("SELECT id, titel, inhalt, reihenfolge FROM klauseln WHERE dokument='aab' ORDER BY reihenfolge").all();
 
     const pdfs = [];
@@ -1132,7 +1134,9 @@ app.post("/api/mail/send/:id", requireAuth, async (req, res) => {
     // PDF generieren und anhängen
     if (attachPdf === "mappe" || attachPdf === "angebot") {
       try {
-        const user = db.prepare("SELECT name, titel, ort, email, telefon, mobil, unterschrift FROM users WHERE sub=?").get(req.session.user.sub) || {};
+        const mailPdfRow = db.prepare("SELECT created_by FROM vorgaenge WHERE id=?").get(req.params.id) || {};
+        const mailPdfUserSub = mailPdfRow.created_by || req.session.user.sub;
+        const user = db.prepare("SELECT name, titel, ort, email, telefon, mobil, unterschrift FROM users WHERE sub=?").get(mailPdfUserSub) || {};
         const klauselnAAB = db.prepare("SELECT id, titel, inhalt, reihenfolge FROM klauseln WHERE dokument='aab' ORDER BY reihenfolge").all();
         const kosten = getGlobalKosten();
         const nr = (ev.auftragsnr || "").replace(/[^a-zA-Z0-9_-]/g, "_");
@@ -1393,13 +1397,15 @@ app.post("/api/pdf/vertrag/:id", requireAuth, async (req, res) => {
   const { id } = req.params;
   try {
     const db = require("./db").getDb();
-    const row = db.prepare("SELECT data, bereitschaft_code FROM vorgaenge WHERE id=?").get(id);
+    const row = db.prepare("SELECT data, bereitschaft_code, created_by FROM vorgaenge WHERE id=?").get(id);
     if (!row) return res.status(404).json({ error: "Vorgang nicht gefunden" });
     const vorgang = JSON.parse(row.data);
     const bc = row.bereitschaft_code || req.session.user.bereitschaftCode;
     const stamm = db.prepare("SELECT * FROM bereitschaften WHERE code=?").get(bc) || {};
     const kosten = getGlobalKosten();
-    const user = db.prepare("SELECT name, titel, ort, email, telefon, mobil, unterschrift FROM users WHERE sub=?").get(req.session.user.sub) || {};
+    // PDF zeigt immer den Ersteller des Vorgangs, nicht den aktuell eingeloggten User
+    const pdfUserSub = row.created_by || req.session.user.sub;
+    const user = db.prepare("SELECT name, titel, ort, email, telefon, mobil, unterschrift FROM users WHERE sub=?").get(pdfUserSub) || {};
     const html = buildVertragHTML(vorgang, stamm, user);
     const browser = await BrowserPool.get();
     const page = await browser.newPage();
@@ -1676,13 +1682,15 @@ app.post("/api/pdf/angebot/:id", requireAuth, async (req, res) => {
   // puppeteer via BrowserPool
   try {
     const db = require("./db").getDb();
-    const row = db.prepare("SELECT data, bereitschaft_code FROM vorgaenge WHERE id=?").get(req.params.id);
+    const row = db.prepare("SELECT data, bereitschaft_code, created_by FROM vorgaenge WHERE id=?").get(req.params.id);
     if (!row) return res.status(404).json({ error: "Vorgang nicht gefunden" });
     const vorgang = JSON.parse(row.data);
     const bc = row.bereitschaft_code || req.session.user.bereitschaftCode;
     const stamm = db.prepare("SELECT * FROM bereitschaften WHERE code=?").get(bc) || {};
     const kosten = getGlobalKosten();
-    const user = db.prepare("SELECT name, titel, ort, email, telefon, mobil, unterschrift FROM users WHERE sub=?").get(req.session.user.sub) || {};
+    // PDF zeigt immer den Ersteller des Vorgangs, nicht den aktuell eingeloggten User
+    const pdfUserSub = row.created_by || req.session.user.sub;
+    const user = db.prepare("SELECT name, titel, ort, email, telefon, mobil, unterschrift FROM users WHERE sub=?").get(pdfUserSub) || {};
     const { dayCalcs, totalCosts, activeDays } = req.body;
     const html = buildAngebotHTML(vorgang.event || {}, dayCalcs || [], totalCosts || 0, activeDays || [], stamm, kosten, user);
 
@@ -1727,12 +1735,14 @@ app.post("/api/pdf/mappe/:id", requireAuth, async (req, res) => {
   // pdf-lib nicht mehr noetig - Single-Render
   try {
     const db = require("./db").getDb();
-    const row = db.prepare("SELECT data, bereitschaft_code FROM vorgaenge WHERE id=?").get(req.params.id);
+    const row = db.prepare("SELECT data, bereitschaft_code, created_by FROM vorgaenge WHERE id=?").get(req.params.id);
     if (!row) return res.status(404).json({ error: "Vorgang nicht gefunden" });
     const vorgang = JSON.parse(row.data);
     const bc = row.bereitschaft_code || req.session.user.bereitschaftCode;
     const stamm = db.prepare("SELECT * FROM bereitschaften WHERE code=?").get(bc) || {};
-    const user = db.prepare("SELECT name, titel, ort, email, telefon, mobil, unterschrift FROM users WHERE sub=?").get(req.session.user.sub) || {};
+    // PDF zeigt immer den Ersteller des Vorgangs, nicht den aktuell eingeloggten User
+    const pdfUserSub = row.created_by || req.session.user.sub;
+    const user = db.prepare("SELECT name, titel, ort, email, telefon, mobil, unterschrift FROM users WHERE sub=?").get(pdfUserSub) || {};
     const klauselnAAB = db.prepare("SELECT id, titel, inhalt, reihenfolge FROM klauseln WHERE dokument='aab' ORDER BY reihenfolge").all();
     const { dayCalcs, totalCosts, activeDays } = req.body;
 
