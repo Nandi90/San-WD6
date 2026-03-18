@@ -2446,9 +2446,9 @@ function buildAngebotHTML(ev, dayCalcs, totalCosts, activeDays, stamm, kosten, u
   </style></head><body>
   <div style="font-family:Arial,Helvetica,sans-serif;font-size:10pt;color:#000;padding:0 0 10mm 0">
     <!-- KOPFZEILE: Flex-Layout links Bereitschaft+Adresse, rechts Logo+Kontakt -->
-    <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px">
+    <div style="display:flex;align-items:flex-start;margin-bottom:10px;gap:0">
       <!-- Links: Bereitschaftsname + Absender + Adressfeld -->
-      <div style="flex:1;padding-right:10mm">
+      <div style="width:110mm;flex-shrink:0">
         <div style="font-size:16pt;font-weight:bold;margin-bottom:3px">${berName}</div>
         <div style="font-size:8pt;color:#444;margin-bottom:0">Bayerisches Rotes Kreuz · ${berName}</div>
         <!-- DIN 5008 Leerzeile vor Adressfeld -->
@@ -2462,7 +2462,7 @@ function buildAngebotHTML(ev, dayCalcs, totalCosts, activeDays, stamm, kosten, u
         </div>
       </div>
       <!-- Rechts: Logo + Kontaktblock -->
-      <div style="font-size:9.5pt;line-height:1.6;text-align:left;width:68mm;flex-shrink:0;margin-left:auto">
+      <div style="font-size:9.5pt;line-height:1.6;text-align:left;width:75mm;flex-shrink:0">
         ${logoHtml}
         <div style="font-weight:bold;font-size:11pt">${unterzeichner}</div>
         <div style="font-weight:bold">${unterTitel}</div>
