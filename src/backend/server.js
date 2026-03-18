@@ -2462,7 +2462,7 @@ function buildAngebotHTML(ev, dayCalcs, totalCosts, activeDays, stamm, kosten, u
         </div>
       </div>
       <!-- Rechts: Logo + Kontaktblock -->
-      <div style="font-size:9.5pt;line-height:1.6;text-align:left;width:72mm;flex-shrink:0">
+      <div style="font-size:9.5pt;line-height:1.6;text-align:left;width:68mm;flex-shrink:0;margin-left:auto">
         ${logoHtml}
         <div style="font-weight:bold;font-size:11pt">${unterzeichner}</div>
         <div style="font-weight:bold">${unterTitel}</div>
