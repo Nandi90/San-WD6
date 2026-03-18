@@ -2445,22 +2445,23 @@ function buildAngebotHTML(ev, dayCalcs, totalCosts, activeDays, stamm, kosten, u
     .beauftragung{page-break-inside:avoid;break-inside:avoid}
   </style></head><body>
   <div style="font-family:Arial,Helvetica,sans-serif;font-size:10pt;color:#000;padding:0 0 10mm 0">
-    <!-- KOPFZEILE -->
-    <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:12px">
-      <div>
-        <div style="font-size:16pt;font-weight:bold;margin-bottom:4px">${berName}</div>
-        <div style="font-size:8pt;color:#444">Bayerisches Rotes Kreuz · ${berName}</div>
-        <div style="height:17mm"></div>
-        <div style="font-size:10pt;line-height:1.6">
-          <div style="font-weight:bold">${esc(ev.rechnungsempfaenger||ev.veranstalter||"")}</div>
-          ${ev.ansprechpartner?`<div>${esc(ev.ansprechpartner)}</div>`:""}
-          ${ev.reStrasse?`<div>${esc(ev.reStrasse)}</div>`:""}
-          <div>${esc(ev.rePlzOrt||"")}</div>
-        </div>
+    <!-- KOPFZEILE: DIN 5008 konform, position:relative wrapper -->
+    <div style="position:relative;min-height:55mm;margin-bottom:6px">
+      <!-- Absenderzeile (klein, über Adressfeld) -->
+      <div style="position:absolute;top:0;left:0;font-size:7pt;color:#666;white-space:nowrap;border-bottom:0.5px solid #ccc;padding-bottom:1px;width:85mm">
+        BRK · ${berName}
       </div>
-      <div style="font-size:9.5pt;line-height:1.6;text-align:left;min-width:165px">
+      <!-- Adressfeld: DIN 5008 bei ca. 27mm von Seitenanfang, hier relativ ~12mm von Absender -->
+      <div style="position:absolute;top:12mm;left:0;width:85mm;font-size:10pt;line-height:1.65">
+        <div style="font-weight:bold">${esc(ev.rechnungsempfaenger||ev.veranstalter||"")}</div>
+        ${ev.ansprechpartner?`<div>${esc(ev.ansprechpartner)}</div>`:""}
+        ${ev.reStrasse?`<div>${esc(ev.reStrasse)}</div>`:""}
+        <div>${esc(ev.rePlzOrt||"")}</div>
+      </div>
+      <!-- Absenderblock rechts -->
+      <div style="position:absolute;top:0;right:0;font-size:9.5pt;line-height:1.6;text-align:left;min-width:65mm;max-width:75mm">
         ${logoHtml}
-        <div style="font-weight:bold;font-size:11pt">${unterzeichner}</div>
+        <div style="font-weight:bold;font-size:11pt;margin-top:${logoHtml?"4px":"0"}">${unterzeichner}</div>
         <div style="font-weight:bold">${unterTitel}</div>
         ${unterTelefon?`<div>Tel.: ${unterTelefon}</div>`:""}
         ${stamm.fax?`<div>Fax: ${esc(stamm.fax)}</div>`:""}
