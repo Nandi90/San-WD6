@@ -2453,10 +2453,6 @@ function buildAngebotHTML(ev, dayCalcs, totalCosts, activeDays, stamm, kosten, u
         <div style="font-size:8pt;color:#444;margin-bottom:0">Bayerisches Rotes Kreuz · ${berName}</div>
         <!-- DIN 5008 Leerzeile vor Adressfeld -->
         <div style="height:14mm"></div>
-        <!-- Absenderzeile klein -->
-        <div style="font-size:7pt;color:#666;border-bottom:0.5px solid #ccc;padding-bottom:1px;margin-bottom:3px;white-space:nowrap">
-          BRK · ${berName}
-        </div>
         <!-- Adressfeld -->
         <div style="font-size:10pt;line-height:1.65">
           <div style="font-weight:bold">${esc(ev.rechnungsempfaenger||ev.veranstalter||"")}</div>
@@ -2466,7 +2462,7 @@ function buildAngebotHTML(ev, dayCalcs, totalCosts, activeDays, stamm, kosten, u
         </div>
       </div>
       <!-- Rechts: Logo + Kontaktblock -->
-      <div style="font-size:9.5pt;line-height:1.6;text-align:left;min-width:60mm;max-width:75mm;flex-shrink:0">
+      <div style="font-size:9.5pt;line-height:1.6;text-align:left;width:72mm;flex-shrink:0">
         ${logoHtml}
         <div style="font-weight:bold;font-size:11pt">${unterzeichner}</div>
         <div style="font-weight:bold">${unterTitel}</div>
