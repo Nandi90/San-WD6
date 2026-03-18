@@ -2446,7 +2446,7 @@ function buildAngebotHTML(ev, dayCalcs, totalCosts, activeDays, stamm, kosten, u
   </style></head><body>
   <div style="font-family:Arial,Helvetica,sans-serif;font-size:10pt;color:#000;padding:0 0 10mm 0">
     <!-- KOPFZEILE: position:relative, linker Block normal, rechter Block absolut rechts -->
-    <div style="position:relative;min-height:52mm;margin-bottom:10px">
+    <div style="position:relative;width:100%;min-height:52mm;margin-bottom:10px">
       <!-- Links: Bereitschaftsname + Adressfeld -->
       <div style="width:105mm">
         <div style="font-size:16pt;font-weight:bold;margin-bottom:3px">${berName}</div>
