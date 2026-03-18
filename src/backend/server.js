@@ -357,11 +357,9 @@ app.get("/anfrage", (req, res) => {
   const fertigUrl = stamm.fertig_url || "https://www.kvndsob.brk.de/ehrenamt.html";
   const dsUrl = stamm.datenschutz_url || "https://www.kvndsob.brk.de/footer-menue-deutsch/service/datenschutz-1.html";
   let logoTag = '<svg width="48" height="48" viewBox="0 0 100 100" fill="none"><rect x="35" y="5" width="30" height="90" rx="2" fill="' + ROT + '"/><rect x="5" y="35" width="90" height="30" rx="2" fill="' + ROT + '"/></svg>';
-  if (stamm.logo) {
-    try {
-      const b64 = Buffer.isBuffer(stamm.logo) ? stamm.logo.toString("base64") : Buffer.from(stamm.logo).toString("base64");
-      logoTag = '<img src="data:image/png;base64,' + b64 + '" style="height:56px;width:auto">';
-    } catch(e) {}
+  const _logoB64Ep = getLogoB64(stamm);
+  if (_logoB64Ep) {
+    logoTag = '<img src="data:image/png;base64,' + _logoB64Ep + '" style="height:56px;width:auto">';
   }
   res.send(`<!DOCTYPE html><html lang="de"><head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
@@ -1449,7 +1447,7 @@ function buildVertragHTML(vorgang, stamm, user) {
   const kvAdresse = esc(require('./db').getConfig('kv_adresse') || "");
   const kvPlzOrt = esc(require('./db').getConfig('kv_plz_ort') || "");
 
-  const logoB64 = stamm.logo ? (Buffer.isBuffer(stamm.logo) ? stamm.logo.toString("base64") : Buffer.from(stamm.logo).toString("base64")) : null;
+  const logoB64 = getLogoB64(stamm);
   const logoHtml = logoB64
     ? `<img src="data:image/png;base64,${logoB64}" style="height:36px;width:auto;vertical-align:middle">`
     : `<span style="color:${ROT};font-weight:bold;font-size:18pt;vertical-align:middle">✚</span>`;
@@ -1870,9 +1868,9 @@ function buildEinsatzprotokollHTML(vorgang, stamm, dayIdx) {
 
   // Logo aus bereitschaften.logo (Binary → Base64)
   let logoImg;
-  if (stamm.logo) {
-    const b64 = Buffer.isBuffer(stamm.logo) ? stamm.logo.toString("base64") : Buffer.from(stamm.logo).toString("base64");
-    logoImg = `<img src="data:image/png;base64,${b64}" style="max-width:200px;max-height:90px;object-fit:contain;" />`;
+  const _logoB64V = getLogoB64(stamm);
+  if (_logoB64V) {
+    logoImg = `<img src="data:image/png;base64,${_logoB64V}" style="max-width:200px;max-height:90px;object-fit:contain;" />`;
   } else {
     logoImg = `<div style="font-weight:bold;font-size:16px;text-align:center;">BRK<br/>Bereitschaft</div>`;
   }
@@ -2173,7 +2171,7 @@ function buildGefahrenHTML(ev, activeDays, dayCalcs, stamm) {
   const fDate = s => s ? new Date(s).toLocaleDateString("de-DE") : "";
   const kvName = (require('./db').getConfig('kv_name') || "").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
   const berName = (stamm.name || "").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
-  const logoB64 = stamm.logo ? (Buffer.isBuffer(stamm.logo) ? stamm.logo.toString("base64") : Buffer.from(stamm.logo).toString("base64")) : null;
+  const logoB64 = getLogoB64(stamm);
   const logoHtml = logoB64 ? `<img src="data:image/png;base64,${logoB64}" style="height:40px;width:auto">` : `<span style="color:${ROT};font-size:16pt;font-weight:bold">+</span>`;
 
   const pages = (activeDays||[]).map((day, i) => {
@@ -2259,13 +2257,25 @@ function buildGefahrenHTML(ev, activeDays, dayCalcs, stamm) {
 // ═══════════════════════════════════════════════════════════════════
 // HTML Builder: Deckblatt Angebotsmappe
 // ═══════════════════════════════════════════════════════════════════
+// ── Logo-Hilfsfunktion mit globalem Fallback ────────────────────
+function getLogoB64(stamm) {
+  let logo = stamm.logo;
+  if (!logo) {
+    // Fallback: erstes verfügbares Logo aus beliebiger Bereitschaft
+    const row = require("./db").getDb().prepare("SELECT logo FROM bereitschaften WHERE logo IS NOT NULL LIMIT 1").get();
+    logo = row?.logo || null;
+  }
+  if (!logo) return null;
+  return Buffer.isBuffer(logo) ? logo.toString("base64") : Buffer.from(logo).toString("base64");
+}
+
 function buildDeckblattHTML(ev, activeDays, stamm, user, includeDocs) {
   const esc = s => (s||"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
   const fDate = s => s ? new Date(s).toLocaleDateString("de-DE") : "";
   const ROT = "#c0392b";
   const berName = esc(stamm.name || "");
   const kvName = esc(require('./db').getConfig('kv_name') || "");
-  const logoB64 = stamm.logo ? (Buffer.isBuffer(stamm.logo) ? stamm.logo.toString("base64") : Buffer.from(stamm.logo).toString("base64")) : null;
+  const logoB64 = getLogoB64(stamm);
   const logoHtml = logoB64
     ? `<img src="data:image/png;base64,${logoB64}" style="height:90px;width:auto;display:block;margin:0 auto 12px">`
     : `<div style="font-size:48pt;color:${ROT};text-align:center;margin-bottom:12px">&#10010;</div>`;
@@ -2357,7 +2367,7 @@ function buildAngebotHTML(ev, dayCalcs, totalCosts, activeDays, stamm, kosten, u
   const ortName = esc(user?.ort || (stamm.name||"").replace(/^Bereitschaft\s*/i,"").trim() || "");
   const berName = esc(stamm.name || "");
 
-  const logoB64 = stamm.logo ? (Buffer.isBuffer(stamm.logo) ? stamm.logo.toString("base64") : Buffer.from(stamm.logo).toString("base64")) : null;
+  const logoB64 = getLogoB64(stamm);
   const logoHtml = logoB64 ? `<img src="data:image/png;base64,${logoB64}" style="height:55px;width:auto;display:block;margin-bottom:4px">` : "";
 
   const tKtw = dayCalcs.reduce((s,d)=>s+(d.kc||0),0);
@@ -2534,7 +2544,7 @@ function buildAABHTML(stamm, bereitschaftCode, klauseln, auftragsnr) {
   const ROT = "#c0392b";
   const esc = s => (s||"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
   const kvName = esc(require('./db').getConfig('kv_name') || "");
-  const logoB64 = stamm.logo ? (Buffer.isBuffer(stamm.logo) ? stamm.logo.toString("base64") : Buffer.from(stamm.logo).toString("base64")) : null;
+  const logoB64 = getLogoB64(stamm);
   const logoHtml = logoB64 ? `<img src="data:image/png;base64,${logoB64}" style="height:28px;width:auto">` : `<span style="color:${ROT};font-weight:bold">✚</span>`;
 
   const sektionen = klauseln.map(k => {
