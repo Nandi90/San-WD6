@@ -2654,7 +2654,14 @@ function FeedbackButton({user,currentView,toast}){
 // ═══════════════════════════════════════════════════════════════════════════
 const TABS=[{id:"events",label:"Vorgänge",icon:"📁"},{id:"event",label:"Veranstaltung",icon:"📋"},{id:"days",label:"Tage & Analyse",icon:"📊"},{id:"costs",label:"Kosten",icon:"💰"},{id:"pdf",label:"Dokumente",icon:"🖨️"},{id:"kunden",label:"Kunden",icon:"👥"},{id:"anfragen",label:"Anfragen",icon:"📩"},{id:"statistik",label:"Statistik",icon:"📈"},{id:"profil",label:"Mein Profil",icon:"👤"},{id:"einstellungen",label:"Einstellungen",icon:"⚙️",admin:true},{id:"releases",label:"Changelog",icon:"🆕"}];
 const APP_VERSION="v7.6";
-const LATEST_RELEASE={v:"v7.6",d:"04.03.2026",c:[
+const LATEST_RELEASE={v:"v7.7",d:"18.03.2026",c:[
+"PDF: Ersteller des Vorgangs wird in allen Dokumenten angezeigt – nicht der aktuell eingeloggte Benutzer",
+"PDF: Logo-Fallback global – fehlt das Bereitschafts-Logo wird das KV-Logo aus den Einstellungen verwendet",
+"Logo: Wird jetzt global in app_config gespeichert und gilt für alle Bereitschaften",
+"Angebot: Inaktive Tage werden nicht mehr im Angebot angezeigt (auch bei 1-Tages-Veranstaltungen korrekt)",
+"Angebotsmappe: Alle Fehler bei Bereitschaften ohne eigenes Logo behoben",
+]};
+const RELEASE_V76={v:"v7.6",d:"04.03.2026",c:[
 "FiBu: Weiterleitung per E-Mail mit Angebots-PDF als Anhang",
 "FiBu: Abfrage Helfer/Fahrzeuge anderer Bereitschaften (BC, Anzahl, Kennzeichen)",
 "FiBu: Freitext-Feld für externe Helfer (THW, ASB etc.) ohne Benachrichtigung",
@@ -3287,6 +3294,7 @@ export default function App(){
             </div>
             {[
               LATEST_RELEASE,
+              RELEASE_V76,
               RELEASE_V75,
               RELEASE_V74,
               RELEASE_V73,
