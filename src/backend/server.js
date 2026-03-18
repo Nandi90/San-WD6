@@ -2444,7 +2444,7 @@ function buildAngebotHTML(ev, dayCalcs, totalCosts, activeDays, stamm, kosten, u
     }
     .beauftragung{page-break-inside:avoid;break-inside:avoid}
   </style></head><body>
-  <div style="font-family:Arial,Helvetica,sans-serif;font-size:10pt;color:#000;padding:0 0 10mm 0">
+  <div style="font-family:Arial,Helvetica,sans-serif;font-size:10pt;color:#000;padding:3mm 0 10mm 0">
     <!-- KOPFZEILE: DIN 5008 konform, position:relative wrapper -->
     <div style="position:relative;min-height:55mm;margin-bottom:6px">
       <!-- Absenderzeile (klein, über Adressfeld) -->
