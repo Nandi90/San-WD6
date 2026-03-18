@@ -103,16 +103,25 @@ router.put("/kostensaetze", requireAdmin, (req, res) => {
 });
 
 // ── Logo Upload ──────────────────────────────────────────────────
+// Logo wird global in app_config gespeichert (gilt für alle Bereitschaften)
 router.post("/logo", requireAdmin, upload.single("logo"), (req, res) => {
   if (!req.file) return res.status(400).json({ error: "Keine Datei" });
+  // Global in app_config als Base64
+  const b64 = req.file.buffer.toString("base64");
+  const mime = req.file.mimetype || "image/png";
+  setConfig("kv_logo", b64);
+  setConfig("kv_logo_mime", mime);
+  // Zusätzlich in eigener Bereitschaft für Rückwärtskompatibilität
   const bc = getBereitschaftCode(req);
   getDb().prepare("UPDATE bereitschaften SET logo = ?, updated_at = datetime('now') WHERE code = ?")
     .run(req.file.buffer, bc);
-  audit(req.session.user, "upload", "logo", bc);
+  audit(req.session.user, "upload", "logo", "global");
   res.json({ success: true, logo: `/api/stammdaten/logo` });
 });
 
 router.delete("/logo", requireAdmin, (req, res) => {
+  setConfig("kv_logo", "");
+  setConfig("kv_logo_mime", "");
   const bc = getBereitschaftCode(req);
   getDb().prepare("UPDATE bereitschaften SET logo = NULL, updated_at = datetime('now') WHERE code = ?").run(bc);
   res.json({ success: true });
@@ -134,6 +143,16 @@ router.put("/bereitschaftsleiter", requireBL, (req, res) => {
 });
 
 router.get("/logo", (req, res) => {
+  // Zuerst globales KV-Logo aus app_config
+  const kvLogoB64 = getConfig("kv_logo");
+  if (kvLogoB64) {
+    const mime = getConfig("kv_logo_mime") || "image/png";
+    const buf = Buffer.from(kvLogoB64, "base64");
+    res.set("Content-Type", mime);
+    res.set("Cache-Control", "private, max-age=3600");
+    return res.send(buf);
+  }
+  // Fallback: bereitschafts-eigenes Logo
   const bc = getBereitschaftCode(req);
   const row = getDb().prepare("SELECT logo FROM bereitschaften WHERE code = ?").get(bc);
   if (!row || !row.logo) return res.status(404).send("Kein Logo vorhanden");

@@ -2258,13 +2258,13 @@ function buildGefahrenHTML(ev, activeDays, dayCalcs, stamm) {
 // HTML Builder: Deckblatt Angebotsmappe
 // ═══════════════════════════════════════════════════════════════════
 // ── Logo-Hilfsfunktion mit globalem Fallback ────────────────────
+// Priorität: 1. app_config kv_logo (global), 2. stamm.logo (BC-spezifisch)
 function getLogoB64(stamm) {
-  let logo = stamm.logo;
-  if (!logo) {
-    // Fallback: erstes verfügbares Logo aus beliebiger Bereitschaft
-    const row = require("./db").getDb().prepare("SELECT logo FROM bereitschaften WHERE logo IS NOT NULL LIMIT 1").get();
-    logo = row?.logo || null;
-  }
+  // 1. Globales KV-Logo aus app_config
+  const kvLogoB64 = require("./db").getConfig("kv_logo");
+  if (kvLogoB64) return kvLogoB64;
+  // 2. Bereitschafts-eigenes Logo
+  const logo = stamm.logo;
   if (!logo) return null;
   return Buffer.isBuffer(logo) ? logo.toString("base64") : Buffer.from(logo).toString("base64");
 }
