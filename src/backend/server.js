@@ -14,7 +14,7 @@ const rateLimit = require("express-rate-limit");
 
 const db = require("./db");
 const authRouter = require("./middleware/auth");
-const { requireAuth } = require("./middleware/rbac");
+const { requireAuth, requireAdmin } = require("./middleware/rbac");
 const vorgaengeRouter = require("./routes/vorgaenge");
 const kundenRouter = require("./routes/kunden");
 const stammdatenRouter = require("./routes/stammdaten");
@@ -671,8 +671,7 @@ app.get("/api/anfragen/count", (req, res) => {
   } catch { res.json({ neu: 0 }); }
 });
 
-app.put("/api/anfragen/:id/status", (req, res) => {
-  if (!req.session?.user) return res.status(401).json({ error: "Nicht authentifiziert" });
+app.put("/api/anfragen/:id/status", requireAuth, requireAdmin, (req, res) => {
   try {
     const { status, grund } = req.body;
     if (status === "abgelehnt" && grund) {
@@ -685,8 +684,7 @@ app.put("/api/anfragen/:id/status", (req, res) => {
 });
 
 // Anfrage annehmen → Vorgang erstellen
-app.post("/api/anfragen/:id/annehmen", async (req, res) => {
-  if (!req.session?.user) return res.status(401).json({ error: "Nicht authentifiziert" });
+app.post("/api/anfragen/:id/annehmen", requireAuth, requireAdmin, async (req, res) => {
   try {
     const anfrage = db.getDb().prepare("SELECT * FROM anfragen WHERE id=?").get(req.params.id);
     if (!anfrage) return res.status(404).json({ error: "Anfrage nicht gefunden" });
@@ -812,7 +810,7 @@ app.post("/api/anfragen/:id/annehmen", async (req, res) => {
 });
 
 // Anfrage umzuweisen (Bereitschaft ändern)
-app.post("/api/anfragen/:id/umzuweisen", requireAuth, (req, res) => {
+app.post("/api/anfragen/:id/umzuweisen", requireAuth, requireAdmin, (req, res) => {
   try {
     const anfrage = db.getDb().prepare("SELECT * FROM anfragen WHERE id=?").get(req.params.id);
     if (!anfrage) return res.status(404).json({ error: "Anfrage nicht gefunden" });
@@ -836,10 +834,10 @@ app.post("/api/anfragen/:id/umzuweisen", requireAuth, (req, res) => {
   }
 });
 
-app.delete("/api/anfragen/:id", (req, res) => {
-  if (!req.session?.user) return res.status(401).json({ error: "Nicht authentifiziert" });
+app.delete("/api/anfragen/:id", requireAuth, requireAdmin, (req, res) => {
   try {
-    db.getDb().prepare("DELETE FROM anfragen WHERE id=?").run(req.params.id);
+    db.getDb().prepare("UPDATE anfragen SET deleted_at=datetime('now') WHERE id=?").run(req.params.id);
+    db.audit(req.session.user, "delete", "anfrage", req.params.id, "Anfrage gelöscht");
     res.json({ success: true });
   } catch (e) { res.status(500).json({ error: "Serverfehler" }); }
 });
