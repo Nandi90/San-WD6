@@ -60,7 +60,10 @@ const BrowserPool = (() => {
     const page = await browser.newPage();
     try {
       await page.setViewport({ width: 1240, height: 1754, deviceScaleFactor: 2 });
-      await page.setContent(html, { waitUntil: "networkidle0" });
+      // domcontentloaded statt networkidle0: Das HTML enthaelt ausschliesslich
+      // inline CSS und Base64-Logos, keine externen Ressourcen. networkidle0
+      // wuerde unnoetig auf Favicon-Requests warten und nach 30s timeouten.
+      await page.setContent(html, { waitUntil: "domcontentloaded", timeout: 15000 });
       const pdf = await page.pdf({
         format: "A4",
         margin: { top: opts.marginTop || "15mm", right: "12mm", bottom: "20mm", left: opts.marginLeft || "12mm" },
@@ -1406,7 +1409,7 @@ app.post("/api/pdf/vertrag/:id", requireAuth, async (req, res) => {
     const browser = await BrowserPool.get();
     const page = await browser.newPage();
     await page.setViewport({ width: 1240, height: 1754, deviceScaleFactor: 2 });
-    await page.setContent(html, { waitUntil: "networkidle0" });
+    await page.setContent(html, { waitUntil: "domcontentloaded", timeout: 15000 });
     const pdf = await page.pdf({
       format: "A4",
       margin: { top: "15mm", right: "12mm", bottom: "20mm", left: "12mm" },
