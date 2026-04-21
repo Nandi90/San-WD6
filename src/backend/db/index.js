@@ -144,7 +144,7 @@ function migrate() {
       kv_adresse TEXT DEFAULT 'Karl Konrad Str. 3',
       kv_plz_ort TEXT DEFAULT '86633 Neuburg',
       leiter_name TEXT DEFAULT '',
-      leiter_title TEXT DEFAULT 'Bereitschaftsleiter',
+      leiter_title TEXT DEFAULT 'Bereitschaftsleitung',
       telefon TEXT DEFAULT '',
       fax TEXT DEFAULT '',
       mobil TEXT DEFAULT '',

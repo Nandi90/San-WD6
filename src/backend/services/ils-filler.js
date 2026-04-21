@@ -179,7 +179,7 @@ async function fillILS(vorgang, bereitschaft, user) {
   const data = {
     organisation: "BRK " + (bereitschaft.name || ""),
     absender_name: user?.name || bereitschaft.leiter_name || "",
-    absender_funktion: user?.titel || bereitschaft.leiter_title || "Bereitschaftsleiter",
+    absender_funktion: user?.titel || "Bereitschaftsleitung",
     absender_telefon: (() => {
       const candidates = [user?.mobil, user?.telefon, bereitschaft.mobil, bereitschaft.telefon];
       return candidates.find(v => v && v.trim() && v.trim() !== "-") || "";

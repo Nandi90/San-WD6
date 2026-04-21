@@ -1439,7 +1439,7 @@ function buildVertragHTML(vorgang, stamm, user) {
   const ort = esc(user.ort || "");
   const today = new Date().toLocaleDateString("de-DE");
   const unterzeichner = esc(user.name || stamm.leiter_name || "");
-  const titel = esc(user.titel || stamm.leiter_title || "Bereitschaftsleiter");
+  const titel = esc(user.titel || "Bereitschaftsleitung");
   const kvName = esc(require('./db').getConfig('kv_name') || "");
   const kgf = esc(require('./db').getConfig('kgf') || "");
   const kvAdresse = esc(require('./db').getConfig('kv_adresse') || "");
@@ -2357,7 +2357,7 @@ function buildAngebotHTML(ev, dayCalcs, totalCosts, activeDays, stamm, kosten, u
   const num = v => (v !== null && v !== undefined && v > 0) ? String(v) : "";
 
   const unterzeichner = esc(user?.name || stamm.leiter_name || "");
-  const unterTitel = esc(user?.titel || stamm.leiter_title || "Bereitschaftsleiter");
+  const unterTitel = esc(user?.titel || "Bereitschaftsleitung");
   const unterTelefon = esc(user?.telefon || stamm.telefon || "");
   const unterMobil = esc(user?.mobil || stamm.mobil || "");
   const unterEmail = esc(user?.email || stamm.email || "");

@@ -23,7 +23,7 @@ const BRKLogo=({size=48,full,customLogo})=>{const imgStyle={height:size,width:"a
 // DATA
 // ═══════════════════════════════════════════════════════════════════════════
 const BEREITSCHAFTEN=[{code:"KBL",name:"Kreisbereitschaftsleitung",short:"KBL"},{code:"BSOB",name:"Bereitschaft Schrobenhausen",short:"SOB"},{code:"BND",name:"Bereitschaft Neuburg",short:"ND"},{code:"BKAHU",name:"Bereitschaft Karlshuld",short:"KAHU"},{code:"BKK",name:"Bereitschaft Karlskron",short:"KK"},{code:"BBGH",name:"Bereitschaft Burgheim",short:"BGH"},{code:"BWEIG",name:"Bereitschaft Weichering",short:"WEIG"}];
-const DEFAULT_STAMMDATEN={kvName:"",kgf:"",kvAdresse:"",kvPlzOrt:"",bereitschaftIdx:0,bereitschaftsleiterTitle:"Bereitschaftsleiter",bereitschaftsleiter:"",telefon:"",fax:"",mobil:"",email:"",funkgruppe:"",customLogo:null,rates:{helfer:14,ktw:125,rtw:155,aerzte:0,gktw:105,einsatzleiter:14,einsatzleiterKfz:155,mobileSanstation:115,segLkw:125,mtw:50,zelt:60,kmKtw:0.4,kmRtw:0.4,kmGktw:0.4,kmElKfz:0.6,kmSegLkw:0.6,kmMtw:0.4,verpflegung:17}};
+const DEFAULT_STAMMDATEN={kvName:"",kgf:"",kvAdresse:"",kvPlzOrt:"",bereitschaftIdx:0,bereitschaftsleiterTitle:"Bereitschaftsleitung",bereitschaftsleiter:"",telefon:"",fax:"",mobil:"",email:"",funkgruppe:"",customLogo:null,rates:{helfer:14,ktw:125,rtw:155,aerzte:0,gktw:105,einsatzleiter:14,einsatzleiterKfz:155,mobileSanstation:115,segLkw:125,mtw:50,zelt:60,kmKtw:0.4,kmRtw:0.4,kmGktw:0.4,kmElKfz:0.6,kmSegLkw:0.6,kmMtw:0.4,verpflegung:17}};
 const EVENT_TYPES=[{id:1,name:"Kurkonzert",factor:0.1},{id:2,name:"Reitsportveranstaltung",factor:0.1},{id:3,name:"Klassikkonzert, Oper, Operette",factor:0.2},{id:4,name:"Schauspiel, Theater",factor:0.2},{id:5,name:"Show",factor:0.2},{id:6,name:"Allg. Sportveranstaltung",factor:0.3},{id:7,name:"Ausstellung, Basar, Flohmarkt",factor:0.3},{id:8,name:"Langlauf, Radrennen",factor:0.3},{id:9,name:"Messe, Martinszug",factor:0.3},{id:10,name:"Kombi Sport-Musik-Show",factor:0.35},{id:11,name:"Volksfest, Straßenfest",factor:0.4},{id:12,name:"Feuerwerk",factor:0.4},{id:13,name:"Schützenfest, Festzug",factor:0.5},{id:14,name:"Festzug mit Pferdewagen",factor:0.7},{id:15,name:"Musikveranstaltung",factor:0.5},{id:16,name:"Kundgebung",factor:0.5},{id:17,name:"Triathlon, Crosslauf",factor:0.6},{id:18,name:"Faschingsveranstaltung",factor:0.7},{id:19,name:"Wintersport Ski/Snowboard",factor:0.8},{id:20,name:"Wintersport Rodel/Bob",factor:0.8},{id:21,name:"Motorsportveranstaltung",factor:0.8},{id:22,name:"Demonstration",factor:0.8},{id:23,name:"Flugveranstaltung",factor:0.9},{id:24,name:"Rock-/Popkonzert",factor:1.0},{id:25,name:"Individueller Faktor",factor:0}];
 const PERSONNEL_TABLE=[{min:0,max:2,h:2,k:0},{min:2,max:4,h:3,k:0},{min:4,max:13,h:5,k:1},{min:13,max:25,h:10,k:2},{min:25,max:40,h:20,k:3},{min:40,max:60,h:30,k:4},{min:60,max:80,h:40,k:5},{min:80,max:100,h:80,k:6},{min:100,max:120,h:120,k:8},{min:120,max:9999,h:140,k:10}];
 const RTW_T=[{min:0,max:6,v:0},{min:6,max:25.5,v:1},{min:25.5,max:45.5,v:2},{min:45.5,max:60.5,v:3},{min:60.5,max:75.5,v:4},{min:75.5,max:100,v:5},{min:100,max:120,v:6},{min:120,max:9999,v:8}];
@@ -1755,7 +1755,7 @@ function ILSPreview({event,days,stammdaten,user,updateEvent,currentEventId,saveE
   const firstDay=activeDays[0]||{};
   const lastDay=activeDays[activeDays.length-1]||firstDay;
   const fields=[
-    {section:"Absendende Person",items:[{label:"Organisation",value:`BRK ${bereitschaft.name}`},{label:"Name",value:user?.name||stammdaten.bereitschaftsleiter},{label:"Funktion",value:stammdaten.bereitschaftsleiterTitle||"Bereitschaftsleiter"},{label:"Rückrufnummer",value:stammdaten.mobil}]},
+    {section:"Absendende Person",items:[{label:"Organisation",value:`BRK ${bereitschaft.name}`},{label:"Name",value:user?.name||stammdaten.bereitschaftsleiter},{label:"Funktion",value:user?.titel||"Bereitschaftsleitung"},{label:"Rückrufnummer",value:stammdaten.mobil}]},
     {section:"Örtlichkeit",items:[{label:"Straße",value:event.adresse||""},{label:"Objekt",value:event.ort||""},{label:"PLZ / Ort",value:event.rePlzOrt||event.ort||""}]},
     {section:"Allgemeine Informationen",items:[{label:"Name Veranstaltung",value:event.name||""}]},
   ];
@@ -2088,7 +2088,7 @@ function AngebotPDF({event,dayCalcs,totalCosts,stammdaten,activeDays,bereitschaf
   const unterTelefon=user?.telefon||stammdaten.telefon;
   const unterMobil=user?.mobil||stammdaten.mobil;
   const unterEmail=user?.email||stammdaten.email;
-  const unterTitel=user?.titel||stammdaten.bereitschaftsleiterTitle||"Bereitschaftsleiter";
+  const unterTitel=user?.titel||"Bereitschaftsleitung";
   const unterZeichen=(user?.name||stammdaten.bereitschaftsleiter||"").split(" ").map(w=>w[0]).join("")||"BL";
   const isPauschal=!!event.pauschalAktiv||(event.pauschalangebot&&event.pauschalangebot>0);
   const endPreis=isPauschal?parseFloat(event.pauschalangebot||0):totalCosts;
@@ -2284,7 +2284,7 @@ function AngebotPDF({event,dayCalcs,totalCosts,stammdaten,activeDays,bereitschaf
 function VertragPDF({event,dayCalcs,totalCosts,stammdaten,activeDays,bereitschaft,user}){
   const vOrt=user?.ort||bereitschaft.name.replace(/^Bereitschaft\s*/i,"").trim()||"Schrobenhausen";
   const vUnterzeichner=user?.name||stammdaten.bereitschaftsleiter;
-  const vTitel=user?.titel||stammdaten.bereitschaftsleiterTitle||"Bereitschaftsleiter";
+  const vTitel=user?.titel||"Bereitschaftsleitung";
   return(<div className="pdf-page" style={{fontFamily:"Arial,sans-serif",fontSize:"9.5pt",color:"#000",background:"#fff",padding:"12mm 12mm",lineHeight:1.5}}>
     <div style={{display:"flex",justifyContent:"space-between",marginBottom:6}}>
       <div style={{fontSize:"8pt",color:"#666"}}>{stammdaten.customLogo?<img src={stammdaten.customLogo} alt="Logo" style={{height:32,width:"auto"}}/>:<span style={{color:C.rot,fontWeight:"bold",fontSize:"10pt"}}>✚</span>} {stammdaten.kvName}</div>
