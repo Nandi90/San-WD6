@@ -191,10 +191,31 @@ router.get("/:year/:id", (req, res) => {
 // ── Erstellen / Aktualisieren ───────────────────────────────────
 router.put("/:id", requireWriteAccess, (req, res) => {
   const isAdmin = req.session.user.rolle === "admin";
-  // Admin: BC aus Vorgang-Payload (Bereitschaft die im Auftrag gewaehlt ist)
-  // BL: immer eigene Bereitschaft
-  const bc = (isAdmin && req.body.bereitschaftCode) ? req.body.bereitschaftCode : getBereitschaftCode(req);
+  const isKbl = req.session.user.rolle === "kbl";
+  const canReassign = isAdmin || isKbl;
   const { id } = req.params;
+
+  // Bestehenden bereitschaft_code lesen, um Umzuweisungen zu erkennen
+  const existingRow = getDb().prepare("SELECT bereitschaft_code FROM vorgaenge WHERE id = ?").get(id);
+  const currentBc = existingRow ? existingRow.bereitschaft_code : null;
+
+  // bc bestimmen:
+  //  - Admin/KBL dürfen die Bereitschaft per bereitschaftCode-Payload ändern (Umzuweisung)
+  //  - Normale Nutzer (Helfer/BL): eigene Session-Bereitschaft
+  //  - Bei UPDATE ohne Umzuweisung: alte Bereitschaft beibehalten
+  const requestedBc = (canReassign && req.body.bereitschaftCode) ? req.body.bereitschaftCode : null;
+  let bc;
+  if (!existingRow) {
+    // Neuer Vorgang
+    bc = requestedBc || getBereitschaftCode(req);
+  } else if (requestedBc && requestedBc !== currentBc) {
+    // Admin/KBL weist explizit einer anderen Bereitschaft zu
+    bc = requestedBc;
+  } else {
+    // Normaler Update-Fall: Bereitschaft unverändert lassen
+    bc = currentBc;
+  }
+
   const lock = getActiveLock(id, req.session.user.sub);
   if (isVersendet(id)) {
     const newData = typeof req.body === "string" ? JSON.parse(req.body) : req.body;
@@ -214,7 +235,11 @@ router.put("/:id", requireWriteAccess, (req, res) => {
   // Alten Stand lesen für Diff
   let _oldData = null;
   try { const _r = getDb().prepare("SELECT data FROM vorgaenge WHERE id = ?").get(id); if(_r) _oldData = JSON.parse(_r.data); } catch {}
-  getDb().prepare("INSERT INTO vorgaenge (id, bereitschaft_code, year, data, created_by) VALUES (?, ?, ?, ?, ?) ON CONFLICT(id) DO UPDATE SET data = ?, updated_at = datetime('now')").run(id, bc, year, json, req.session.user.sub, json);
+  getDb().prepare("INSERT INTO vorgaenge (id, bereitschaft_code, year, data, created_by) VALUES (?, ?, ?, ?, ?) ON CONFLICT(id) DO UPDATE SET bereitschaft_code = excluded.bereitschaft_code, data = excluded.data, updated_at = datetime('now')").run(id, bc, year, json, req.session.user.sub);
+  // Umzuweisung loggen (wenn Admin/KBL die Bereitschaft geändert hat)
+  if (existingRow && currentBc && bc !== currentBc) {
+    audit(req.session.user, "vorgang_umzugewiesen", "vorgang", id, `Bereitschaft: ${currentBc} → ${bc}`);
+  }
   // Checklist-Diff + Feld-Diff
   if (_oldData) {
     try {
