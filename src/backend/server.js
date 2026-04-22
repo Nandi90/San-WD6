@@ -2406,14 +2406,15 @@ function buildAngebotHTML(ev, dayCalcs, totalCosts, activeDays, stamm, kosten, u
       const c = dayCalcs[i];
       if (!c || !c.hfc || c.hfc <= 0) return null;
       const sameDate = activeDays.filter(dd=>dd.date===d.date).length > 1;
-      const label = sameDate ? `${fDate(d.date)} ${d.startTime||""}-${d.endTime||""} Uhr` : fDate(d.date);
+      const shortT = t => (t && t.endsWith(":00")) ? t.slice(0,-3) : (t||"");
+      const label = sameDate ? `${fDate(d.date)} ${shortT(d.startTime)}-${shortT(d.endTime)} Uhr` : fDate(d.date);
       return { pos:"Einsatzkräfte "+label, anz:null, pers:c.hfc, hrs:c.h, rate:rates.helfer, summe:c.cH };
     }),
     ev.verpflegung===false && dayCalcs.reduce((s,d)=>s+(d.cV||0),0)>0 && { pos:"Verpflegungspauschale", anz:null, pers:tTP, hrs:null, rate:rates.verpflegung, summe:dayCalcs.reduce((s,d)=>s+(d.cV||0),0) },
   ].filter(Boolean);
 
   const TH = 'border:1px solid #000;padding:3px 6px;font-size:9pt;font-weight:bold;background:#c8c8c8;text-align:center;white-space:nowrap';
-  const TD = 'border:1px solid #000;padding:3px 6px;font-size:9pt;vertical-align:middle';
+  const TD = 'border:1px solid #000;padding:3px 6px;font-size:9pt;vertical-align:middle;line-height:1.3';
   const TDR = TD+';text-align:right';
   const TDC = TD+';text-align:center';
 
@@ -2428,7 +2429,7 @@ function buildAngebotHTML(ev, dayCalcs, totalCosts, activeDays, stamm, kosten, u
 
   const fzRowsHTML = fzRows.map(row =>
     `<tr>
-      <td style="${TD};font-weight:${row.isBold?"bold":"normal"}">${esc(row.pos)}</td>
+      <td style="${TD};font-weight:${row.isBold?"bold":"normal"};white-space:nowrap">${esc(row.pos)}</td>
       <td style="${TDC}">${num(row.anz)}</td>
       <td style="${TDC}">${num(row.pers)}</td>
       <td style="${TDC}">${num(row.km)}</td>

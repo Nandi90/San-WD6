@@ -2125,11 +2125,11 @@ function AngebotPDF({event,dayCalcs,totalCosts,stammdaten,activeDays,bereitschaf
     // Einsatzkräfte pro Tag aufgegliedert: Personen × Stunden × Rate ergibt die Zeilen-Summe.
     // hfc = helfer + kc*2 + rc*2 + gc*2  (Fahrzeugbesatzung zählt als Einsatzkraft zusätzlich zur Fahrzeugpauschale)
     // Bei mehreren Abschnitten am gleichen Datum wird die Uhrzeit im Label mit angezeigt, damit die Zeilen unterscheidbar sind.
-    ...activeDays.map((d,i)=>{const c=dayCalcs[i];if(!c||!c.hfc||c.hfc<=0)return null;const sameDate=activeDays.filter(dd=>dd.date===d.date).length>1;const label=sameDate?`${fDate2(d.date)} ${d.startTime}-${d.endTime} Uhr`:fDate2(d.date);return{pos:"Einsatzkräfte "+label,anz:null,pers:c.hfc,km:null,hrs:c.h,rate:rates.helfer,summe:c.cH};}),
+    ...activeDays.map((d,i)=>{const c=dayCalcs[i];if(!c||!c.hfc||c.hfc<=0)return null;const sameDate=activeDays.filter(dd=>dd.date===d.date).length>1;const shortT=t=>t&&t.endsWith(":00")?t.slice(0,-3):(t||"");const label=sameDate?`${fDate2(d.date)} ${shortT(d.startTime)}-${shortT(d.endTime)} Uhr`:fDate2(d.date);return{pos:"Einsatzkräfte "+label,anz:null,pers:c.hfc,km:null,hrs:c.h,rate:rates.helfer,summe:c.cH};}),
     !event.verpflegung&&dayCalcs.reduce((s,d)=>s+(d.cV||0),0)>0&&{pos:"Verpflegungspauschale",anz:null,pers:tTP,km:null,hrs:null,rate:rates.verpflegung,summe:dayCalcs.reduce((s,d)=>s+(d.cV||0),0)},
   ].filter(Boolean);
   const TH={border:"1px solid #000",padding:"3px 6px",fontSize:"9pt",fontWeight:"bold",background:"#c8c8c8",textAlign:"center",whiteSpace:"nowrap"};
-  const TD={border:"1px solid #000",padding:"3px 6px",fontSize:"9pt",verticalAlign:"middle"};
+  const TD={border:"1px solid #000",padding:"3px 6px",fontSize:"9pt",verticalAlign:"middle",lineHeight:1.3};
   const TDR={...TD,textAlign:"right"};
   const TDC={...TD,textAlign:"center"};
   return(
@@ -2210,7 +2210,7 @@ function AngebotPDF({event,dayCalcs,totalCosts,stammdaten,activeDays,bereitschaf
         <tbody>
           {fzRows.map((row,i)=>(
             <tr key={i}>
-              <td style={{...TD,fontWeight:row.isBold?"bold":"normal"}}>{row.pos}</td>
+              <td style={{...TD,fontWeight:row.isBold?"bold":"normal",whiteSpace:"nowrap"}}>{row.pos}</td>
               <td style={TDC}>{num(row.anz)}</td>
               <td style={TDC}>{num(row.pers)}</td>
               <td style={TDC}>{num(row.km)}</td>
