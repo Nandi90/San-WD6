@@ -2659,8 +2659,19 @@ function FeedbackButton({user,currentView,toast}){
 // MAIN APP
 // ═══════════════════════════════════════════════════════════════════════════
 const TABS=[{id:"events",label:"Vorgänge",icon:"📁"},{id:"event",label:"Veranstaltung",icon:"📋"},{id:"days",label:"Tage & Analyse",icon:"📊"},{id:"costs",label:"Kosten",icon:"💰"},{id:"pdf",label:"Dokumente",icon:"🖨️"},{id:"kunden",label:"Kunden",icon:"👥"},{id:"anfragen",label:"Anfragen",icon:"📩"},{id:"statistik",label:"Statistik",icon:"📈"},{id:"profil",label:"Mein Profil",icon:"👤"},{id:"einstellungen",label:"Einstellungen",icon:"⚙️",admin:true},{id:"releases",label:"Changelog",icon:"🆕"}];
-const APP_VERSION="v7.6";
-const LATEST_RELEASE={v:"v7.7",d:"18.03.2026",c:[
+const APP_VERSION="v7.8";
+const LATEST_RELEASE={v:"v7.8",d:"22.04.2026",c:[
+"Angebot: Einsatzkräfte jetzt pro Tag aufgegliedert – Personen × Stunden × Rate ergibt pro Zeile sichtbar die angezeigte Summe (vorher Anzeige-Inkonsistenz bei mehrtägigen Events)",
+"Angebot: Frontend-Preview und serverseitig generiertes PDF nutzen identische Tabellenstruktur – 7 Spalten inkl. 'a' Euro' mit Fahrzeug-Raten (KTW, MTW, etc.) neben der Summe",
+"Angebot: Labels bei mehreren Abschnitten am gleichen Datum werden um die Uhrzeit ergänzt (z.B. 'Einsatzkräfte 12.9.2027 10-18 Uhr')",
+"Angebot: Einheitliche Zeilenhöhen – kompakte Zeit-Darstellung ('10-18 Uhr' statt '10:00-18:00 Uhr'), nowrap + line-height in der Tabelle",
+"Tage & Analyse: Dynamische Tag-Liste statt 8 vorgefertigter Tabs – neuer Vorgang startet mit einem Tag, Button '+ Tag/Zeitraum hinzufügen' legt weitere nach Bedarf an",
+"Tage & Analyse: Neuer Button '↔ Aufteilen' teilt einen Tag in zwei Zeitabschnitte – z.B. nachmittags weniger Personal als abends/nachts, alle Overrides werden auf beide Hälften kopiert",
+"Tage & Analyse: Bei mehreren Abschnitten gleichen Datums wird die Uhrzeit im Tab-Label ergänzt (z.B. '26.4. 10-16' / '26.4. 16-22')",
+"Tage & Analyse: Altbestand mit inaktiven Tages-Slots wird beim Laden bereinigt – Zahlen bleiben identisch, nur Datenstruktur wird beim nächsten Speichern schlanker",
+"Dokumente: Briefsymbol zum Versenden des Angebots ist nun auch für Stellvertretungs-BL und andere Nicht-Admin-Rollen sichtbar – SMTP-Status-Check war fälschlich admin-only",
+]};
+const RELEASE_V77={v:"v7.7",d:"18.03.2026",c:[
 "PDF: Ersteller des Vorgangs wird in allen Dokumenten angezeigt – nicht der aktuell eingeloggte Benutzer",
 "PDF: Logo-Fallback global – fehlt das Bereitschafts-Logo wird das KV-Logo aus den Einstellungen verwendet",
 "Logo: Wird jetzt global in app_config gespeichert und gilt für alle Bereitschaften",
@@ -3321,6 +3332,7 @@ export default function App(){
             </div>
             {[
               LATEST_RELEASE,
+              RELEASE_V77,
               RELEASE_V76,
               RELEASE_V75,
               RELEASE_V74,
