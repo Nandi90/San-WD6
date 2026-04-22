@@ -2397,10 +2397,13 @@ function buildAngebotHTML(ev, dayCalcs, totalCosts, activeDays, stamm, kosten, u
     tMtw>0 && { pos:"MTW", anz:tMtw, pers:null, hrs:null, rate:rates.mtw, summe:dayCalcs.reduce((s,d)=>s+(d.cM||0),0) },
     // Einsatzkräfte pro Tag aufgegliedert: Personen × Stunden × Rate ergibt die Zeilen-Summe.
     // hfc = helfer + kc*2 + rc*2 + gc*2  (Fahrzeugbesatzung zählt als Einsatzkraft zusätzlich zur Fahrzeugpauschale)
+    // Bei mehreren Abschnitten am gleichen Datum wird die Uhrzeit im Label mit angezeigt, damit die Zeilen unterscheidbar sind.
     ...activeDays.map((d,i)=>{
       const c = dayCalcs[i];
       if (!c || !c.hfc || c.hfc <= 0) return null;
-      return { pos:"Einsatzkräfte "+fDate(d.date), anz:null, pers:c.hfc, hrs:c.h, rate:rates.helfer, summe:c.cH };
+      const sameDate = activeDays.filter(dd=>dd.date===d.date).length > 1;
+      const label = sameDate ? `${fDate(d.date)} ${d.startTime||""}-${d.endTime||""} Uhr` : fDate(d.date);
+      return { pos:"Einsatzkräfte "+label, anz:null, pers:c.hfc, hrs:c.h, rate:rates.helfer, summe:c.cH };
     }),
     ev.verpflegung===false && dayCalcs.reduce((s,d)=>s+(d.cV||0),0)>0 && { pos:"Verpflegungspauschale", anz:null, pers:tTP, hrs:null, rate:rates.verpflegung, summe:dayCalcs.reduce((s,d)=>s+(d.cV||0),0) },
   ].filter(Boolean);

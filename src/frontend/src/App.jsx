@@ -49,7 +49,11 @@ function calcRisk(d){const ap=d.auflagen?(d.geschlossen?vPts(d.auflagen)*2:vPts(
 function getRec(risk){const p=PERSONNEL_TABLE.find(r=>risk>=r.min&&risk<r.max)||PERSONNEL_TABLE[9];const rtw=(RTW_T.find(r=>risk>=r.min&&risk<r.max)||RTW_T[7]).v;const nef=(NEF_T.find(r=>risk>=r.min&&risk<r.max)||NEF_T[4]).v;let el="im Team";if(risk>60)el="volle stabsmäßige EL";else if(risk>30)el="stabsm. EL, reduziert";else if(p.h>=21)el="Zugführer";else if(p.h>=6)el="Gruppenführer";return{helfer:p.h,ktw:p.k,rtw,nef,el,elKfz:risk>=110?3:risk>=80?2:risk>=50?1:0,gktw:risk>=90?1:0};}
 function calcH(s,e){if(!s||!e)return 0;const[sh,sm]=s.split(":").map(Number);const[eh,em]=e.split(":").map(Number);let d=(eh*60+em)-(sh*60+sm);if(d<=0)d+=1440;return Math.ceil(d/15)*0.25;}
 function calcDay(d,rates,verpfVA){const h=calcH(d.startTime,d.endTime);const risk=calcRisk(d);const rec=getRec(risk.total);const hc=d.oHelfer??rec.helfer,kc=d.oKtw??rec.ktw,rc=d.oRtw??rec.rtw,ac=d.oAerzte??0,gc=d.oGktw??rec.gktw,el=d.oEl??rec.el;const ec=d.oElKfz??rec.elKfz,sc=d.oSeg??0,mc=d.oMtw??0,zc=d.oZelt??0;const tp=el==="im Team"?hc+kc*2+rc*2+gc*2+ac:hc+kc*2+rc*2+gc*2+ac+1;const hfc=el==="im Team"?tp-ac:tp-ac-1;const cH=hfc*h*rates.helfer,cK=kc*rates.ktw+(d.kmKtw||0)*kc*rates.kmKtw,cR=rc*rates.rtw+(d.kmRtw||0)*rc*rates.kmRtw,cA=ac*rates.aerzte,cG=gc*rates.gktw+(d.kmGktw||0)*gc*rates.kmGktw,cE=el==="im Team"?0:h*rates.einsatzleiter,cEK=ec*rates.einsatzleiterKfz+(d.kmElKfz||0)*rates.kmElKfz,cS=sc*rates.segLkw+(d.kmSeg||0)*sc*rates.kmSegLkw,cM=mc*rates.mtw+(d.kmMtw||0)*mc*rates.kmMtw,cZ=zc*rates.zelt;const vB=verpfVA?0:Math.ceil(h/8);const cV=verpfVA?0:vB*tp*rates.verpflegung;return{h,risk,rec,hc,kc,rc,ac,gc,el,ec,sc,mc,zc,tp,hfc,cH,cK,cR,cA,cG,cE,cEK,cS,cM,cZ,cV,total:cH+cK+cR+cA+cG+cE+cEK+cS+cM+cZ+cV,vB};}
-const mkDay=(n)=>({id:n,active:n===1,date:"",startTime:"18:00",endTime:"23:00",auflagen:0,geschlossen:false,flaeche:0,geschlossenFlaeche:false,besucher:1000,besucherFlaeche:0,eventTypeId:11,customFactor:0,prominente:0,polizeiRisiko:false,oHelfer:null,oKtw:null,oRtw:null,oAerzte:null,oGktw:null,oEl:null,oElKfz:null,oSeg:null,oMtw:null,oZelt:null,kmKtw:0,kmRtw:0,kmGktw:0,kmElKfz:0,kmSeg:0,kmMtw:0,fahrzeuge:[]});
+const mkDay=(n)=>({id:n,active:true,date:"",startTime:"18:00",endTime:"23:00",auflagen:0,geschlossen:false,flaeche:0,geschlossenFlaeche:false,besucher:1000,besucherFlaeche:0,eventTypeId:11,customFactor:0,prominente:0,polizeiRisiko:false,oHelfer:null,oKtw:null,oRtw:null,oAerzte:null,oGktw:null,oEl:null,oElKfz:null,oSeg:null,oMtw:null,oZelt:null,kmKtw:0,kmRtw:0,kmGktw:0,kmElKfz:0,kmSeg:0,kmMtw:0,fahrzeuge:[]});
+// Altbestand: fruehere Versionen hatten fix 8 days mit active:true/false. Wir filtern
+// die inaktiven raus und sorgen fuer mindestens 1 aktiven Tag. Alle Felder bleiben
+// erhalten (Datum, Overrides, etc.), damit gesperrte Vorgaenge unveraendert bleiben.
+const normalizeDays=(raw)=>{const f=(raw||[]).filter(d=>d&&d.active!==false).map(d=>({...d,active:true}));return f.length>0?f:[mkDay(1)];};
 const EMPTY_EVENT={auftragsnr:"",name:"",ort:"",adresse:"",veranstalter:"",ansprechpartner:"",telefon:"",email:"",rechnungsempfaenger:"",reStrasse:"",rePlzOrt:"",anrede:"Sehr geehrte Damen und Herren,",auflagen:"keine",kfzStellplatz:true,sanitaetsraum:false,strom:true,verpflegung:true,pauschalangebot:0,bemerkung:"",veranstalterInfo:"",coords:null,w3w:"",hausnr:"",checklist:{},ilsEL:"",ilsTelefon:"",ilsFunk:"",ilsAbkoemmlich:"",ilsFzg1:"",ilsFzg2:"",ilsFzg3:"",ilsSonstige:""};
 const f2=(v)=>new Intl.NumberFormat("de-DE",{minimumFractionDigits:2,maximumFractionDigits:2}).format(v);
 const fDate=(d)=>d?new Date(d).toLocaleDateString("de-DE"):"";
@@ -2120,7 +2124,8 @@ function AngebotPDF({event,dayCalcs,totalCosts,stammdaten,activeDays,bereitschaf
     tZelt>0&&{pos:"Zelt",anz:tZelt,pers:null,km:null,hrs:null,rate:rates.zelt,summe:dayCalcs.reduce((s,d)=>s+(d.cZ||0),0)},
     // Einsatzkräfte pro Tag aufgegliedert: Personen × Stunden × Rate ergibt die Zeilen-Summe.
     // hfc = helfer + kc*2 + rc*2 + gc*2  (Fahrzeugbesatzung zählt als Einsatzkraft zusätzlich zur Fahrzeugpauschale)
-    ...activeDays.map((d,i)=>{const c=dayCalcs[i];if(!c||!c.hfc||c.hfc<=0)return null;return{pos:"Einsatzkräfte "+fDate2(d.date),anz:null,pers:c.hfc,km:null,hrs:c.h,rate:rates.helfer,summe:c.cH};}),
+    // Bei mehreren Abschnitten am gleichen Datum wird die Uhrzeit im Label mit angezeigt, damit die Zeilen unterscheidbar sind.
+    ...activeDays.map((d,i)=>{const c=dayCalcs[i];if(!c||!c.hfc||c.hfc<=0)return null;const sameDate=activeDays.filter(dd=>dd.date===d.date).length>1;const label=sameDate?`${fDate2(d.date)} ${d.startTime}-${d.endTime} Uhr`:fDate2(d.date);return{pos:"Einsatzkräfte "+label,anz:null,pers:c.hfc,km:null,hrs:c.h,rate:rates.helfer,summe:c.cH};}),
     !event.verpflegung&&dayCalcs.reduce((s,d)=>s+(d.cV||0),0)>0&&{pos:"Verpflegungspauschale",anz:null,pers:tTP,km:null,hrs:null,rate:rates.verpflegung,summe:dayCalcs.reduce((s,d)=>s+(d.cV||0),0)},
   ].filter(Boolean);
   const TH={border:"1px solid #000",padding:"3px 6px",fontSize:"9pt",fontWeight:"bold",background:"#c8c8c8",textAlign:"center",whiteSpace:"nowrap"};
@@ -2769,7 +2774,9 @@ export default function App(){
   /* stammdaten via API geladen */
   const [currentEventId,setCurrentEventId]=useState(null);
   const [event,setEvent]=useState({...EMPTY_EVENT});
-  const [days,setDays]=useState(Array.from({length:8},(_,i)=>mkDay(i+1)));
+  // normalizeDays: alte Vorgaenge koennen bis zu 8 Tage mit active:true/false haben.
+  // Wir behalten nur die aktiven und stellen sicher dass mindestens 1 Tag existiert.
+  const [days,setDays]=useState([mkDay(1)]);
   const [activeDay,setActiveDay]=useState(0);
   const [showOverrides,setShowOverrides]=useState(false);
   const [laufendeNr,setLaufendeNr]=useState(1);
@@ -2887,6 +2894,15 @@ export default function App(){
   },[currentEventId,user]);
   const updateEvent=useCallback((k,v)=>setEvent(p=>({...p,[k]:v})),[]);
   const updateDay=useCallback((i,k,v)=>setDays(p=>p.map((d,j)=>j===i?{...d,[k]:v}:d)),[]);
+  // Neuen Tag/Zeitraum anhaengen. Datum wird vom letzten Eintrag uebernommen (praktisch
+  // bei mehrtaegigen Events - Nutzer aendert nur die Uhrzeit oder stellt Datum um).
+  const addDayEntry=useCallback(()=>{setDays(p=>{const last=p[p.length-1]||{};const nd={...mkDay((p[p.length-1]?.id||0)+1),date:last.date||"",startTime:last.endTime||"18:00",endTime:"23:00"};return[...p,nd];});setActiveDay(a=>a);/* activeDay bleibt, Nutzer kann selber wechseln */},[]);
+  // Tag/Abschnitt loeschen. Mindestens ein Eintrag bleibt immer bestehen.
+  const removeDayEntry=useCallback((idx)=>{setDays(p=>p.length<=1?p:p.filter((_,j)=>j!==idx));setActiveDay(a=>{if(a===idx)return Math.max(0,idx-1);if(a>idx)return a-1;return a;});},[]);
+  // Tag in zwei Abschnitte aufteilen: Splitzeit liegt in der Mitte der bestehenden
+  // Zeitspanne. Alle Overrides (Personal + Fahrzeuge) werden auf beide Haelften kopiert -
+  // der Nutzer kann sie dann pro Haelfte unabhaengig anpassen.
+  const splitDayEntry=useCallback((idx)=>{setDays(p=>{const d=p[idx];if(!d)return p;const h=calcH(d.startTime,d.endTime);if(h<=0.5)return p;/* zu kurz zum Splitten */const[sh,sm]=d.startTime.split(":").map(Number);const startMin=sh*60+sm;let endMin=startMin+Math.round(h*60);const midMin=startMin+Math.round(h*30);/* = Mitte */const mid=`${String(Math.floor(midMin/60)%24).padStart(2,"0")}:${String(midMin%60).padStart(2,"0")}`;const first={...d,endTime:mid};const second={...d,id:(p[p.length-1]?.id||0)+1,startTime:mid};return[...p.slice(0,idx),first,second,...p.slice(idx+1)];});setActiveDay(a=>a===idx?idx:a);/* Fokus bleibt auf erster Haelfte */},[]);
   const updateStamm=useCallback((k,v)=>setStammdaten(p=>({...p,[k]:v})),[]);
   const updateRate=useCallback((k,v)=>setStammdaten(p=>({...p,rates:{...p.rates,[k]:v}})),[]);
   useEffect(()=>{if(!user||user.rolle==="helfer"||user.rolle==="bl")return;const t=setTimeout(()=>{const r=stammdaten.rates;API.saveKostensaetze({helfer:r.helfer,ktw:r.ktw,rtw:r.rtw,gktw:r.gktw,einsatzleiter:r.einsatzleiter,einsatzleiter_kfz:r.einsatzleiterKfz,seg_lkw:r.segLkw,mtw:r.mtw,zelt:r.zelt,km_ktw:r.kmKtw,km_rtw:r.kmRtw,km_gktw:r.kmGktw,km_el_kfz:r.kmElKfz,km_seg_lkw:r.kmSegLkw,km_mtw:r.kmMtw,verpflegung:r.verpflegung}).catch(e=>console.warn("Kostensätze speichern:",e));},2000);return()=>clearTimeout(t);},[stammdaten.rates,user]);
@@ -2946,9 +2962,9 @@ export default function App(){
   };
   // Lock freigeben beim Vorgang-Wechsel
   const releaseLock=useCallback(async()=>{if(currentEventId){try{await API.unlockVorgang(currentEventId);}catch(e){console.error("Fehler:",e);}setLockInfo(null);}},[currentEventId]);
-  const newEvent=useCallback(()=>{setCurrentEventId(null);setEvent({...EMPTY_EVENT});setDays(Array.from({length:8},(_,i)=>mkDay(i+1)));setActiveDay(0);setTab("event");},[]);
+  const newEvent=useCallback(()=>{setCurrentEventId(null);setEvent({...EMPTY_EVENT});setDays([mkDay(1)]);setActiveDay(0);setTab("event");},[]);
   const loadEvent=useCallback(async(ev)=>{
-    setCurrentEventId(ev.id);setEvent({...EMPTY_EVENT,...(ev.event||{})});setDays(ev.days||Array.from({length:8},(_,i)=>mkDay(i+1)));setTab("event");setActiveDay(0);
+    setCurrentEventId(ev.id);setEvent({...EMPTY_EVENT,...(ev.event||{})});setDays(normalizeDays(ev.days));setTab("event");setActiveDay(0);
     setKompOverride({ack:false,kommentar:"",saving:false});setShowKompModal(false);
     // Lock prüfen und setzen
     try{
@@ -2963,7 +2979,7 @@ export default function App(){
     // History laden
     try{const h=await API.json("/api/vorgaenge/"+ev.id+"/history");setEditHistory(h||[]);}catch{setEditHistory([]);}
   },[user]);
-  const copyEvent=useCallback((ev)=>{setCurrentEventId(null);const e={...EMPTY_EVENT,...(ev.event||{}),auftragsnr:"",checklist:{}};setEvent(e);setDays((ev.days||Array.from({length:8},(_,i)=>mkDay(i+1))).map(d=>({...d,date:""})));setActiveDay(0);setTab("event");},[]);
+  const copyEvent=useCallback((ev)=>{setCurrentEventId(null);const e={...EMPTY_EVENT,...(ev.event||{}),auftragsnr:"",checklist:{}};setEvent(e);setDays(normalizeDays(ev.days).map(d=>({...d,date:""})));setActiveDay(0);setTab("event");},[]);
 
   // PUBLIC LOGO (Login-Screen)
   const [publicLogo,setPublicLogo]=React.useState(null);
@@ -3046,7 +3062,7 @@ export default function App(){
           <Btn className="r-abmelden" small variant="ghost" onClick={()=>window.location.href="/auth/logout"}>{mob?"⏻":"Abmelden"}</Btn>
         </div>
       </header>
-      <nav className="top-nav" style={{display:"flex",gap:1,padding:"0 12px",background:C.weiss,borderBottom:`1px solid ${C.mittelgrau}40`,overflowX:"auto"}}>{TABS.filter(t=>!t.admin||user?.rolle==="admin").map(t=>(<button key={t.id} onClick={()=>{if(t.id==="events"){releaseLock();setCurrentEventId(null);setEvent({...EMPTY_EVENT});setDays(Array.from({length:8},(_,i)=>mkDay(i+1)));}setTab(t.id);}} style={{padding:"10px 14px",background:"none",border:"none",color:tab===t.id?C.rot:C.dunkelgrau,fontSize:12,fontWeight:tab===t.id?700:500,cursor:"pointer",display:"flex",alignItems:"center",gap:5,borderBottom:tab===t.id?`2px solid ${C.rot}`:"2px solid transparent",fontFamily:FONT.sans,whiteSpace:"nowrap"}}><span style={{fontSize:13}}>{t.icon}</span> {t.label}{t.id==="anfragen"&&anfragenNeu>0&&<span style={{marginLeft:4,background:C.rot,color:"#fff",borderRadius:10,padding:"1px 6px",fontSize:10,fontWeight:700,lineHeight:"16px",minWidth:16,textAlign:"center",display:"inline-block",animation:"pulse 2s infinite"}}>{anfragenNeu}</span>}</button>))}</nav>
+      <nav className="top-nav" style={{display:"flex",gap:1,padding:"0 12px",background:C.weiss,borderBottom:`1px solid ${C.mittelgrau}40`,overflowX:"auto"}}>{TABS.filter(t=>!t.admin||user?.rolle==="admin").map(t=>(<button key={t.id} onClick={()=>{if(t.id==="events"){releaseLock();setCurrentEventId(null);setEvent({...EMPTY_EVENT});setDays([mkDay(1)]);}setTab(t.id);}} style={{padding:"10px 14px",background:"none",border:"none",color:tab===t.id?C.rot:C.dunkelgrau,fontSize:12,fontWeight:tab===t.id?700:500,cursor:"pointer",display:"flex",alignItems:"center",gap:5,borderBottom:tab===t.id?`2px solid ${C.rot}`:"2px solid transparent",fontFamily:FONT.sans,whiteSpace:"nowrap"}}><span style={{fontSize:13}}>{t.icon}</span> {t.label}{t.id==="anfragen"&&anfragenNeu>0&&<span style={{marginLeft:4,background:C.rot,color:"#fff",borderRadius:10,padding:"1px 6px",fontSize:10,fontWeight:700,lineHeight:"16px",minWidth:16,textAlign:"center",display:"inline-block",animation:"pulse 2s infinite"}}>{anfragenNeu}</span>}</button>))}</nav>
 
       <main className="r-main" style={{maxWidth:1100,margin:"0 auto",padding:"16px 14px"}}>
 
@@ -3151,19 +3167,29 @@ export default function App(){
         {tab==="days"&&(<div>
           <LockBanner lockInfo={lockInfo} isOwner={lockInfo?.lockedBy===user?.name} onUnlock={async()=>{try{await API.unlockVorgang(currentEventId);setLockInfo(null);}catch(e){console.error("Fehler:",e);}}}/>
           <StatusBanner angebotVersendet={event?.checklist?.angebotVersendet} abgeschlossen={event?.checklist?.abgeschlossen} onUnlock={async(begruendung)=>{await API.entsperrenVorgang(currentEventId,begruendung);updateEvent("checklist",{...event.checklist,angebotVersendet:false,abgeschlossen:false});}}/>
-          <div style={{display:"flex",gap:4,marginBottom:12,flexWrap:"wrap"}}>{days.map((d,i)=>(<div key={i} style={{display:"inline-flex",alignItems:"center",gap:0}}>
-              <button onClick={()=>{if(!(isLocked||isEditLocked)&&!d.active)updateDay(i,"active",true);if(d.active)setActiveDay(i);}} style={{padding:"6px 14px",borderRadius:d.active&&i>0?"4px 0 0 4px":4,border:`1px solid ${d.active?(activeDay===i?C.rot:C.mittelgrau):"#e0e0e0"}`,background:activeDay===i?`${C.rot}11`:d.active?C.weiss:C.hellgrau,color:d.active?C.schwarz:C.bgrau,cursor:d.active?"pointer":"default",fontSize:12,fontWeight:activeDay===i?700:500,fontFamily:FONT.sans,borderRight:d.active&&i>0?"none":undefined,opacity:!d.active&&(isLocked||isEditLocked)?0.4:1}}>Tag {i+1}{d.active&&d.date&&<span style={{marginLeft:4,fontSize:10,opacity:0.6}}>{fDate(d.date)}</span>}</button>
-              {d.active&&i>0&&!(isLocked||isEditLocked)&&<button onClick={(e)=>{e.stopPropagation();updateDay(i,"active",false);if(activeDay===i)setActiveDay(0);}} title="Tag deaktivieren" style={{padding:"6px 8px",borderRadius:"0 4px 4px 0",border:`1px solid ${activeDay===i?C.rot:C.mittelgrau}`,borderLeft:"none",background:activeDay===i?`${C.rot}11`:C.weiss,color:C.rot,cursor:"pointer",fontSize:11,fontWeight:700,lineHeight:1}}>✕</button>}
-            </div>))}</div>
+          <div style={{display:"flex",gap:4,marginBottom:12,flexWrap:"wrap",alignItems:"center"}}>{days.map((d,i)=>{
+              // Wenn mehrere Eintraege dasselbe Datum haben -> Zeitspanne mit anzeigen zur Unterscheidung
+              const sameDate=d.date?days.filter(dd=>dd.date===d.date).length>1:false;
+              const isActive=activeDay===i;
+              return(<div key={i} style={{display:"inline-flex",alignItems:"center",gap:0}}>
+              <button onClick={()=>setActiveDay(i)} style={{padding:"6px 14px",borderRadius:days.length>1?"4px 0 0 4px":4,border:`1px solid ${isActive?C.rot:C.mittelgrau}`,background:isActive?`${C.rot}11`:C.weiss,color:C.schwarz,cursor:"pointer",fontSize:12,fontWeight:isActive?700:500,fontFamily:FONT.sans,borderRight:days.length>1?"none":undefined}}>Tag {i+1}{d.date&&<span style={{marginLeft:4,fontSize:10,opacity:0.6}}>{fDate(d.date)}{sameDate&&` ${d.startTime}-${d.endTime}`}</span>}</button>
+              {days.length>1&&!(isLocked||isEditLocked)&&<button onClick={(e)=>{e.stopPropagation();removeDayEntry(i);}} title="Tag/Abschnitt entfernen" style={{padding:"6px 8px",borderRadius:"0 4px 4px 0",border:`1px solid ${isActive?C.rot:C.mittelgrau}`,borderLeft:"none",background:isActive?`${C.rot}11`:C.weiss,color:C.rot,cursor:"pointer",fontSize:11,fontWeight:700,lineHeight:1}}>✕</button>}
+            </div>);
+            })}
+            {!(isLocked||isEditLocked)&&<button onClick={addDayEntry} title="Neuen Tag oder Zeitraum hinzufuegen" style={{padding:"6px 12px",borderRadius:4,border:`1px dashed ${C.mittelblau}`,background:C.weiss,color:C.mittelblau,cursor:"pointer",fontSize:12,fontWeight:600,fontFamily:FONT.sans,marginLeft:4}}>+ Tag/Zeitraum hinzufügen</button>}
+          </div>
           <div style={{position:"relative"}}>
           {(isLocked||isEditLocked)&&<div style={{position:"absolute",top:0,left:0,right:0,bottom:0,background:"rgba(255,255,255,0.55)",zIndex:10,borderRadius:8,pointerEvents:"all"}}/>}
-          {(()=>{const i=activeDay,d=days[i];if(!d.active)return<Card><p style={{color:C.dunkelgrau,textAlign:"center",padding:32}}>Tag {i+1} nicht aktiv. <Btn small onClick={()=>updateDay(i,"active",true)}>Aktivieren</Btn></p></Card>;
+          {(()=>{const i=Math.min(activeDay,days.length-1),d=days[i];if(!d)return null;
             const calc=calcDay(d,stammdaten.rates,event.verpflegung);
             return(<div className="rg21" style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:14}}>
               <div>
                 <Card title={`Tag ${i+1}`} accent={C.mittelblau}>
                   <div className="rg3s" style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:"0 10px"}}><Inp label="Datum" type="date" value={d.date} onChange={v=>updateDay(i,"date",v)}/><Inp label="Beginn" type="time" value={d.startTime} onChange={v=>updateDay(i,"startTime",v)}/><Inp label="Ende" type="time" value={d.endTime} onChange={v=>updateDay(i,"endTime",v)}/></div>
-                  <div style={{padding:"5px 10px",background:C.hellgrau,borderRadius:4,fontSize:12}}>Einsatzdauer: <strong style={{color:C.mittelblau}}>{calc.h.toFixed(2).replace('.',',')} Stunden</strong>{!event.verpflegung&&<span style={{marginLeft:10,color:"#856404"}}>Verpfl.: {calc.vB}×8h</span>}</div>
+                  <div style={{padding:"5px 10px",background:C.hellgrau,borderRadius:4,fontSize:12,display:"flex",alignItems:"center",justifyContent:"space-between",gap:10}}>
+                    <div>Einsatzdauer: <strong style={{color:C.mittelblau}}>{calc.h.toFixed(2).replace('.',',')} Stunden</strong>{!event.verpflegung&&<span style={{marginLeft:10,color:"#856404"}}>Verpfl.: {calc.vB}×8h</span>}</div>
+                    {!(isLocked||isEditLocked)&&calc.h>0.5&&<button onClick={()=>splitDayEntry(i)} title="Tag in zwei Zeitabschnitte splitten - z.B. Nachmittag/Abend mit unterschiedlichem Personal" style={{padding:"3px 10px",borderRadius:4,border:`1px solid ${C.mittelblau}`,background:C.weiss,color:C.mittelblau,cursor:"pointer",fontSize:11,fontWeight:600,fontFamily:FONT.sans,whiteSpace:"nowrap"}}>↔ Aufteilen</button>}
+                  </div>
                 </Card>
                 <Card title="Besucher & Risiko" accent="#d4920a">
                   <Inp label="Max. Besucher (Auflagen)" type="number" min={0} value={d.auflagen} onChange={v=>updateDay(i,"auflagen",v)}/>
@@ -3490,7 +3516,7 @@ export default function App(){
           </div>
         </div>
       )}
-      {tab==="anfragen"&&<AnfragenTab user={user} toast={toast} bereitschaften={bereitschaften} onOpenVorgang={(id)=>{setCurrentEventId(id);API.json(`/api/vorgaenge/${year}?bc=ALL`).then(r=>{const v=r.find(v=>v.id===id);if(v){setEvent({...EMPTY_EVENT,...(v.event||{})});setDays(v.days||Array.from({length:8},(_,i)=>mkDay(i+1)));setTab("event");}}).catch(()=>setTab("events"));}}/>}
+      {tab==="anfragen"&&<AnfragenTab user={user} toast={toast} bereitschaften={bereitschaften} onOpenVorgang={(id)=>{setCurrentEventId(id);API.json(`/api/vorgaenge/${year}?bc=ALL`).then(r=>{const v=r.find(v=>v.id===id);if(v){setEvent({...EMPTY_EVENT,...(v.event||{})});setDays(normalizeDays(v.days));setTab("event");}}).catch(()=>setTab("events"));}}/>}
 
       {tab==="statistik"&&<StatistikDashboard user={user} year={year} toast={toast}/>}
 
@@ -3530,7 +3556,7 @@ export default function App(){
           <button onClick={()=>setMenuOpen(false)} style={{background:"none",border:"none",fontSize:20,cursor:"pointer",color:C.dunkelgrau,lineHeight:1}}>✕</button>
         </div>
         <div style={{flex:1,overflowY:"auto",paddingTop:4}}>
-          {TABS.filter(t=>!t.admin||user?.rolle==="admin").map(t=>(<button key={t.id} className={`drawer-item${tab===t.id?" active":""}`} onClick={()=>{if(t.id==="events"){releaseLock();setCurrentEventId(null);setEvent({...EMPTY_EVENT});setDays(Array.from({length:8},(_,j)=>mkDay(j+1)));}setTab(t.id);setMenuOpen(false);}}><span className="drawer-icon">{t.icon}</span>{t.label}{t.id==="anfragen"&&anfragenNeu>0&&<span style={{marginLeft:"auto",background:C.rot,color:"#fff",borderRadius:10,padding:"1px 7px",fontSize:10,fontWeight:700,minWidth:16,textAlign:"center"}}>{anfragenNeu}</span>}</button>))}
+          {TABS.filter(t=>!t.admin||user?.rolle==="admin").map(t=>(<button key={t.id} className={`drawer-item${tab===t.id?" active":""}`} onClick={()=>{if(t.id==="events"){releaseLock();setCurrentEventId(null);setEvent({...EMPTY_EVENT});setDays([mkDay(1)]);}setTab(t.id);setMenuOpen(false);}}><span className="drawer-icon">{t.icon}</span>{t.label}{t.id==="anfragen"&&anfragenNeu>0&&<span style={{marginLeft:"auto",background:C.rot,color:"#fff",borderRadius:10,padding:"1px 7px",fontSize:10,fontWeight:700,minWidth:16,textAlign:"center"}}>{anfragenNeu}</span>}</button>))}
         </div>
         <div style={{padding:"12px 20px",borderTop:`1px solid ${C.hellgrau}`}}>
           <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:10}}>
