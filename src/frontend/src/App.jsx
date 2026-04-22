@@ -2118,8 +2118,9 @@ function AngebotPDF({event,dayCalcs,totalCosts,stammdaten,activeDays,bereitschaf
     tSeg>0&&{pos:"SEG-LKW",anz:tSeg,pers:null,km:null,hrs:null,rate:rates.segLkw,summe:dayCalcs.reduce((s,d)=>s+(d.cS||0),0)},
     tMtw>0&&{pos:"MTW",anz:tMtw,pers:null,km:null,hrs:null,rate:rates.mtw,summe:dayCalcs.reduce((s,d)=>s+(d.cM||0),0)},
     tZelt>0&&{pos:"Zelt",anz:tZelt,pers:null,km:null,hrs:null,rate:rates.zelt,summe:dayCalcs.reduce((s,d)=>s+(d.cZ||0),0)},
-    {pos:"Einsatzkräfte",anz:null,pers:tHelferPers,km:null,hrs:null,rate:null,summe:null,isSpacer:true},
-    {pos:"Summe Einsatzkräfte",anz:null,pers:tTP,km:null,hrs:tHrs,rate:rates.helfer,summe:dayCalcs.reduce((s,d)=>s+(d.cH||0),0),isBold:true},
+    // Einsatzkräfte pro Tag aufgegliedert: Personen × Stunden × Rate ergibt die Zeilen-Summe.
+    // hfc = helfer + kc*2 + rc*2 + gc*2  (Fahrzeugbesatzung zählt als Einsatzkraft zusätzlich zur Fahrzeugpauschale)
+    ...activeDays.map((d,i)=>{const c=dayCalcs[i];if(!c||!c.hfc||c.hfc<=0)return null;return{pos:"Einsatzkräfte "+fDate2(d.date),anz:null,pers:c.hfc,km:null,hrs:c.h,rate:rates.helfer,summe:c.cH};}),
     !event.verpflegung&&dayCalcs.reduce((s,d)=>s+(d.cV||0),0)>0&&{pos:"Verpflegungspauschale",anz:null,pers:tTP,km:null,hrs:null,rate:rates.verpflegung,summe:dayCalcs.reduce((s,d)=>s+(d.cV||0),0)},
   ].filter(Boolean);
   const TH={border:"1px solid #000",padding:"3px 6px",fontSize:"9pt",fontWeight:"bold",background:"#c8c8c8",textAlign:"center",whiteSpace:"nowrap"};

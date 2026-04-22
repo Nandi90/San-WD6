@@ -2383,17 +2383,26 @@ function buildAngebotHTML(ev, dayCalcs, totalCosts, activeDays, stamm, kosten, u
   const isPauschal = !!ev.pauschalAktiv || (ev.pauschalangebot && ev.pauschalangebot > 0);
   const endPreis = isPauschal ? parseFloat(ev.pauschalangebot) : totalCosts;
 
+  // Raten fallback über app_config, falls kosten-Parameter leer (z.B. bei der Angebotsmappe-Route)
+  const rates = (kosten && Object.keys(kosten).length > 0) ? kosten : getGlobalKosten();
+
   // rates aus stammdaten (dayCalcs haben bereits die berechneten Kosten)
   const fzRows = [
-    tKtw>0 && { pos:"KTW", anz:tKtw, pers:null, hrs:null, rate:null, summe:dayCalcs.reduce((s,d)=>s+(d.cK||0),0) },
-    tRtw>0 && { pos:"RTW", anz:tRtw, pers:null, hrs:null, rate:null, summe:dayCalcs.reduce((s,d)=>s+(d.cR||0),0) },
-    tAerzt>0 && { pos:"Ärzte", anz:tAerzt, pers:1, hrs:tHrs, rate:null, summe:dayCalcs.reduce((s,d)=>s+(d.cA||0),0) },
-    tElKfz>0 && { pos:"Einsatzleiter KFZ", anz:tElKfz, pers:null, hrs:null, rate:null, summe:dayCalcs.reduce((s,d)=>s+(d.cEK||0),0) },
-    tGktw>0 && { pos:"GKTW", anz:tGktw, pers:null, hrs:null, rate:null, summe:dayCalcs.reduce((s,d)=>s+(d.cG||0),0) },
-    tSeg>0 && { pos:"SEG-LKW", anz:tSeg, pers:null, hrs:null, rate:null, summe:dayCalcs.reduce((s,d)=>s+(d.cS||0),0) },
-    tMtw>0 && { pos:"MTW", anz:tMtw, pers:null, hrs:null, rate:null, summe:dayCalcs.reduce((s,d)=>s+(d.cM||0),0) },
-    { pos:"Einsatzkräfte (gesamt)", anz:null, pers:tTP, hrs:tHrs, rate:null, summe:dayCalcs.reduce((s,d)=>s+(d.cH||0),0), isBold:true },
-    ev.verpflegung===false && dayCalcs.reduce((s,d)=>s+(d.cV||0),0)>0 && { pos:"Verpflegungspauschale", anz:null, pers:tTP, hrs:null, rate:null, summe:dayCalcs.reduce((s,d)=>s+(d.cV||0),0) },
+    tKtw>0 && { pos:"KTW", anz:tKtw, pers:null, hrs:null, rate:rates.ktw, summe:dayCalcs.reduce((s,d)=>s+(d.cK||0),0) },
+    tRtw>0 && { pos:"RTW", anz:tRtw, pers:null, hrs:null, rate:rates.rtw, summe:dayCalcs.reduce((s,d)=>s+(d.cR||0),0) },
+    tAerzt>0 && { pos:"Ärzte", anz:tAerzt, pers:1, hrs:tHrs, rate:rates.aerzte||0, summe:dayCalcs.reduce((s,d)=>s+(d.cA||0),0) },
+    tElKfz>0 && { pos:"Einsatzleiter KFZ", anz:tElKfz, pers:null, hrs:null, rate:rates.einsatzleiter_kfz, summe:dayCalcs.reduce((s,d)=>s+(d.cEK||0),0) },
+    tGktw>0 && { pos:"GKTW", anz:tGktw, pers:null, hrs:null, rate:rates.gktw, summe:dayCalcs.reduce((s,d)=>s+(d.cG||0),0) },
+    tSeg>0 && { pos:"SEG-LKW", anz:tSeg, pers:null, hrs:null, rate:rates.seg_lkw, summe:dayCalcs.reduce((s,d)=>s+(d.cS||0),0) },
+    tMtw>0 && { pos:"MTW", anz:tMtw, pers:null, hrs:null, rate:rates.mtw, summe:dayCalcs.reduce((s,d)=>s+(d.cM||0),0) },
+    // Einsatzkräfte pro Tag aufgegliedert: Personen × Stunden × Rate ergibt die Zeilen-Summe.
+    // hfc = helfer + kc*2 + rc*2 + gc*2  (Fahrzeugbesatzung zählt als Einsatzkraft zusätzlich zur Fahrzeugpauschale)
+    ...activeDays.map((d,i)=>{
+      const c = dayCalcs[i];
+      if (!c || !c.hfc || c.hfc <= 0) return null;
+      return { pos:"Einsatzkräfte "+fDate(d.date), anz:null, pers:c.hfc, hrs:c.h, rate:rates.helfer, summe:c.cH };
+    }),
+    ev.verpflegung===false && dayCalcs.reduce((s,d)=>s+(d.cV||0),0)>0 && { pos:"Verpflegungspauschale", anz:null, pers:tTP, hrs:null, rate:rates.verpflegung, summe:dayCalcs.reduce((s,d)=>s+(d.cV||0),0) },
   ].filter(Boolean);
 
   const TH = 'border:1px solid #000;padding:3px 6px;font-size:9pt;font-weight:bold;background:#c8c8c8;text-align:center;white-space:nowrap';
@@ -2417,15 +2426,16 @@ function buildAngebotHTML(ev, dayCalcs, totalCosts, activeDays, stamm, kosten, u
       <td style="${TDC}">${num(row.pers)}</td>
       <td style="${TDC}">${num(row.km)}</td>
       <td style="${TDC}">${row.hrs?num(row.hrs):""}</td>
+      <td style="${TDR}">${row.rate>0?euro(row.rate):""}</td>
       <td style="${TDR}">${row.summe!=null?euro(row.summe):""}</td>
     </tr>`
   ).join("");
 
   const pauschalRow = isPauschal ? `<tr>
-    <td colspan="5" style="${TD};font-weight:600">Gesamtsumme</td>
+    <td colspan="6" style="${TD};font-weight:600">Gesamtsumme</td>
     <td style="${TDR};font-weight:600">${euro(totalCosts)}</td>
   </tr><tr>
-    <td colspan="5" style="${TD};font-weight:bold;font-size:11pt"><strong>Pauschalangebot</strong></td>
+    <td colspan="6" style="${TD};font-weight:bold;font-size:11pt"><strong>Pauschalangebot</strong></td>
     <td style="${TDR};font-weight:bold;font-size:11pt"><strong>${euro(endPreis)}</strong></td>
   </tr>` : "";
 
@@ -2487,18 +2497,19 @@ function buildAngebotHTML(ev, dayCalcs, totalCosts, activeDays, stamm, kosten, u
     <table style="width:100%;border-collapse:collapse;margin-bottom:0">
       <thead>
         <tr>
-          <th style="${TH};text-align:left;width:32%">Position</th>
+          <th style="${TH};text-align:left;width:30%">Position</th>
           <th style="${TH}">Anzahl</th>
           <th style="${TH}">Personen</th>
           <th style="${TH}">Kilometer</th>
-          <th style="${TH}">Einsatzstunden</th>
+          <th style="${TH}">a' Einsatzst.</th>
+          <th style="${TH}">a' Euro</th>
           <th style="${TH}">Summe</th>
         </tr>
       </thead>
       <tbody>
         ${fzRowsHTML}
         ${!isPauschal?`<tr>
-          <td colspan="5" style="${TD};border:none;background:#fff"></td>
+          <td colspan="6" style="${TD};border:none;background:#fff"></td>
           <td style="${TDR};font-weight:bold;border-top:2px solid #000">${euro(totalCosts)}</td>
         </tr>`:""}
         ${pauschalRow}
