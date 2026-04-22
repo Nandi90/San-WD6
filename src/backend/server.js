@@ -1079,8 +1079,12 @@ app.put("/api/config/nextcloud", requireAuth, (req, res) => {
 // SMTP Config (Admin)
 // ═══════════════════════════════════════════════════════════════════
 app.get("/api/config/smtp", requireAuth, (req, res) => {
-  if (req.session.user.rolle !== "admin") return res.status(403).json({ error: "Nur Admin" });
-  const { getAllConfig } = require("./db");
+  const { getAllConfig, getConfig } = require("./db");
+  // Nicht-Admins bekommen nur das enabled-Flag - benoetigt zum Einblenden des Mail-Buttons
+  // im Dokumente-Tab. Passwort, Host, User etc. bleiben admin-only.
+  if (req.session.user.rolle !== "admin") {
+    return res.json({ smtp_enabled: getConfig("smtp_enabled") || "false" });
+  }
   const rows = getAllConfig("smtp_");
   const cfg = {};
   rows.forEach(r => { cfg[r.key] = r.key === "smtp_password" ? (r.value ? "***" : "") : r.value; });
