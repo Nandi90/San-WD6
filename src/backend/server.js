@@ -1247,14 +1247,24 @@ app.post("/api/mail/fibu/:id", requireAuth, async (req, res) => {
     const { to, subject, body, fremdHelfer, fremdFahrzeuge, dayCalcs, totalCosts, activeDays: _activeDaysF } = req.body;
     if (!to) return res.status(400).json({ error: "FiBu-E-Mail fehlt" });
 
+    // Gleiche Fallback-Logik wie /api/mail/send/:id und die Mappe-Route:
+    // Bevorzugt activeDays aus dem Request (Frontend hat schon gefiltert).
+    // Wenn leer: aus DB die active!==false Tage filtern.
+    const activeDays = (_activeDaysF && _activeDaysF.length > 0) ? _activeDaysF : (vorgang.days || []).filter(d => d.active !== false);
+
     // Angebot-PDF generieren
     const attachments = [];
+    let pdfError = null;
     try {
-      const html = buildAngebotHTML(ev, dayCalcs || [], totalCosts || 0, activeDays || vorgang.days || [], stamm, kosten, user);
+      const html = buildAngebotHTML(ev, dayCalcs || [], totalCosts || 0, activeDays, stamm, kosten, user);
       const pdf = await BrowserPool.renderPDF(html, { marginTop: "20mm", marginLeft: "12mm" });
       const nr = (ev.auftragsnr || "").replace(/[^a-zA-Z0-9_-]/g, "_");
       attachments.push({ filename: `${nr}_Angebot.pdf`, content: pdf, contentType: "application/pdf" });
-    } catch (e) { console.warn("FiBu PDF:", e.message); }
+    } catch (e) {
+      // Fehler NICHT verschlucken - in Response zurueckmelden, damit der Nutzer es sieht
+      console.error("FiBu PDF Anhang fehlgeschlagen:", e);
+      pdfError = e.message || String(e);
+    }
 
     // Haupt-Mail an FiBu
     const htmlBody = body.split("\n").map(l => l.trim() ? `<p>${l}</p>` : "<p>&nbsp;</p>").join("");
@@ -1321,7 +1331,7 @@ app.post("/api/mail/fibu/:id", requireAuth, async (req, res) => {
     const { audit } = require("./db");
     audit(req.session.user, "fibu_mail", "vorgang", req.params.id, `An: ${to}, Benachrichtigt: ${notifiedBCs.join(", ") || "keine"}`);
 
-    res.json({ success: true, notifiedBCs });
+    res.json({ success: true, notifiedBCs, pdfAttached: attachments.length > 0, ...(pdfError ? { pdfError } : {}) });
   } catch(e) {
     console.error("FiBu Mail:", e);
     res.status(500).json({ error: e.message });

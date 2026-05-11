@@ -1524,7 +1524,18 @@ function FiBuModal({currentEventId,event:ev,user,stammdaten,dayCalcs,totalCosts,
         fremdFahrzeuge:hasFzg?fahrzeuge.filter(f=>f.typ||f.kennzeichen):[],
         dayCalcs,totalCosts,activeDays
       });
-      if(r.success){setSent(true);setNotifiedBCs(r.notifiedBCs||[]);toast("✉️ FiBu-Mail gesendet","success");if(onSent)onSent();}
+      if(r.success){
+        setSent(true);
+        setNotifiedBCs(r.notifiedBCs||[]);
+        if(r.pdfAttached===false){
+          // Mail ging raus, aber das Angebot-PDF konnte nicht angehaengt werden -
+          // FiBu hat damit keine Abrechnungsgrundlage. Nutzer muss darauf aufmerksam werden.
+          toast("⚠️ FiBu-Mail gesendet, aber das Angebot-PDF konnte NICHT angehängt werden"+(r.pdfError?": "+r.pdfError:". Bitte erneut senden oder manuell weiterleiten."),"warning");
+        } else {
+          toast("✉️ FiBu-Mail gesendet","success");
+        }
+        if(onSent)onSent();
+      }
       else toast("Fehler: "+(r.error||""),"error");
     }catch(e){toast("Fehler: "+e.message,"error");}
     finally{setSending(false);}
