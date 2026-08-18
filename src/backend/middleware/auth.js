@@ -31,34 +31,90 @@ async function getClient() {
 }
 
 // ── Rolle aus Keycloak Claims bestimmen ──────────────────────────
-// BRK.id MemberShip-IDs → Bereitschaft-Code + Rolle
+// Keycloak-Gruppen (auth.brk-sob.de) → Bereitschaft-Code + Rolle
+//
+// WICHTIG: Die Gruppen heißen im Keycloak GRP_BL_* (Bereitschaftsleitung),
+// NICHT GRP_Bereitschaft_*. Die alten Namen existieren dort nicht mehr.
+//
+// GRP_BL_Alle ist bewusst NICHT gemappt: die Sammelgruppe weist keine
+// einzelne Bereitschaft zu. Wer nur dort Mitglied ist, hat keine
+// Bereitschaftszuordnung – Mitglieder mit zusätzlicher GRP_BL_<Ort>
+// werden über diese korrekt zugeordnet.
 const GROUP_MAP = {
   "GRP_Kreisbereitschaftsleitung": { code: "KBL",   rolle: "admin" },
-  "GRP_Bereitschaft_ND":           { code: "BND",   rolle: "bl"    },
-  "GRP_Bereitschaft_SOB":          { code: "BSOB",  rolle: "bl"    },
-  "GRP_Bereitschaft_BGH":          { code: "BBGH",  rolle: "bl"    },
-  "GRP_Bereitschaft_KaHu":         { code: "BKAHU", rolle: "bl"    },
-  "GRP_Bereitschaft_KarKo":        { code: "BKK",   rolle: "bl"    },
-  "GRP_Bereitschaft_WEIlG":        { code: "BWEIG", rolle: "bl"    },
+  "GRP_BL_ND":                     { code: "BND",   rolle: "bl"    },
+  "GRP_BL_SOB":                    { code: "BSOB",  rolle: "bl"    },
+  "GRP_BL_BGH":                    { code: "BBGH",  rolle: "bl"    },
+  "GRP_BL_KaHu":                   { code: "BKAHU", rolle: "bl"    },
+  "GRP_BL_KarKo":                  { code: "BKK",   rolle: "bl"    },
+  // Weichering: großes I und kleines L sind in der Keycloak-Oberfläche
+  // optisch identisch – beide Schreibweisen werden akzeptiert.
+  "GRP_BL_WEIlG":                  { code: "BWEIG", rolle: "bl"    },
+  "GRP_BL_WEIIG":                  { code: "BWEIG", rolle: "bl"    },
+  "GRP_BL_WEIG":                   { code: "BWEIG", rolle: "bl"    },
 };
 
+// Lookup case-insensitiv: In der Keycloak-Oberfläche sind großes I und
+// kleines L nicht unterscheidbar (WEIlG/WEIIG), und Schreibweisen wie
+// KaHu/KarKo laden zu Tippfehlern ein. Ein Zeichen darf den Login
+// nicht mehr blockieren.
+const GROUP_LOOKUP = Object.fromEntries(
+  Object.entries(GROUP_MAP).map(([k, v]) => [k.toLowerCase(), v])
+);
+
+function lookupGroup(g) {
+  return GROUP_LOOKUP[String(g || "").trim().toLowerCase()];
+}
+
+// Gruppen aus allen relevanten Claims einsammeln und normalisieren.
+// Der Group-Mapper liefert je nach Einstellung "GRP_BL_ND" oder den
+// vollen Pfad "/GRP_BL_ND" bzw. "/BRK/Bereitschaften/GRP_BL_ND" –
+// beides muss greifen.
+function collectGroups(userinfo) {
+  const raw = [];
+  const push = v => {
+    if (!v) return;
+    if (Array.isArray(v)) raw.push(...v.map(String));
+    else raw.push(String(v));
+  };
+  push(userinfo.groups);
+  push(userinfo.memberOf);
+  push(userinfo.membership);
+  push(userinfo.realm_access?.roles);
+
+  const out = [];
+  for (const g of raw) {
+    const s = String(g).trim();
+    if (!s) continue;
+    out.push(s);
+    if (s.includes("/")) {
+      const parts = s.split("/").filter(Boolean);
+      if (parts.length) out.push(parts[parts.length - 1]);
+    }
+  }
+  return out;
+}
+
 function extractRole(userinfo) {
-  const groups = userinfo.groups || [];
+  const groups = collectGroups(userinfo);
   // KBL hat immer Vorrang → admin
-  if (groups.includes("GRP_Kreisbereitschaftsleitung")) return "admin";
+  if (groups.some(g => lookupGroup(g)?.code === "KBL")) return "admin";
   for (const g of groups) {
-    if (GROUP_MAP[g]) return GROUP_MAP[g].rolle;
+    const m = lookupGroup(g);
+    if (m) return m.rolle;
   }
   return "helfer";
 }
 
 function extractBereitschaft(userinfo) {
-  const groups = userinfo.groups || [];
+  const groups = collectGroups(userinfo);
   // KBL → eigene Bereitschaft behalten aber Rolle=admin
   // Spezifische Bereitschaft als Code, auch wenn Admin
-  const specific = groups.find(g => GROUP_MAP[g] && GROUP_MAP[g].code !== "KBL");
-  if (specific) return GROUP_MAP[specific].code;
-  if (groups.includes("GRP_Kreisbereitschaftsleitung")) return "KBL";
+  for (const g of groups) {
+    const m = lookupGroup(g);
+    if (m && m.code !== "KBL") return m.code;
+  }
+  if (groups.some(g => lookupGroup(g)?.code === "KBL")) return "KBL";
   return null;
 }
 
@@ -151,12 +207,31 @@ router.get("/callback", async (req, res) => {
 
     const rolle = extractRole(userinfo);
     let bereitschaftCode = extractBereitschaft(userinfo);
+    const gruppen = collectGroups(userinfo);
+    console.log("Auth-Auflösung:", JSON.stringify({ gruppen, rolle, bereitschaftCode }));
 
     if (!bereitschaftCode || bereitschaftCode === "ADMIN") {
       if (rolle === "admin") {
         bereitschaftCode = "KBL";
       } else {
-        return res.status(403).send("Keine Bereitschaft zugewiesen. Bitte beim Admin melden.");
+        const esc = s => String(s).replace(/[<>&]/g, c => ({ "<": "&lt;", ">": "&gt;", "&": "&amp;" }[c]));
+        const liste = gruppen.length
+          ? gruppen.map(g => `<li><code>${esc(g)}</code></li>`).join("")
+          : `<li><em>Keine Gruppen im Token übermittelt</em></li>`;
+        console.warn("Login abgelehnt – keine Bereitschaft. Gruppen:", gruppen);
+        return res.status(403).send(`<!DOCTYPE html><html lang="de"><head><meta charset="utf-8">
+          <meta name="viewport" content="width=device-width,initial-scale=1"><title>Keine Zuordnung</title>
+          <style>body{font-family:Arial,sans-serif;max-width:620px;margin:40px auto;padding:0 20px;color:#222}
+          h2{color:#c62828;font-size:19px}code{background:#f4f4f4;padding:2px 6px;border-radius:3px;font-size:13px}
+          ul{line-height:1.8}.hint{background:#fff8e1;border-left:3px solid #ffa000;padding:12px 16px;font-size:14px;margin-top:24px}
+          a{color:#1a237e}</style></head><body>
+          <h2>Keine Bereitschaft zugewiesen</h2>
+          <p>Die Anmeldung war erfolgreich, aber keine der übermittelten Gruppen ist einer
+          Bereitschaft zugeordnet:</p>
+          <ul>${liste}</ul>
+          <div class="hint">Bitte diese Liste an die Kreisbereitschaftsleitung weitergeben.</div>
+          <p style="margin-top:24px"><a href="/auth/logout">Abmelden</a></p>
+        </body></html>`);
       }
     }
 

@@ -2670,8 +2670,13 @@ function FeedbackButton({user,currentView,toast}){
 // MAIN APP
 // ═══════════════════════════════════════════════════════════════════════════
 const TABS=[{id:"events",label:"Vorgänge",icon:"📁"},{id:"event",label:"Veranstaltung",icon:"📋"},{id:"days",label:"Tage & Analyse",icon:"📊"},{id:"costs",label:"Kosten",icon:"💰"},{id:"pdf",label:"Dokumente",icon:"🖨️"},{id:"kunden",label:"Kunden",icon:"👥"},{id:"anfragen",label:"Anfragen",icon:"📩"},{id:"statistik",label:"Statistik",icon:"📈"},{id:"profil",label:"Mein Profil",icon:"👤"},{id:"einstellungen",label:"Einstellungen",icon:"⚙️",admin:true},{id:"releases",label:"Changelog",icon:"🆕"}];
-const APP_VERSION="v7.8";
-const LATEST_RELEASE={v:"v7.8",d:"22.04.2026",c:[
+const APP_VERSION="v7.9";
+const LATEST_RELEASE={v:"v7.9",d:"18.08.2026",c:[
+"Login: Keycloak-Gruppen der Bereitschaftsleitungen (GRP_BL_*) werden wieder korrekt erkannt \u2013 Anmeldung schlug mit 'Keine Bereitschaft zugewiesen' fehl, weil noch die alten Gruppennamen (GRP_Bereitschaft_*) hinterlegt waren",
+"Login: Gruppenzuordnung ist unabh\u00e4ngig von Gro\u00df-/Kleinschreibung und funktioniert auch bei vollem Gruppenpfad (/GRP_BL_ND)",
+"Login: Statt der nackten Fehlermeldung zeigt die Abweisungsseite jetzt die tats\u00e4chlich \u00fcbermittelten Gruppen \u2013 erleichtert die Kl\u00e4rung mit der KBL",
+]};
+const RELEASE_V78={v:"v7.8",d:"22.04.2026",c:[
 "Angebot: Einsatzkräfte jetzt pro Tag aufgegliedert – Personen × Stunden × Rate ergibt pro Zeile sichtbar die angezeigte Summe (vorher Anzeige-Inkonsistenz bei mehrtägigen Events)",
 "Angebot: Frontend-Preview und serverseitig generiertes PDF nutzen identische Tabellenstruktur – 7 Spalten inkl. 'a' Euro' mit Fahrzeug-Raten (KTW, MTW, etc.) neben der Summe",
 "Angebot: Labels bei mehreren Abschnitten am gleichen Datum werden um die Uhrzeit ergänzt (z.B. 'Einsatzkräfte 12.9.2027 10-18 Uhr')",
@@ -3343,6 +3348,7 @@ export default function App(){
             </div>
             {[
               LATEST_RELEASE,
+              RELEASE_V78,
               RELEASE_V77,
               RELEASE_V76,
               RELEASE_V75,
