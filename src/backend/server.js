@@ -2392,6 +2392,7 @@ function buildAngebotHTML(ev, dayCalcs, totalCosts, activeDays, stamm, kosten, u
   const tElKfz = dayCalcs.reduce((s,d)=>s+(d.ec||0),0);
   const tSeg = dayCalcs.reduce((s,d)=>s+(d.sc||0),0);
   const tMtw = dayCalcs.reduce((s,d)=>s+(d.mc||0),0);
+  const tZelt = dayCalcs.reduce((s,d)=>s+(d.zc||0),0);
   const tHrs = dayCalcs.reduce((s,d)=>s+(d.h||0),0);
   const tTP = dayCalcs.reduce((s,d)=>s+(d.tp||0),0);
   const isPauschal = !!ev.pauschalAktiv || (ev.pauschalangebot && ev.pauschalangebot > 0);
@@ -2409,6 +2410,7 @@ function buildAngebotHTML(ev, dayCalcs, totalCosts, activeDays, stamm, kosten, u
     tGktw>0 && { pos:"GKTW", anz:tGktw, pers:null, hrs:null, rate:rates.gktw, summe:dayCalcs.reduce((s,d)=>s+(d.cG||0),0) },
     tSeg>0 && { pos:"SEG-LKW", anz:tSeg, pers:null, hrs:null, rate:rates.seg_lkw, summe:dayCalcs.reduce((s,d)=>s+(d.cS||0),0) },
     tMtw>0 && { pos:"MTW", anz:tMtw, pers:null, hrs:null, rate:rates.mtw, summe:dayCalcs.reduce((s,d)=>s+(d.cM||0),0) },
+    tZelt>0 && { pos:"Zelt", anz:tZelt, pers:null, hrs:null, rate:rates.zelt, summe:dayCalcs.reduce((s,d)=>s+(d.cZ||0),0) },
     // Einsatzkräfte pro Tag aufgegliedert: Personen × Stunden × Rate ergibt die Zeilen-Summe.
     // hfc = helfer + kc*2 + rc*2 + gc*2  (Fahrzeugbesatzung zählt als Einsatzkraft zusätzlich zur Fahrzeugpauschale)
     // Bei mehreren Abschnitten am gleichen Datum wird die Uhrzeit im Label mit angezeigt, damit die Zeilen unterscheidbar sind.
